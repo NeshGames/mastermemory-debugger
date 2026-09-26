@@ -17,7 +17,7 @@
 
 | 項目 | 版本 |
 | --- | --- |
-| Unity | 6000.0 以上 |
+| Unity | 6000.0 以上（實測版本：6000.6） |
 | MasterMemory | 3.x（透過 [NuGetForUnity](https://github.com/GlitchEnzo/NuGetForUnity) 安裝） |
 | MessagePack | MasterMemory 的相依套件（NuGetForUnity 會一起安裝） |
 | Input System | 選用。有安裝就使用 Input System，否則使用舊的 Input Manager |
