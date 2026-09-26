@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace Nesh.MasterMemoryDebugger
@@ -21,7 +20,6 @@ namespace Nesh.MasterMemoryDebugger
     /// }
     /// </code>
     /// </summary>
-    [Serializable]
     public sealed class MasterDataPatch
     {
         public const int CurrentFormatVersion = 1;
@@ -45,7 +43,6 @@ namespace Nesh.MasterMemoryDebugger
         }
     }
 
-    [Serializable]
     public sealed class MasterDataPatchTable
     {
         /// <summary>Registered table name (for example "SkillMaster").</summary>
@@ -60,7 +57,6 @@ namespace Nesh.MasterMemoryDebugger
         public List<MasterDataPatchRecord> Records = new List<MasterDataPatchRecord>();
     }
 
-    [Serializable]
     public sealed class MasterDataPatchRecord
     {
         /// <summary>Primary key member name → value. Composite keys have several entries.</summary>
@@ -69,7 +65,6 @@ namespace Nesh.MasterMemoryDebugger
         public List<MasterDataPatchChange> Changes = new List<MasterDataPatchChange>();
     }
 
-    [Serializable]
     public sealed class MasterDataPatchChange
     {
         public string Field;

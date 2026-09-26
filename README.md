@@ -19,8 +19,10 @@ See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for 
 ## Develop the package in this repository
 
 1. Open the repository root with Unity 6000.0 or newer.
-2. NuGetForUnity restores MasterMemory from `Assets/packages.config` (menu `NuGet > Restore Packages` if needed).
-3. Accept enabling the Input System backend when Unity asks.
+2. NuGetForUnity restores MasterMemory and its dependencies from `Assets/packages.config`
+   (menu `NuGet > Restore Packages` if the Console reports missing `MasterMemory` / `MessagePack`).
+3. Player Settings > Active Input Handling: `Input System Package (New)` or `Both`
+   (the debugger supports both backends).
 4. Window > Package Manager > MasterMemory Runtime Debugger > Samples > import **Basic Example**,
    add `ExampleDebuggerLauncher` to a GameObject, enter Play Mode and press **F8**.
 5. Window > General > Test Runner runs the package tests (Edit Mode and Play Mode).

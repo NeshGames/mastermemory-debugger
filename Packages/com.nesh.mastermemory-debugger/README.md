@@ -24,8 +24,40 @@
 
 ## Installation
 
-1. 用 NuGetForUnity 安裝 `MasterMemory`（參考 MasterMemory README 的 Unity 章節）。
-2. Package Manager → `+` → **Add package from git URL...**
+### 1. NuGetForUnity
+
+Package Manager → `+` → **Add package from git URL...**
+
+```
+https://github.com/GlitchEnzo/NuGetForUnity.git?path=/src/NuGetForUnity
+```
+
+### 2. MasterMemory
+
+選單 **NuGet > Manage NuGet Packages** → 搜尋 `MasterMemory` → 安裝 3.x。
+MessagePack、MasterMemory.Annotations 等相依套件會一起安裝。
+
+> 如果是手寫 `Assets/packages.config` 再 Restore，必須列出所有相依套件
+>（MasterMemory、MasterMemory.Annotations、MessagePack、MessagePack.Annotations、MessagePackAnalyzer、
+> Microsoft.NET.StringTools、System.Collections.Immutable），否則 Console 會出現
+> `MasterMemory.dll will not be loaded ... Unable to resolve reference 'MessagePack'`。
+
+MasterMemory 本身的必要設定（放 Master 定義的 assembly 中任一個 `.cs`）：
+
+```csharp
+[assembly: MasterMemoryGeneratorOptions(Namespace = "MyGame.MasterData")]
+
+namespace System.Runtime.CompilerServices
+{
+    internal sealed class IsExternalInit { }
+}
+```
+
+IL2CPP 還需要把產生的 `MasterMemoryResolver` 註冊到 MessagePack（參考 MasterMemory README）。
+
+### 3. 本 Package
+
+Package Manager → `+` → **Add package from git URL...**
 
    ```
    https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger
@@ -270,7 +302,8 @@ Patch 只記錄 **有修改的可編輯欄位** 與其 **原始值**，不會保
 
 ## Development Build Behavior
 
-所有功能只在 `UNITY_EDITOR` 或 `DEVELOPMENT_BUILD` 下啟用。正式版 Build 中：
+所有功能只在 Unity Editor 與 Development Build 中啟用。Player 在啟動時（任何場景載入前）讀取一次 `Debug.isDebugBuild` 來判斷，
+不使用 Unity 6.6 起已 deprecated 的 `DEVELOPMENT_BUILD` define。正式版 Build 中：
 
 - `TryGetOverride` 永遠回傳 `false` → 讀取 MasterMemory
 - `SetOverride` / `RegisterTable` / `RegisterDatabase` 等 API 不做任何事
@@ -325,14 +358,15 @@ Override Layer **只保證經過 `TryGetOverride` / `Resolve` 的 PrimaryKey 查
 
 | 症狀 | 原因 / 處理 |
 | --- | --- |
-| 按 F8 沒反應 | 是否在 Play Mode / Development Build？Settings 的 Enabled 與 Toggle Key？Input System 專案請確認 Active Input Handling 設定。 |
+| 按 F8 沒反應 | 是否在 Play Mode / Development Build？Settings 的 Enabled 與 Toggle Key？Input System 專案請確認 Player Settings 的 Active Input Handling 是 Input System Package 或 Both。 |
+| `MasterMemory.dll will not be loaded ... Unable to resolve reference 'MessagePack'` | NuGet 相依套件沒有裝齊。用 Manage NuGet Packages 重新安裝 MasterMemory，或補齊 `packages.config` 後執行 **NuGet > Restore Packages**。 |
 | 顯示「No table registered」 | 還沒呼叫 `RegisterDatabase` / `RegisterTable`，或呼叫時 database 尚未載入。 |
 | Apply 之後遊戲數值沒變 | 該讀取路徑沒有經過 `TryGetOverride` / `Resolve`，或者是 SecondaryKey / Range 查詢（參考 Query Limitation）。 |
 | 欄位顯示 `RO` | 不支援的型別（Array / List / 巢狀物件…）或沒有 setter。 |
 | Load Patch 顯示版本不同 | 用 `SetMasterVersionProvider` 提供正確版本，或在確認後選 Force Load。 |
 | Auto Load 沒有套用 | `SetMasterVersionProvider` 必須在註冊 Table **之前** 呼叫；版本不同時不會自動載入。 |
 | UI 被遊戲 UI 蓋住 | 調高 Settings 的 Sorting Order，或指定自己的 PanelSettings。 |
-| 編譯錯誤找不到 `MasterMemory` | 請用 NuGetForUnity 安裝 MasterMemory 3.x。 |
+| 編譯錯誤找不到 `MasterMemory` / `PrimaryKeyAttribute` | 請用 NuGetForUnity 安裝 MasterMemory 3.x，並確認 Console 沒有 `MasterMemory.dll will not be loaded` 錯誤。 |
 
 ## Tests
 
