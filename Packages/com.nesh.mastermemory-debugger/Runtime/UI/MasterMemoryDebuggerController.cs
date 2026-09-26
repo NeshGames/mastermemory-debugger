@@ -15,9 +15,9 @@ namespace Nesh.MasterMemoryDebugger
         internal static readonly string[] RequiredElementNames =
         {
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
-            "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup",
+            "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json",
-            "mm-close", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel",
+            "mm-close", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel",
             "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary",
             "mm-log", "mm-log-toggle",
         };
@@ -31,6 +31,7 @@ namespace Nesh.MasterMemoryDebugger
             Data,
             Changes,
             Patches,
+            Validation,
         }
 
         // Kept across open / close so the debugger reopens where it was.
@@ -52,8 +53,10 @@ namespace Nesh.MasterMemoryDebugger
         readonly Button dataTab;
         readonly Button changesTab;
         readonly Button patchesTab;
+        readonly Button validationTab;
         readonly MasterChangesController changes;
         readonly MasterPatchesController patches;
+        readonly MasterValidationController validation;
         Tab currentTab;
         readonly ScrollView logView;
         readonly Button logToggle;
@@ -115,6 +118,7 @@ namespace Nesh.MasterMemoryDebugger
             dataTab = Required<Button>(root, "mm-tab-data");
             changesTab = Required<Button>(root, "mm-tab-changes");
             patchesTab = Required<Button>(root, "mm-tab-patches");
+            validationTab = Required<Button>(root, "mm-tab-validation");
             changes = new MasterChangesController(
                 Required<VisualElement>(root, "mm-changes-panel"),
                 Required<ScrollView>(root, "mm-changes-list"),
@@ -122,6 +126,7 @@ namespace Nesh.MasterMemoryDebugger
                 OpenRecord,
                 SetStatus);
             patches = new MasterPatchesController(patchesPanel, dialog, SetStatus, Session.PatchName);
+            validation = new MasterValidationController(Required<VisualElement>(root, "mm-validation-panel"), OpenRecord);
             logView = Required<ScrollView>(root, "mm-log");
             logToggle = Required<Button>(root, "mm-log-toggle");
             logView.style.display = DisplayStyle.None;
@@ -130,7 +135,10 @@ namespace Nesh.MasterMemoryDebugger
             Bind(root, "mm-tab-data", () => SelectTab(Tab.Data));
             Bind(root, "mm-tab-changes", () => SelectTab(Tab.Changes));
             Bind(root, "mm-tab-patches", () => SelectTab(Tab.Patches));
+            Bind(root, "mm-tab-validation", () => SelectTab(Tab.Validation));
             Bind(root, "mm-log-toggle", ToggleLog);
+            Bind(root, "mm-copy-rows", CopyRows);
+            Bind(root, "mm-label-template", CopyLabelTemplate);
             Bind(root, "mm-scale-down", () => ChangeScale(-ScaleStep));
             Bind(root, "mm-scale-up", () => ChangeScale(ScaleStep));
 
@@ -142,10 +150,12 @@ namespace Nesh.MasterMemoryDebugger
             tableList.TableSelected += OnTableSelected;
             recordList.RecordSelected += OnRecordSelected;
             editor.ReferenceRequested += OpenReference;
+            editor.ReferencingRequested += OpenReferencing;
             MasterMemoryDebugRegistry.TablesChanged += OnTablesChanged;
             MasterMemoryDebugRuntime.OverridesChanged += OnOverridesChanged;
             MasterMemoryDebuggerMessages.Changed += OnMessagesChanged;
             MasterMemoryDebugLocalization.Changed += OnLabelsChanged;
+            MasterMemoryDebugValidation.Changed += OnValidationChanged;
             root.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
 
             // restore the previous session
@@ -179,11 +189,13 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugRuntime.OverridesChanged -= OnOverridesChanged;
             MasterMemoryDebuggerMessages.Changed -= OnMessagesChanged;
             MasterMemoryDebugLocalization.Changed -= OnLabelsChanged;
+            MasterMemoryDebugValidation.Changed -= OnValidationChanged;
             languageField.UnregisterValueChangedCallback(OnLanguageSelected);
             root.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             tableList.TableSelected -= OnTableSelected;
             recordList.RecordSelected -= OnRecordSelected;
             editor.ReferenceRequested -= OpenReference;
+            editor.ReferencingRequested -= OpenReferencing;
             foreach (var (button, action) in buttons) button.clicked -= action;
             buttons.Clear();
 
@@ -302,6 +314,12 @@ namespace Nesh.MasterMemoryDebugger
             RefreshHeader();
         }
 
+        void OnValidationChanged()
+        {
+            validation.Refresh();
+            RefreshHeader();
+        }
+
         // ------------------------------------------------------------------ tabs
 
         void SelectTab(Tab tab)
@@ -312,13 +330,15 @@ namespace Nesh.MasterMemoryDebugger
             else changes.Hide();
             patchesPanel.style.display = tab == Tab.Patches ? DisplayStyle.Flex : DisplayStyle.None;
             if (tab == Tab.Patches) patches.Refresh();
+            if (tab == Tab.Validation) validation.Show();
+            else validation.Hide();
             recordList.CloseColumnsPopup();
             RefreshHeader();
         }
 
         void HideChanges() => SelectTab(Tab.Data);
 
-        /// <summary>Jumps from the Changes view to a record.</summary>
+        /// <summary>Jumps from the Changes / Validation view to a record.</summary>
         void OpenRecord(MasterMemoryTableDescriptor table, object key)
         {
             RunAfterEditGuard(() =>
@@ -360,13 +380,28 @@ namespace Nesh.MasterMemoryDebugger
             }
 
             // not the primary key: show every record whose member has this value
-            var query = reference.TargetMember + "=" + FormatQueryValue(value);
+            OpenFiltered(target, reference.TargetMember + "=" + FormatQueryValue(value));
+        }
+
+        /// <summary>Shows the records of the source table that reference <paramref name="value"/> (Referenced by).</summary>
+        void OpenReferencing(MasterMemoryReference reference, object value)
+        {
+            if (!MasterMemoryDebugRegistry.TryGetTable(reference.SourceType, out var source))
+            {
+                SetStatus($"{reference.SourceType.Name} is not registered.", true);
+                return;
+            }
+            OpenFiltered(source, reference.SourceMember + "=" + FormatQueryValue(value));
+        }
+
+        void OpenFiltered(MasterMemoryTableDescriptor table, string query)
+        {
             RunAfterEditGuard(() =>
             {
                 HideChanges();
                 recordList.SetState(query, false);
-                tableList.RestoreSelection(target);
-                ShowTable(target);
+                tableList.RestoreSelection(table);
+                ShowTable(table);
             }, () => { });
         }
 
@@ -391,6 +426,27 @@ namespace Nesh.MasterMemoryDebugger
             if (value == null) return "null";
             var text = MasterDataValueUtility.Format(value);
             return text.IndexOf(' ') >= 0 ? "\"" + text.Replace("\"", string.Empty) + "\"" : text;
+        }
+
+        // ------------------------------------------------------------------ copy
+
+        void CopyRows()
+        {
+            if (recordList.TableName == null)
+            {
+                SetStatus("Select a table first.", true);
+                return;
+            }
+            var result = MasterDataPatchExporter.CopyToClipboard(recordList.BuildTsv(), recordList.TableName + ".tsv", "text/tab-separated-values");
+            SetStatus($"{recordList.TableName}: {recordList.Rows.Count} rows. {result.Message}", !result.Succeeded);
+        }
+
+        void CopyLabelTemplate()
+        {
+            var language = MasterMemoryDebugLocalization.Language;
+            var tsv = MasterMemoryDebugLocalization.CreateTsvTemplate(language);
+            var result = MasterDataPatchExporter.CopyToClipboard(tsv, "labels.tsv", "text/tab-separated-values");
+            SetStatus($"Label template ({(string.IsNullOrEmpty(language) ? "fill in the language column" : language)}). {result.Message}", !result.Succeeded);
         }
 
         // ------------------------------------------------------------------ log panel
@@ -489,6 +545,10 @@ namespace Nesh.MasterMemoryDebugger
             dataTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Data);
             changesTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Changes);
             patchesTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Patches);
+            validationTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Validation);
+            var newFailures = MasterMemoryDebugValidation.NewFailureCount;
+            validationTab.text = newFailures > 0 ? $"Validation ({newFailures} new)" : "Validation";
+            validationTab.EnableInClassList("mm-debugger__tab--alert", newFailures > 0);
             overrideCountLabel.text = count > 0 ? $"{count} overrides" : "No overrides";
             overrideCountLabel.EnableInClassList("mm-debugger__override-count--active", count > 0);
         }

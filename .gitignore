@@ -37,3 +37,8 @@
 # OS
 .DS_Store
 Thumbs.db
+
+# Test harness (Tools/Harness) builds outside Unity
+!/Tools/Harness/**/*.csproj
+/Tools/Harness/**/bin/
+/Tools/Harness/**/obj/

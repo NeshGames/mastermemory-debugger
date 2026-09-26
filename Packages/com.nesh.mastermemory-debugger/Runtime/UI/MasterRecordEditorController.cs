@@ -28,6 +28,9 @@ namespace Nesh.MasterMemoryDebugger
         readonly Action<string, bool> setStatus;
         readonly List<FieldRow> rows = new List<FieldRow>();
 
+        // the Referenced by section stays open or closed across records
+        static bool s_referencedByOpen = true;
+
         MasterMemoryRecordDescriptor record;
         object workingCopy;
         bool isDirty;
@@ -63,6 +66,9 @@ namespace Nesh.MasterMemoryDebugger
 
         /// <summary>A reference button was clicked: the reference and the value currently in the editor.</summary>
         public event Action<MasterMemoryReference, object> ReferenceRequested;
+
+        /// <summary>Show was clicked in Referenced by: the reference and the value of this record it points at.</summary>
+        public event Action<MasterMemoryReference, object> ReferencingRequested;
 
         public bool IsDirty => isDirty;
 
@@ -133,6 +139,7 @@ namespace Nesh.MasterMemoryDebugger
                 rows.Add(row);
                 container.Add(row.Root);
             }
+            AddReferencedBy();
             RefreshOriginalMarkers();
             UpdateState();
         }
@@ -188,6 +195,60 @@ namespace Nesh.MasterMemoryDebugger
             editor.AddToClassList("mm-debugger__field-value");
             row.Root.Add(editor);
             return row;
+        }
+
+        /// <summary>
+        /// Records of other tables (or this one) that hold a key of this record, from the IValidatable Exists() references.
+        /// Counted when the section is open.
+        /// </summary>
+        void AddReferencedBy()
+        {
+            var incoming = MasterMemoryReferences.GetIncoming(record.Table);
+            if (incoming.Count == 0) return;
+
+            var foldout = new Foldout { text = "Referenced by", value = s_referencedByOpen };
+            foldout.AddToClassList("mm-debugger__referenced-by");
+            foldout.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.target != foldout) return;
+                s_referencedByOpen = evt.newValue;
+                if (evt.newValue && foldout.contentContainer.childCount == 0) FillReferencedBy(foldout, incoming);
+            });
+            if (s_referencedByOpen) FillReferencedBy(foldout, incoming);
+            container.Add(foldout);
+        }
+
+        void FillReferencedBy(Foldout foldout, List<MasterMemoryReference> incoming)
+        {
+            foreach (var reference in incoming)
+            {
+                var value = MasterMemoryReferences.GetReferencedValue(reference, record);
+                var count = MasterMemoryReferences.FindReferencing(reference, value).Count;
+
+                var row = new VisualElement();
+                row.AddToClassList("mm-debugger__referenced-by-row");
+                var name = new Label(FormatSource(reference)) { tooltip = reference + "  (MasterMemory Validate)" };
+                name.AddToClassList("mm-debugger__referenced-by-name");
+                row.Add(name);
+                var countLabel = new Label(count == 1 ? "1 record" : $"{count} records");
+                countLabel.AddToClassList("mm-debugger__referenced-by-count");
+                countLabel.EnableInClassList("mm-debugger__referenced-by-count--none", count == 0);
+                row.Add(countLabel);
+                var show = new Button(() => ReferencingRequested?.Invoke(reference, value)) { text = "Show", tooltip = "Open the referencing records" };
+                show.AddToClassList("mm-debugger__button");
+                show.SetEnabled(count > 0);
+                row.Add(show);
+                foldout.Add(row);
+            }
+        }
+
+        static string FormatSource(MasterMemoryReference reference)
+        {
+            if (!MasterMemoryDebugRegistry.TryGetTable(reference.SourceType, out var source)) return $"{reference.SourceType.Name}.{reference.SourceMember}";
+            var member = source.TypeDescriptor.TryGetField(reference.SourceMember, out var field)
+                ? MasterMemoryDebugLocalization.GetFieldLabel(source, field)
+                : reference.SourceMember;
+            return $"{MasterMemoryDebugLocalization.GetTableLabel(source)}.{member}";
         }
 
         /// <summary>Shows the labels of the selected language without rebuilding the editors (unapplied edits are kept).</summary>

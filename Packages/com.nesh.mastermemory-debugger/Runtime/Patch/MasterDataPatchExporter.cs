@@ -59,14 +59,14 @@ namespace Nesh.MasterMemoryDebugger
         /// Copies text to the system clipboard. WebGL builds can not write the OS clipboard from a debug UI click
         /// reliably, so the text is downloaded as <paramref name="webGLFileName"/> instead.
         /// </summary>
-        public static MasterDataExportResult CopyToClipboard(string text, string webGLFileName)
+        public static MasterDataExportResult CopyToClipboard(string text, string webGLFileName, string mimeType = "application/json")
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return new MasterDataExportResult(false, "Debugger is disabled in this build.", null);
             try
             {
                 if (MasterDataWebGLBridge.IsAvailable)
                 {
-                    MasterDataWebGLBridge.DownloadFile(webGLFileName, text, "application/json");
+                    MasterDataWebGLBridge.DownloadFile(webGLFileName, text, mimeType);
                     return new MasterDataExportResult(true, "Downloaded: " + webGLFileName, null);
                 }
                 GUIUtility.systemCopyBuffer = text;

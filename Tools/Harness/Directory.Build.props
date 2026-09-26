@@ -1,0 +1,8 @@
+<Project>
+  <!-- Compiles the package outside Unity against the stubs in Stubs/ (see README.md). -->
+  <PropertyGroup>
+    <PackageRoot>$(MSBuildThisFileDirectory)../../Packages/com.nesh.mastermemory-debugger/</PackageRoot>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+</Project>

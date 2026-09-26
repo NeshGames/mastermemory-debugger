@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  harness:
+    name: Build and test (outside Unity)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Changelog and READMEs match the package version
+        run: |
+          version=$(jq -r .version Packages/com.nesh.mastermemory-debugger/package.json)
+          grep -q "^## \[$version\]" Packages/com.nesh.mastermemory-debugger/CHANGELOG.md \
+            || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
+          for readme in README.md Packages/com.nesh.mastermemory-debugger/README.md; do
+            grep -q "#v$version" "$readme" \
+              || { echo "::error::$readme does not pin the install URL to #v$version"; exit 1; }
+          done
+
+      - name: Build every configuration and run the tests
+        run: Tools/Harness/run.sh

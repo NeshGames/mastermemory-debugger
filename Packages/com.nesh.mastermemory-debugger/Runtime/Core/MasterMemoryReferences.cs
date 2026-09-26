@@ -80,6 +80,53 @@ namespace Nesh.MasterMemoryDebugger
             return null;
         }
 
+        /// <summary>References into <paramref name="target"/> from the registered tables (including itself).</summary>
+        public static List<MasterMemoryReference> GetIncoming(MasterMemoryTableDescriptor target)
+        {
+            var result = new List<MasterMemoryReference>();
+            if (target == null) return result;
+            foreach (var table in MasterMemoryDebugRegistry.Tables)
+            {
+                foreach (var reference in Get(table))
+                {
+                    if (reference.TargetType == target.RecordType) result.Add(reference);
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Records of the source table of <paramref name="reference"/> whose member holds <paramref name="value"/>
+        /// (current values, overrides included). Empty when the member is not a direct member of the record.
+        /// </summary>
+        public static List<MasterMemoryRecordDescriptor> FindReferencing(MasterMemoryReference reference, object value)
+        {
+            var result = new List<MasterMemoryRecordDescriptor>();
+            if (reference == null || value == null) return result;
+            if (!MasterMemoryDebugRegistry.TryGetTable(reference.SourceType, out var source)) return result;
+            if (!source.TypeDescriptor.TryGetField(reference.SourceMember, out var field)) return result;
+            foreach (var record in source.CreateRecordSnapshot())
+            {
+                if (SameValue(field.GetValue(record.Current), value)) result.Add(record);
+            }
+            return result;
+        }
+
+        /// <summary>The value of <paramref name="record"/> that records referencing it hold, or null.</summary>
+        public static object GetReferencedValue(MasterMemoryReference reference, MasterMemoryRecordDescriptor record)
+        {
+            if (reference == null || record == null) return null;
+            return record.Table.TypeDescriptor.TryGetField(reference.TargetMember, out var field) ? field.GetValue(record.Current) : null;
+        }
+
+        // int and long keys of the same value (Exists compares converted values)
+        static bool SameValue(object a, object b)
+        {
+            if (Equals(a, b)) return true;
+            if (a == null || b == null || a.GetType() == b.GetType()) return false;
+            return MasterDataValueUtility.Format(a) == MasterDataValueUtility.Format(b);
+        }
+
         internal static void ClearCache() => s_cache.Clear();
 
         internal static IReadOnlyList<MasterMemoryReference> Discover(Type recordType, IEnumerable<object> records)

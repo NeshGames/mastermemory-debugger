@@ -2,6 +2,22 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.5.0] - 2026-09-26
+
+### Added
+
+- Validation tab: every failure of MasterMemory `Validate()` on the database rebuilt by `MasterMemoryDebugRebuild.AutoRebuild`, the ones caused by the overrides first (NEW, `Validation (N new)` in the tab title). Open jumps to the failing record; New only filter. `MasterMemoryDebugValidation.Run()` / `NewFailureCount`.
+- Referenced by: the inspector lists the members of other tables that reference the record (from the IValidatable `Exists()` references) with the number of records, and Show opens them. `MasterMemoryReferences.GetIncoming` / `FindReferencing` / `GetReferencedValue`.
+- Copy: the shown rows and columns of the record grid as tab separated text for spreadsheets (WebGL: `.tsv` download).
+- Labels TSV: a label template of every table and field (with the labels already set for the selected language) for `MasterMemoryDebugLocalization.LoadTsv`. `MasterMemoryDebugLocalization.CreateTsvTemplate`.
+- `Tools/Harness`: builds the package and runs the tests with the .NET SDK, without Unity. CI runs it on every pull request; pushing a new `package.json` version to `main` creates the tag and the GitHub Release.
+
+### Changed
+
+- Column visibility, freezing and dragged widths are saved in PlayerPrefs per table and survive restarts (they were kept for the play session only).
+- `LoadTsv` skips lines without a label and a tip (unfilled template lines).
+- `MasterDataPatchExporter.CopyToClipboard` takes an optional MIME type for the WebGL download.
+
 ## [0.4.0] - 2026-09-26
 
 ### Added

@@ -136,11 +136,52 @@ namespace Nesh.MasterMemoryDebugger
                 var language = cells[2].Trim();
                 var label = cells[3].Trim();
                 var tip = cells.Length > 4 ? cells[4].Trim().Replace("\\n", "\n") : null;
+                // unfilled template line
+                if (label.Length == 0 && string.IsNullOrEmpty(tip)) continue;
                 Set(field.Length == 0 ? table : table + "." + field, language, label, tip, notify: false);
                 count++;
             }
             if (count > 0) Changed?.Invoke();
             return count;
+        }
+
+        /// <summary>
+        /// Tab separated lines for <see cref="LoadTsv"/>: a line for every registered table and each of its fields, with the
+        /// labels and tips already set for <paramref name="language"/> (empty to fill in). With <see cref="CodeNames"/>
+        /// the language column is left empty for you to fill in.
+        /// </summary>
+        public static string CreateTsvTemplate(string language)
+        {
+            language ??= CodeNames;
+            var text = new StringBuilder();
+            text.Append("table\tfield\tlanguage\tlabel\ttip\n");
+            foreach (var table in MasterMemoryDebugRegistry.Tables)
+            {
+                AppendTemplateLine(text, table.TableName, string.Empty, language);
+                foreach (var field in table.TypeDescriptor.Fields)
+                {
+                    AppendTemplateLine(text, table.TableName, field.Name, language);
+                }
+            }
+            return text.ToString();
+        }
+
+        static void AppendTemplateLine(StringBuilder text, string table, string field, string language)
+        {
+            var key = field.Length == 0 ? table : table + "." + field;
+            var entry = default(Text);
+            if (s_texts.TryGetValue(key, out var byLanguage)) byLanguage.TryGetValue(language, out entry);
+            text.Append(table).Append('\t')
+                .Append(field).Append('\t')
+                .Append(language).Append('\t')
+                .Append(TemplateCell(entry.Label)).Append('\t')
+                .Append(TemplateCell(entry.Tip)).Append('\n');
+        }
+
+        // LoadTsv reads \n back as a line break
+        static string TemplateCell(string value)
+        {
+            return string.IsNullOrEmpty(value) ? string.Empty : value.Replace("\r", string.Empty).Replace("\n", "\\n").Replace('\t', ' ');
         }
 
         public static void Clear()

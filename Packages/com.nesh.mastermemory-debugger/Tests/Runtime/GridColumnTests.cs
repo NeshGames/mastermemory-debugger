@@ -101,6 +101,47 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void Settings_ShouldRoundTripThroughText()
+        {
+            var settings = new Dictionary<string, MasterGridLayout.ColumnSettings>
+            {
+                ["Damage"] = new MasterGridLayout.ColumnSettings { Visible = false, Frozen = true, Width = 222.5f, UserSized = true },
+                ["Name"] = new MasterGridLayout.ColumnSettings { Visible = true, Frozen = false, Width = 90f, UserSized = false },
+            };
+            var text = MasterGridLayout.Serialize(settings);
+            var read = MasterGridLayout.Deserialize(text + "broken line\n\tx\n");
+
+            Assert.AreEqual(2, read.Count);
+            Assert.IsFalse(read["Damage"].Visible);
+            Assert.IsTrue(read["Damage"].Frozen);
+            Assert.AreEqual(222.5f, read["Damage"].Width);
+            Assert.IsTrue(read["Damage"].UserSized);
+            Assert.IsTrue(read["Name"].Visible);
+            Assert.IsFalse(read["Name"].UserSized);
+            Assert.AreEqual(0, MasterGridLayout.Deserialize(null).Count);
+        }
+
+        [Test]
+        public void Tsv_ShouldContainTheShownColumnsInGridOrder()
+        {
+            var table = Table<TestSkill>();
+            var columns = MasterRecordListController.CreateColumns(table);
+            columns.Single(x => x.Key == "Damage").Frozen = true;
+            columns.Single(x => x.Key == "Cooldown").Visible = false;
+            var rows = table.CreateRecordSnapshot().Take(2).ToList();
+
+            var lines = MasterRecordListController.BuildTsv(columns, rows).TrimEnd().Split('\n').Select(x => x.TrimEnd('\r').Split('\t')).ToList();
+
+            Assert.AreEqual(3, lines.Count);
+            Assert.AreEqual("Id (PK)", lines[0][0], "the state column is left out");
+            Assert.AreEqual("Damage", lines[0][1], "frozen columns first");
+            CollectionAssert.DoesNotContain(lines[0], "Cooldown");
+            Assert.AreEqual("1001", lines[1][0]);
+            Assert.AreEqual("120", lines[1][1]);
+            Assert.AreEqual(lines[0].Length, lines[2].Length);
+        }
+
+        [Test]
         public void StateAndPrimaryKeyColumns_ShouldAlwaysBeShownAndFrozen()
         {
             var columns = MasterRecordListController.CreateColumns(Table<TestEnemyLevel>());

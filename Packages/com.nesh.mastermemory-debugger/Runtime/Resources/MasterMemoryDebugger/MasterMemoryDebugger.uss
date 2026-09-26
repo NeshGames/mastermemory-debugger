@@ -174,6 +174,19 @@
     flex-grow: 1;
 }
 
+.mm-debugger__table-panel-header {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.mm-debugger .mm-debugger__small-button {
+    font-size: 10px;
+    padding: 0 5px;
+    min-height: 16px;
+    margin: 0 2px 2px 2px;
+}
+
 .mm-debugger__table-row {
     flex-direction: row;
     align-items: center;
@@ -857,6 +870,11 @@
     -unity-font-style: bold;
 }
 
+/* the overrides broke Validate() */
+.mm-debugger .mm-debugger__tab--alert {
+    color: rgb(255, 120, 110);
+}
+
 /* ------------------------------------------------------------------ patches tab */
 
 .mm-debugger__patches-panel {
@@ -1105,6 +1123,69 @@
     padding-left: 16px;
     color: rgb(255, 120, 110);
     white-space: normal;
+}
+
+/* ------------------------------------------------------------------ referenced by (inspector) */
+
+.mm-debugger__referenced-by {
+    margin: 6px 0 4px 0;
+}
+
+.mm-debugger__referenced-by .unity-foldout__text {
+    color: rgb(160, 168, 184);
+    -unity-font-style: bold;
+}
+
+.mm-debugger__referenced-by .unity-foldout__checkmark {
+    -unity-background-image-tint-color: rgb(200, 205, 215);
+}
+
+.mm-debugger__referenced-by .unity-foldout__content {
+    margin-left: 12px;
+}
+
+.mm-debugger__referenced-by-row {
+    flex-direction: row;
+    align-items: center;
+    min-height: 22px;
+}
+
+.mm-debugger .mm-debugger__referenced-by-name {
+    flex-grow: 1;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgb(150, 190, 255);
+}
+
+.mm-debugger .mm-debugger__referenced-by-count {
+    margin: 0 8px;
+    color: rgb(226, 229, 235);
+}
+
+.mm-debugger .mm-debugger__referenced-by-count--none {
+    color: rgb(150, 157, 171);
+}
+
+/* ------------------------------------------------------------------ validation view */
+
+.mm-debugger__validation {
+    border-color: rgb(110, 116, 130);
+}
+
+.mm-debugger__validation--new {
+    border-color: rgb(229, 83, 75);
+}
+
+.mm-debugger .mm-debugger__validation-message {
+    padding-left: 4px;
+    color: rgb(200, 205, 215);
+    white-space: normal;
+}
+
+.mm-debugger__badge--new {
+    background-color: rgb(229, 83, 75);
+    margin: 0 6px 0 0;
 }
 
 /* ------------------------------------------------------------------ complex value tree */
