@@ -17,15 +17,21 @@ namespace Nesh.MasterMemoryDebugger
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
             "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json",
-            "mm-close", "mm-patch-list", "mm-patch-name", "mm-save-patch", "mm-load-patch", "mm-delete-patch", "mm-import-patch",
-            "mm-export-patch", "mm-open-folder", "mm-reset-all",
-            "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes", "mm-changes-panel", "mm-changes-list", "mm-changes-summary",
+            "mm-close", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel",
+            "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary",
             "mm-log", "mm-log-toggle",
         };
 
         const float MinScale = 0.5f;
         const float MaxScale = 2f;
         const float ScaleStep = 0.1f;
+
+        enum Tab
+        {
+            Data,
+            Changes,
+            Patches,
+        }
 
         // Kept across open / close so the debugger reopens where it was.
         static class Session
@@ -36,13 +42,19 @@ namespace Nesh.MasterMemoryDebugger
             public static bool ModifiedOnly;
             public static float Scale = 1f;
             public static string PatchName;
+            public static Tab Tab = Tab.Data;
         }
 
         readonly MasterMemoryDebuggerDocument host;
         readonly VisualElement root;
         readonly VisualElement mainPanel;
-        readonly Button changesButton;
+        readonly VisualElement patchesPanel;
+        readonly Button dataTab;
+        readonly Button changesTab;
+        readonly Button patchesTab;
         readonly MasterChangesController changes;
+        readonly MasterPatchesController patches;
+        Tab currentTab;
         readonly ScrollView logView;
         readonly Button logToggle;
         MasterMemoryTableDescriptor shownTable;
@@ -54,10 +66,6 @@ namespace Nesh.MasterMemoryDebugger
         readonly Label statusLabel;
         readonly Label versionLabel;
         readonly Label overrideCountLabel;
-        readonly DropdownField patchList;
-        readonly TextField patchName;
-        readonly Button loadPatchButton;
-        readonly Button deletePatchButton;
         readonly List<(Button button, Action action)> buttons = new List<(Button, Action)>();
 
         public MasterMemoryDebuggerController(VisualElement root, MasterMemoryDebuggerDocument host)
@@ -70,14 +78,6 @@ namespace Nesh.MasterMemoryDebugger
             versionLabel = Required<Label>(root, "mm-master-version");
             overrideCountLabel = Required<Label>(root, "mm-override-count");
             dialog = new MasterMemoryDebuggerDialog(Required<VisualElement>(root, "mm-dialog-layer"));
-
-            patchList = Required<DropdownField>(root, "mm-patch-list");
-            patchName = Required<TextField>(root, "mm-patch-name");
-            loadPatchButton = Required<Button>(root, "mm-load-patch");
-            deletePatchButton = Required<Button>(root, "mm-delete-patch");
-            patchName.textEdition.placeholder = "patch name";
-            patchName.SetValueWithoutNotify(Session.PatchName ?? MasterDataPatchStorage.DefaultPatchName);
-            patchList.RegisterValueChangedCallback(OnPatchSelected);
 
             tableList = new MasterTableListController(Required<TreeView>(root, "mm-table-list"));
             recordList = new MasterRecordListController(
@@ -103,36 +103,29 @@ namespace Nesh.MasterMemoryDebugger
                 SetStatus);
 
             mainPanel = Required<VisualElement>(root, "mm-main");
-            changesButton = Required<Button>(root, "mm-changes");
+            patchesPanel = Required<VisualElement>(root, "mm-patches-panel");
+            dataTab = Required<Button>(root, "mm-tab-data");
+            changesTab = Required<Button>(root, "mm-tab-changes");
+            patchesTab = Required<Button>(root, "mm-tab-patches");
             changes = new MasterChangesController(
                 Required<VisualElement>(root, "mm-changes-panel"),
                 Required<ScrollView>(root, "mm-changes-list"),
                 Required<Label>(root, "mm-changes-summary"),
                 OpenRecord,
                 SetStatus);
+            patches = new MasterPatchesController(patchesPanel, dialog, SetStatus, Session.PatchName);
             logView = Required<ScrollView>(root, "mm-log");
             logToggle = Required<Button>(root, "mm-log-toggle");
             logView.style.display = DisplayStyle.None;
 
             Bind(root, "mm-close", RuntimeMasterMemoryDebugger.Close);
-            Bind(root, "mm-save-patch", SavePatch);
-            Bind(root, "mm-load-patch", LoadPatch);
-            Bind(root, "mm-delete-patch", ConfirmDeletePatch);
-            Bind(root, "mm-import-patch", ImportPatch);
-            Bind(root, "mm-changes", ToggleChanges);
+            Bind(root, "mm-tab-data", () => SelectTab(Tab.Data));
+            Bind(root, "mm-tab-changes", () => SelectTab(Tab.Changes));
+            Bind(root, "mm-tab-patches", () => SelectTab(Tab.Patches));
             Bind(root, "mm-log-toggle", ToggleLog);
-            Bind(root, "mm-export-patch", ExportPatch);
-            Bind(root, "mm-open-folder", MasterDataPatchExporter.RevealDataDirectory);
-            Bind(root, "mm-reset-all", ConfirmResetAll);
             Bind(root, "mm-scale-down", () => ChangeScale(-ScaleStep));
             Bind(root, "mm-scale-up", () => ChangeScale(ScaleStep));
 
-            SetVisible(root, "mm-save-patch", settings.AllowPatchSave);
-            SetVisible(root, "mm-patch-name", settings.AllowPatchSave);
-            SetVisible(root, "mm-delete-patch", settings.AllowPatchSave);
-            SetVisible(root, "mm-export-patch", settings.AllowPatchSave);
-            SetVisible(root, "mm-open-folder", MasterDataPatchExporter.CanRevealExports);
-            SetVisible(root, "mm-reset-all", settings.AllowEditing);
             var canScale = host.OwnedPanelSettings != null;
             SetVisible(root, "mm-scale-down", canScale);
             SetVisible(root, "mm-scale-up", canScale);
@@ -152,8 +145,7 @@ namespace Nesh.MasterMemoryDebugger
             tableList.Reload(Session.TableName);
             if (pendingKey != null && tableList.SelectedTable != null) recordList.SelectByKey(pendingKey);
 
-            RefreshHeader();
-            RefreshPatchList(patchName.value);
+            SelectTab(Session.Tab);
             OnMessagesChanged();
             if (MasterMemoryDebugRegistry.Tables.Count == 0)
             {
@@ -171,8 +163,8 @@ namespace Nesh.MasterMemoryDebugger
             Session.ModifiedOnly = recordList.ModifiedOnly;
             Session.TableName = tableList.SelectedTable?.TableName;
             Session.RecordKey = editor.Record?.PrimaryKey;
-            Session.PatchName = patchName.value;
-            patchList.UnregisterValueChangedCallback(OnPatchSelected);
+            Session.PatchName = patches.SelectedName;
+            Session.Tab = currentTab;
 
             MasterMemoryDebugRegistry.TablesChanged -= OnTablesChanged;
             MasterMemoryDebugRuntime.OverridesChanged -= OnOverridesChanged;
@@ -188,6 +180,7 @@ namespace Nesh.MasterMemoryDebugger
             recordList.Dispose();
             searchCompletion.Dispose();
             editor.Dispose();
+            patches.Dispose();
         }
 
         // ------------------------------------------------------------------ events
@@ -249,30 +242,25 @@ namespace Nesh.MasterMemoryDebugger
             recordList.OnOverridesChanged();
             editor.OnOverridesChanged();
             changes.Refresh();
+            patches.RefreshCurrent();
             RefreshHeader();
         }
 
-        // ------------------------------------------------------------------ changes view
+        // ------------------------------------------------------------------ tabs
 
-        void ToggleChanges()
+        void SelectTab(Tab tab)
         {
-            if (changes.IsVisible) HideChanges();
-            else ShowChanges();
-        }
-
-        void ShowChanges()
-        {
-            mainPanel.style.display = DisplayStyle.None;
-            changes.Show();
+            currentTab = tab;
+            mainPanel.style.display = tab == Tab.Data ? DisplayStyle.Flex : DisplayStyle.None;
+            if (tab == Tab.Changes) changes.Show();
+            else changes.Hide();
+            patchesPanel.style.display = tab == Tab.Patches ? DisplayStyle.Flex : DisplayStyle.None;
+            if (tab == Tab.Patches) patches.Refresh();
+            recordList.CloseColumnsPopup();
             RefreshHeader();
         }
 
-        void HideChanges()
-        {
-            changes.Hide();
-            mainPanel.style.display = DisplayStyle.Flex;
-            RefreshHeader();
-        }
+        void HideChanges() => SelectTab(Tab.Data);
 
         /// <summary>Jumps from the Changes view to a record.</summary>
         void OpenRecord(MasterMemoryTableDescriptor table, object key)
@@ -421,241 +409,6 @@ namespace Nesh.MasterMemoryDebugger
             }
         }
 
-        // ------------------------------------------------------------------ patch
-
-        void OnPatchSelected(ChangeEvent<string> evt)
-        {
-            if (!string.IsNullOrEmpty(evt.newValue)) patchName.SetValueWithoutNotify(evt.newValue);
-            UpdatePatchButtons();
-        }
-
-        /// <summary>Reloads the saved patch names and selects <paramref name="select"/> when it exists.</summary>
-        void RefreshPatchList(string select)
-        {
-            var names = MasterDataPatchStorage.ListPatchNames();
-            patchList.choices = names;
-            var normalized = MasterDataPatchStorage.NormalizeName(select);
-            string value = null;
-            if (normalized != null && names.Contains(normalized)) value = normalized;
-            else if (names.Contains(patchList.value)) value = patchList.value;
-            else if (names.Count > 0) value = names.Contains(MasterDataPatchStorage.DefaultPatchName) ? MasterDataPatchStorage.DefaultPatchName : names[0];
-            patchList.SetValueWithoutNotify(value ?? string.Empty);
-            UpdatePatchButtons();
-        }
-
-        void UpdatePatchButtons()
-        {
-            var hasSelection = !string.IsNullOrEmpty(patchList.value);
-            loadPatchButton.SetEnabled(hasSelection);
-            deletePatchButton.SetEnabled(hasSelection);
-            patchList.SetEnabled(patchList.choices.Count > 0);
-        }
-
-        void SavePatch()
-        {
-            var name = MasterDataPatchStorage.NormalizeName(patchName.value) ?? MasterDataPatchStorage.DefaultPatchName;
-            if (MasterDataPatchStorage.Exists(name) && name != patchList.value)
-            {
-                dialog.Show(
-                    "Overwrite patch",
-                    $"A patch named \"{name}\" already exists. Overwrite it?",
-                    new MasterMemoryDebuggerDialog.DialogButton("Cancel", null),
-                    new MasterMemoryDebuggerDialog.DialogButton("Overwrite", () => SavePatch(name), isDanger: true));
-                return;
-            }
-            SavePatch(name);
-        }
-
-        void SavePatch(string name)
-        {
-            try
-            {
-                var warnings = new List<string>();
-                var patch = MasterDataPatchService.CreatePatch(warnings);
-                var path = MasterDataPatchStorage.Save(patch, name);
-                LogWarnings(warnings);
-                patchName.SetValueWithoutNotify(name);
-                RefreshPatchList(name);
-                SetStatus($"Patch \"{name}\" saved: {patch.RecordCount} records → {path}{WarningSuffix(warnings)}", false);
-            }
-            catch (Exception e)
-            {
-                MasterMemoryDebugLog.Error("Save patch failed: " + e);
-                SetStatus("Save failed: " + e.Message, true);
-            }
-        }
-
-        void LoadPatch()
-        {
-            var name = patchList.value;
-            if (string.IsNullOrEmpty(name))
-            {
-                SetStatus("No saved patch selected.", true);
-                return;
-            }
-
-            MasterDataPatch patch;
-            try
-            {
-                patch = MasterDataPatchStorage.Load(name);
-            }
-            catch (Exception e)
-            {
-                MasterMemoryDebugLog.Error("Load patch failed: " + e);
-                SetStatus("Load failed: " + e.Message, true);
-                return;
-            }
-            if (patch == null)
-            {
-                SetStatus("Patch not found: " + MasterDataPatchStorage.GetPatchPath(name), true);
-                RefreshPatchList(null);
-                return;
-            }
-
-            var result = MasterDataPatchService.Apply(patch);
-            if (result.Status == MasterDataPatchApplyStatus.VersionMismatch)
-            {
-                dialog.Show(
-                    "Master version mismatch",
-                    $"Patch \"{name}\" was created for master version \"{result.PatchMasterVersion}\" but the current version is \"{result.CurrentMasterVersion}\".\n" +
-                    "Records or fields may have changed.",
-                    new MasterMemoryDebuggerDialog.DialogButton("Cancel", () => SetStatus("Load cancelled.", false)),
-                    new MasterMemoryDebuggerDialog.DialogButton("Force Load", () => ReportApply(name, MasterDataPatchService.Apply(patch, force: true)), isDanger: true));
-                return;
-            }
-            ReportApply(name, result);
-        }
-
-        void ImportPatch()
-        {
-            if (!MasterDataPatchImporter.TryOpenFile((fileName, text) => ImportPatchText(MasterDataPatchImporter.SuggestName(fileName), text)))
-            {
-                ShowPasteDialog();
-            }
-        }
-
-        /// <summary>Platforms without a file picker: paste the JSON (for example an exported patch) into a text box.</summary>
-        void ShowPasteDialog()
-        {
-            var content = new VisualElement();
-            var nameField = new TextField("Name") { value = "imported" };
-            nameField.AddToClassList("mm-debugger__import-name");
-            var jsonField = new TextField("Patch JSON") { multiline = true };
-            jsonField.AddToClassList("mm-debugger__import-json");
-            content.Add(nameField);
-            content.Add(jsonField);
-            dialog.Show(
-                "Import patch",
-                "Paste the content of a patch file (for example one exported with Export).",
-                content,
-                new MasterMemoryDebuggerDialog.DialogButton("Cancel", null),
-                new MasterMemoryDebuggerDialog.DialogButton("Import", () => ImportPatchText(nameField.value, jsonField.value), isPrimary: true));
-        }
-
-        void ImportPatchText(string name, string json)
-        {
-            MasterDataPatch patch;
-            try
-            {
-                patch = MasterDataPatchImporter.Parse(json);
-            }
-            catch (Exception e)
-            {
-                SetStatus("Import failed: " + e.Message, true);
-                return;
-            }
-
-            name = MasterDataPatchStorage.NormalizeName(name) ?? "imported";
-            if (MasterDataPatchStorage.Exists(name))
-            {
-                dialog.Show(
-                    "Overwrite patch",
-                    $"A patch named \"{name}\" already exists. Overwrite it with the imported patch?",
-                    new MasterMemoryDebuggerDialog.DialogButton("Cancel", () => SetStatus("Import cancelled.", false)),
-                    new MasterMemoryDebuggerDialog.DialogButton("Overwrite", () => SaveImported(name, patch), isDanger: true));
-                return;
-            }
-            SaveImported(name, patch);
-        }
-
-        void SaveImported(string name, MasterDataPatch patch)
-        {
-            try
-            {
-                MasterDataPatchStorage.Save(patch, name);
-            }
-            catch (Exception e)
-            {
-                SetStatus("Import failed: " + e.Message, true);
-                return;
-            }
-            patchName.SetValueWithoutNotify(name);
-            RefreshPatchList(name);
-            SetStatus($"Patch \"{name}\" imported ({patch.RecordCount} records, master version {patch.MasterVersion}). Press Load Patch to apply it.", false);
-        }
-
-        void ConfirmDeletePatch()
-        {
-            var name = patchList.value;
-            if (string.IsNullOrEmpty(name)) return;
-            dialog.Show(
-                "Delete patch",
-                $"Delete the saved patch \"{name}\"? Current overrides are not changed.",
-                new MasterMemoryDebuggerDialog.DialogButton("Cancel", null),
-                new MasterMemoryDebuggerDialog.DialogButton("Delete", () =>
-                {
-                    MasterDataPatchStorage.Delete(name);
-                    RefreshPatchList(null);
-                    SetStatus($"Patch \"{name}\" deleted.", false);
-                }, isDanger: true));
-        }
-
-        void ReportApply(string name, MasterDataPatchApplyResult result)
-        {
-            LogWarnings(result.Warnings);
-            if (!result.Succeeded)
-            {
-                SetStatus($"Patch \"{name}\" not loaded ({result.Status}).", true);
-                return;
-            }
-            MasterMemoryChangeLog.PatchLoaded(name, result);
-            SetStatus($"Patch \"{name}\" loaded: {result.AppliedRecords} records, {result.AppliedFields} fields{WarningSuffix(result.Warnings)}", false);
-        }
-
-        void ExportPatch()
-        {
-            var warnings = new List<string>();
-            string json;
-            try
-            {
-                json = MasterDataPatchService.CreatePatchJson(warnings);
-            }
-            catch (Exception e)
-            {
-                MasterMemoryDebugLog.Error("Export failed: " + e);
-                SetStatus("Export failed: " + e.Message, true);
-                return;
-            }
-            LogWarnings(warnings);
-            var result = MasterDataPatchExporter.Export(json, MasterDataPatchStorage.CreateExportFileName(patchName.value));
-            SetStatus(result.Message + WarningSuffix(warnings), !result.Succeeded);
-        }
-
-        void ConfirmResetAll()
-        {
-            dialog.Show(
-                "Reset All",
-                "Reset all MasterMemory runtime overrides?",
-                new MasterMemoryDebuggerDialog.DialogButton("Cancel", null),
-                new MasterMemoryDebuggerDialog.DialogButton("Reset All", () =>
-                {
-                    var count = MasterMemoryDebugRuntime.OverrideCount;
-                    MasterMemoryDebugRuntime.ClearAllOverrides();
-                    MasterMemoryChangeLog.ResetAll(count);
-                    SetStatus($"{count} overrides reset.", false);
-                }, isDanger: true));
-        }
-
         // ------------------------------------------------------------------ helpers
 
         void ChangeScale(float delta)
@@ -669,8 +422,12 @@ namespace Nesh.MasterMemoryDebugger
         void RefreshHeader()
         {
             versionLabel.text = "Master: " + MasterMemoryDebugRegistry.GetMasterVersion();
-            changesButton.text = changes.IsVisible ? "Back to Tables" : $"Changes ({MasterMemoryDebugRuntime.OverrideCount})";
             var count = MasterMemoryDebugRuntime.OverrideCount;
+            changesTab.text = $"Changes ({count})";
+            patchesTab.text = $"Patches ({patches.PatchCount})";
+            dataTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Data);
+            changesTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Changes);
+            patchesTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Patches);
             overrideCountLabel.text = count > 0 ? $"{count} overrides" : "No overrides";
             overrideCountLabel.EnableInClassList("mm-debugger__override-count--active", count > 0);
         }
@@ -682,12 +439,12 @@ namespace Nesh.MasterMemoryDebugger
             statusLabel.EnableInClassList("mm-debugger__status--error", isError);
         }
 
-        static void LogWarnings(List<string> warnings)
+        internal static void LogWarnings(List<string> warnings)
         {
             foreach (var warning in warnings) MasterMemoryDebugLog.Warning(warning);
         }
 
-        static string WarningSuffix(List<string> warnings)
+        internal static string WarningSuffix(List<string> warnings)
         {
             return warnings.Count == 0 ? string.Empty : $"  ({warnings.Count} warnings, see Console)";
         }

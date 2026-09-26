@@ -698,30 +698,139 @@
 
 /* ------------------------------------------------------------------ bottom toolbar */
 
-.mm-debugger__bottom-toolbar {
+/* ------------------------------------------------------------------ tabs (Data | Changes | Patches) */
+
+.mm-debugger__tabs {
     flex-direction: row;
+    align-self: stretch;
+    margin-left: 16px;
+}
+
+.mm-debugger .mm-debugger__tab {
+    margin: 0 2px;
+    padding: 2px 12px;
+    border-width: 0 0 2px 0;
+    border-radius: 0;
+    border-color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0);
+    color: rgb(170, 176, 190);
+}
+
+.mm-debugger .mm-debugger__tab:hover {
+    color: rgb(226, 229, 235);
+    background-color: rgb(40, 44, 53);
+}
+
+.mm-debugger .mm-debugger__tab--selected {
+    color: rgb(150, 190, 255);
+    border-color: rgb(80, 140, 230);
+    -unity-font-style: bold;
+}
+
+/* ------------------------------------------------------------------ patches tab */
+
+.mm-debugger__patches-panel {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-height: 200px;
+    flex-direction: column;
+}
+
+.mm-debugger__patches-current {
+    flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     flex-shrink: 0;
-    height: 32px;
-    margin-top: 6px;
-    padding-top: 4px;
-    border-top-width: 1px;
-    border-color: rgb(58, 63, 75);
+    padding: 2px 4px 6px 4px;
+    margin-bottom: 4px;
+    border-bottom-width: 1px;
+    border-color: rgb(52, 57, 68);
 }
 
-.mm-debugger__toolbar-label {
+.mm-debugger .mm-debugger__patches-current-label {
+    -unity-font-style: bold;
+    margin-right: 10px;
+}
+
+.mm-debugger__patches-split {
+    flex-grow: 1;
+}
+
+.mm-debugger__patches-list-panel {
+    min-width: 180px;
+    margin-right: 3px;
+}
+
+.mm-debugger__patches-list {
+    flex-grow: 1;
+}
+
+.mm-debugger__patch-item {
+    justify-content: center;
+    padding: 2px 8px;
+}
+
+.mm-debugger .mm-debugger__patch-item-name {
+    -unity-font-style: bold;
+}
+
+.mm-debugger .mm-debugger__patch-item-info {
+    font-size: 11px;
     color: rgb(150, 157, 171);
-    margin-right: 6px;
 }
 
-.mm-debugger__patch-list {
-    width: 200px;
-    margin: 0 4px 0 0;
+.mm-debugger .mm-debugger__patch-item--problem .mm-debugger__patch-item-info {
+    color: rgb(255, 184, 76);
 }
 
-.mm-debugger__patch-name {
-    width: 180px;
-    margin: 0 2px 0 0;
+.mm-debugger__patches-detail {
+    flex-direction: column;
+    min-width: 260px;
+    margin-left: 6px;
+}
+
+.mm-debugger .mm-debugger__patches-info {
+    font-size: 11px;
+    color: rgb(150, 157, 171);
+    margin: 0 4px 2px 4px;
+    white-space: normal;
+}
+
+.mm-debugger .mm-debugger__patches-warning {
+    font-size: 11px;
+    color: rgb(255, 184, 76);
+    margin: 0 4px 4px 4px;
+    white-space: normal;
+}
+
+.mm-debugger__patches-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding-bottom: 6px;
+    margin-bottom: 4px;
+    border-bottom-width: 1px;
+    border-color: rgb(52, 57, 68);
+}
+
+.mm-debugger__patches-preview {
+    flex-grow: 1;
+}
+
+.mm-debugger .mm-debugger__patches-table {
+    -unity-font-style: bold;
+    color: rgb(150, 190, 255);
+    margin: 6px 4px 2px 4px;
+}
+
+.mm-debugger .mm-debugger__patches-table--missing {
+    color: rgb(255, 150, 120);
+}
+
+.mm-debugger .mm-debugger__patches-record {
+    font-size: 11px;
+    color: rgb(170, 176, 190);
+    margin: 2px 4px 0 10px;
 }
 
 .mm-debugger__status-row {

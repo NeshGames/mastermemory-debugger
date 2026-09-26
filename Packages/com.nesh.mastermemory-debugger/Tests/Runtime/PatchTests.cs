@@ -17,6 +17,39 @@ namespace Nesh.MasterMemoryDebugger.Tests
         {
             MasterDataPatchStorage.Delete();
             MasterDataPatchStorage.Delete("unit-test-balance A");
+            MasterDataPatchStorage.Delete("unit-test-renamed");
+        }
+
+        [Test]
+        public void PatchesTab_ShouldSummarizePatches()
+        {
+            ApplySampleOverrides();
+            var patch = MasterDataPatchService.CreatePatch();
+
+            Assert.AreEqual(5, MasterPatchesController.CountFields(patch));
+            Assert.AreEqual(0, MasterPatchesController.CountFields(null));
+            Assert.AreEqual("185", MasterPatchesController.FormatValue(185));
+            Assert.AreEqual("Fire", MasterPatchesController.FormatValue("Fire"));
+            Assert.AreEqual("null", MasterPatchesController.FormatValue(null));
+            Assert.AreEqual("[1,2]", MasterPatchesController.FormatValue(new System.Collections.Generic.List<object> { 1, 2 }).Replace(" ", ""));
+        }
+
+        [Test]
+        public void Rename_ShouldMoveThePatchAndRespectExistingNames()
+        {
+            ApplySampleOverrides();
+            MasterDataPatchStorage.Save(MasterDataPatchService.CreatePatch(), "unit-test-balance A");
+            MasterDataPatchStorage.Save(MasterDataPatchService.CreatePatch());
+            Assert.IsNotNull(MasterDataPatchStorage.GetSavedTime("unit-test-balance A"));
+
+            Assert.IsFalse(MasterDataPatchStorage.Rename("unit-test-balance A", MasterDataPatchStorage.DefaultPatchName), "name taken");
+            Assert.IsTrue(MasterDataPatchStorage.Rename("unit-test-balance A", "unit-test-renamed"));
+            Assert.IsFalse(MasterDataPatchStorage.Exists("unit-test-balance A"));
+            Assert.AreEqual(2, MasterDataPatchStorage.Load("unit-test-renamed").RecordCount);
+            Assert.IsNull(MasterDataPatchStorage.GetSavedTime("unit-test-balance A"));
+
+            Assert.IsTrue(MasterDataPatchStorage.Rename("unit-test-renamed", MasterDataPatchStorage.DefaultPatchName, overwrite: true));
+            Assert.IsFalse(MasterDataPatchStorage.Rename("missing", "unit-test-renamed"));
         }
 
         void ApplySampleOverrides()
