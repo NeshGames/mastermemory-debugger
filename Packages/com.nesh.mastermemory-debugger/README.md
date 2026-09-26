@@ -61,10 +61,10 @@ IL2CPP 還需要把產生的 `MasterMemoryResolver` 註冊到 MessagePack（參�
 Package Manager → `+` → **Add package from git URL...**
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.6.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.7.0
    ```
 
-   URL 最後的 `#v0.6.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
+   URL 最後的 `#v0.7.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
 
 Runtime assembly (`Nesh.MasterMemoryDebugger.Runtime`) 會自動參考 NuGetForUnity 安裝的 `MasterMemory.dll`。
 
@@ -273,7 +273,10 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
   - 無法修改的 Record（值是 null、超出型別範圍）會略過並列在 Console；整次修改是**一個 Undo 步驟**。
   - 程式中：`MasterMemoryBatchEdit.Apply(records, field, MasterMemoryBatchOperation.Multiply, "1.1")`。
 - **Copy**：把目前顯示的資料列與欄位（套用搜尋、排序、欄位顯示設定後的結果，凍結欄位在前）複製成 Tab 分隔文字，可以直接貼到 Excel / Google 試算表。WebGL 會下載成 `.tsv`。
-- 範例的 `ExampleManyColumnsMaster`（75 欄、120 筆，Test 群組）與 `ExampleWeaponMaster`（27 欄）可以用來確認超出一個畫面時的水平捲動。
+- 範例的 `ExampleManyColumnsMaster`（75 欄、120 筆，Test 群組）與 `ExampleWeaponMaster`（27 欄）可以用來確認超出一個畫面時的水平捲動；
+  `ExampleLargeMaster`（50,000 筆，Test 群組）用來確認大表的開啟、捲動、搜尋、排序與 Batch Edit 的反應速度。
+- **大表**：表格只顯示符合條件的前 `Max Search Results` 筆（預設 500），搜尋、排序、Batch Edit、Copy TSV 等則對整張表運作。
+  5 萬筆時這些操作在 .NET 上都在 1 秒內（`Tests/Runtime/LargeTableTests` 會印出各項耗時；Unity 的 Mono / IL2CPP 通常慢數倍）。
 - **釘選頁籤**：表格上方的 `+ Pin` 把目前的 Table 釘選成頁籤，點頁籤快速切換，`×` 取消釘選。釘選清單記在 PlayerPrefs，下次開啟仍會保留。
 - 表格是自己實作的 virtualized grid（`ListView` + 同步捲動的表頭），沒有使用 `MultiColumnListView`。
 
@@ -301,6 +304,8 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 - 運算子後的值：enum 名稱與 `true` / `false`（`Element=f` → `Fire`；Flags 可用 `|` 連接：`Flags=Boss|Fl` → `Flying`）。
 - 欄位名稱打完整時，清單會列出可用的運算子。
 - 焦點在搜尋框時，Tab 不會跳到下一個控制項。
+- **最近的搜尋**：搜尋框是空的時，清單會列出最近 10 個搜尋條件（有文字時按 **↓** 會列出包含該文字的條件）。
+  按 Enter、離開搜尋框或關閉 Debugger 時，沒有錯誤的搜尋條件會被記下（PlayerPrefs）。
 
 ### Inspector
 
@@ -329,6 +334,17 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 
 **Copy TSV** 會把所有修改過的欄位複製成 `table / key / name / field / original / current` 的 Tab 分隔表格，
 可以貼到試算表，對照著把調整好的數值回填到主資料的原始檔（WebGL 下載成 `changes.tsv`；程式中：`MasterMemoryChangeSummary.ToTsv(...)`）。
+
+**Paste TSV…** 是反方向：把在試算表裡改好的表格貼回來，變成 Override。
+
+1. Copy TSV → 貼到試算表 → 修改 `current` 欄（也可以新增列：填 table、key、field、current 即可）。
+2. 全選複製 → Paste TSV… → 貼上 → **Preview**：列出會改變的值（原值 → 新值）、無法匯入的行與原因。
+3. **Apply** 套用（一個 Undo 步驟）。
+
+- 第一行必須是欄位名稱，需要 `table`、`key`、`field`、`current`（或 `value`），順序不限，其他欄位會被忽略。
+- `key` 的寫法和 Debugger 顯示的相同（`1001`、複合主鍵 `(2, 1)`）。主鍵、List 與複雜型別不能匯入。
+- 有 `original` 欄時，會提醒「原始值已經和匯出時不同」的行（主資料更新過），但仍然會匯入。
+- 程式中：`var plan = MasterMemoryTsvImport.Read(text); MasterMemoryTsvImport.Apply(plan);`
 
 ### Undo / Redo
 
@@ -578,6 +594,7 @@ Override Layer **只保證經過 `TryGetOverride` / `Resolve` 的 PrimaryKey 查
 
 Tests 位於 `Tests/Runtime`（Edit Mode + Play Mode）與 `Tests/Editor`。
 Repository 的 `Tools/Harness` 可以不開 Unity、用 .NET SDK 編譯並執行大部分的測試（CI 在每個 PR 執行）。
+UI 的部分請在發版前照 `Tools/Harness/SMOKE_TEST.md` 在 Unity 中檢查。
 在其他專案中執行時，請在 `Packages/manifest.json` 加入：
 
 ```json

@@ -79,6 +79,7 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
 
             var weapons = CreateWeapons(300);
             var manyColumns = CreateManyColumns(120);
+            var large = CreateLarge(50000);
 
             // generated tables expect data sorted by primary key
             OriginalDatabase = new MemoryDatabase(
@@ -90,8 +91,32 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
                 ExampleShopMasterTable: new ExampleShopMasterTable(shops.OrderBy(x => x.Id).ToArray()),
                 ExampleSkillMasterTable: new ExampleSkillMasterTable(skills.OrderBy(x => x.Id).ToArray()),
                 ExampleManyColumnsMasterTable: new ExampleManyColumnsMasterTable(manyColumns),
+                ExampleLargeMasterTable: new ExampleLargeMasterTable(large),
                 ExampleWeaponMasterTable: new ExampleWeaponMasterTable(weapons));
             return OriginalDatabase;
+        }
+
+        /// <summary>Deterministic rows for the 50,000 record table, sorted by Id.</summary>
+        static ExampleLargeMaster[] CreateLarge(int count)
+        {
+            var skillIds = new[] { 0, 1001, 1002, 1004 };
+            var rows = new ExampleLargeMaster[count];
+            for (var i = 0; i < count; i++)
+            {
+                rows[i] = new ExampleLargeMaster
+                {
+                    Id = 100001 + i,
+                    GroupId = i / 100,
+                    Name = $"Large {i + 1:00000}",
+                    Value = (i * 37) % 1000,
+                    Rate = (i % 20) * 0.05f,
+                    Element = (ExampleElement)(i % 4),
+                    Rarity = (ExampleRarity)(i % 3),
+                    IsEnabled = i % 7 != 0,
+                    SkillId = skillIds[i % skillIds.Length],
+                };
+            }
+            return rows;
         }
 
         /// <summary>Deterministic rows for the 75 column table.</summary>

@@ -69,6 +69,8 @@ namespace Nesh.MasterMemoryDebugger
                 "Field op Value with = != > >= < <= ~ (contains). Quote values with spaces: Name=\"Ice Blast\". Field=null matches null.\n" +
                 "Field names, and enum / bool values after an operator, are suggested while typing: Up / Down select, Tab / Enter accept, Esc closes.";
             searchField.RegisterValueChangedCallback(OnSearchChanged);
+            searchField.RegisterCallback<FocusOutEvent>(OnSearchFocusOut);
+            searchField.RegisterCallback<KeyDownEvent>(OnSearchKeyDown);
             modifiedOnlyToggle.RegisterValueChangedCallback(OnModifiedOnlyChanged);
 
             grid = new MasterRecordGrid(gridHost) { AutoFit = column => MasterGridLayout.AutoFit(column, snapshot) };
@@ -89,7 +91,10 @@ namespace Nesh.MasterMemoryDebugger
         {
             filterJob.Pause();
             SaveColumns();
+            AddQueryToHistory();
             searchField.UnregisterValueChangedCallback(OnSearchChanged);
+            searchField.UnregisterCallback<FocusOutEvent>(OnSearchFocusOut);
+            searchField.UnregisterCallback<KeyDownEvent>(OnSearchKeyDown);
             modifiedOnlyToggle.UnregisterValueChangedCallback(OnModifiedOnlyChanged);
             grid.ItemSelected -= OnItemSelected;
             grid.SortChanged -= ApplyFilter;
@@ -342,6 +347,23 @@ namespace Nesh.MasterMemoryDebugger
         void OnSearchChanged(ChangeEvent<string> evt)
         {
             filterJob.ExecuteLater(SearchDelayMs);
+        }
+
+        void OnSearchFocusOut(FocusOutEvent evt) => AddQueryToHistory();
+
+        void OnSearchKeyDown(KeyDownEvent evt)
+        {
+            // Enter that the completion popup did not take
+            if (evt.keyCode == UnityEngine.KeyCode.Return || evt.keyCode == UnityEngine.KeyCode.KeypadEnter) AddQueryToHistory();
+        }
+
+        /// <summary>A finished search (Enter, leaving the box, closing): remembered when it has no error.</summary>
+        void AddQueryToHistory()
+        {
+            var query = Query.Trim();
+            if (query.Length == 0 || table == null) return;
+            if (MasterRecordQuery.Parse(query, table.TypeDescriptor).Errors.Count > 0) return;
+            MasterSearchHistory.Add(query);
         }
 
         void OnModifiedOnlyChanged(ChangeEvent<bool> evt)

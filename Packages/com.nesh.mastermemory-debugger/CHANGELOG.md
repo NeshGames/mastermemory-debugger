@@ -2,6 +2,17 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.7.0] - 2026-09-26
+
+### Added
+
+- Changes tab: Paste TSV… imports values edited in a spreadsheet (the Copy TSV format: table, key, field, current; columns found by name) as overrides, after a preview of every change and of the lines that can not be imported. Lines whose original value changed since the copy are flagged. One undo step. `MasterMemoryTsvImport.Read` / `Apply`.
+- Recent searches: the last 10 searches without errors (Enter, leaving the search box, closing) are listed when the search box is empty, or with Down when it has text. Saved in PlayerPrefs.
+- Sample: `ExampleLargeMaster` (50,000 records, Test group) to check large tables.
+- `LargeTableTests`: every whole table operation (filter, sort, batch edit, changes, patch, TSV, rebuild, references) on 50,000 records, with the timings printed.
+- `Tools/Harness/SMOKE_TEST.md`: the checks to run in Unity before a release, and a pull request template.
+- The Release workflow can be run by hand with an existing tag to create its GitHub Release.
+
 ## [0.6.0] - 2026-09-26
 
 ### Added

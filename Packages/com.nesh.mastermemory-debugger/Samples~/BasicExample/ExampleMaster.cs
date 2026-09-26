@@ -271,4 +271,31 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         public int? OptionalLimit { get; init; }
         public int[] ValueList { get; init; }
     }
+
+    /// <summary>
+    /// Large table (50,000 records) to check that opening, scrolling, searching, sorting, batch edits and
+    /// Referenced by (from <see cref="ExampleSkillMaster"/>) stay responsive.
+    /// </summary>
+    [MemoryTable("example_large"), MessagePackObject(true)]
+    public sealed record ExampleLargeMaster : IValidatable<ExampleLargeMaster>
+    {
+        [PrimaryKey]
+        public int Id { get; init; }
+
+        [SecondaryKey(0), NonUnique]
+        public int GroupId { get; init; }
+
+        public string Name { get; init; }
+        public int Value { get; init; }
+        public float Rate { get; init; }
+        public ExampleElement Element { get; init; }
+        public ExampleRarity Rarity { get; init; }
+        public bool IsEnabled { get; init; }
+        public int SkillId { get; init; }
+
+        void IValidatable<ExampleLargeMaster>.Validate(IValidator<ExampleLargeMaster> validator)
+        {
+            if (SkillId != 0) validator.GetReferenceSet<ExampleSkillMaster>().Exists(x => x.SkillId, skill => skill.Id);
+        }
+    }
 }

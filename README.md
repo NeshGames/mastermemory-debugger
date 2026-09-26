@@ -11,10 +11,10 @@ This repository is a Unity 6 project that hosts the UPM package
 2. Package Manager → Add package from git URL:
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.6.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.7.0
    ```
 
-   `#v0.6.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
+   `#v0.7.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
 
 See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for usage.
 
@@ -40,4 +40,7 @@ compile-only Unity stubs) and runs the tests that do not need a UI panel. See [T
   `vX.Y.Z` tag and a GitHub Release with that version's CHANGELOG section are created automatically.
 
 Releasing is therefore: bump `version` in `package.json`, add the CHANGELOG section (and update the `#vX.Y.Z` in the
-READMEs), merge to `main`.
+READMEs), run the [smoke test](Tools/Harness/SMOKE_TEST.md) in Unity, merge to `main`.
+
+To create the GitHub Release of an older tag, run the Release workflow by hand (Actions → Release → Run workflow) with
+the tag, for example `v0.4.0`; the notes come from that version's CHANGELOG section.

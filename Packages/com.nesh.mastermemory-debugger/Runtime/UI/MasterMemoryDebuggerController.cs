@@ -18,7 +18,7 @@ namespace Nesh.MasterMemoryDebugger
             "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template", "mm-batch-edit",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json",
             "mm-close", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel",
-            "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary", "mm-changes-copy",
+            "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary", "mm-changes-copy", "mm-changes-paste",
             "mm-log", "mm-log-toggle", "mm-undo", "mm-redo",
         };
 
@@ -127,7 +127,9 @@ namespace Nesh.MasterMemoryDebugger
                 Required<Label>(root, "mm-changes-summary"),
                 OpenRecord,
                 SetStatus,
-                Required<Button>(root, "mm-changes-copy"));
+                Required<Button>(root, "mm-changes-copy"),
+                Required<Button>(root, "mm-changes-paste"),
+                dialog);
             patches = new MasterPatchesController(patchesPanel, dialog, SetStatus, Session.PatchName);
             validation = new MasterValidationController(Required<VisualElement>(root, "mm-validation-panel"), OpenRecord);
             logView = Required<ScrollView>(root, "mm-log");
@@ -151,6 +153,7 @@ namespace Nesh.MasterMemoryDebugger
             Bind(root, "mm-scale-up", () => ChangeScale(ScaleStep));
 
             SetVisible(root, "mm-batch-edit", settings.AllowEditing);
+            SetVisible(root, "mm-changes-paste", settings.AllowEditing);
 
             var canScale = host.OwnedPanelSettings != null;
             SetVisible(root, "mm-scale-down", canScale);

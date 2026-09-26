@@ -1221,6 +1221,15 @@
     margin-top: 6px;
 }
 
+.mm-debugger__import-preview {
+    max-height: 260px;
+}
+
+.mm-debugger .mm-debugger__import-preview-change {
+    white-space: normal;
+    color: rgb(200, 205, 215);
+}
+
 .mm-debugger__import-json .unity-base-text-field__input {
     min-height: 160px;
     max-height: 320px;
