@@ -156,5 +156,34 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugValidation.Convert(result, MasterMemoryDebugRebuild.Validate(Database), failures);
             Assert.IsTrue(failures[0].IsNew);
         }
+
+        [Test]
+        public void SlowValidation_ShouldStopValidatingAfterEveryChange()
+        {
+            var previous = MasterMemoryDebugRebuild.SlowValidateSeconds;
+            MasterMemoryDebugRebuild.SlowValidateSeconds = -1;
+            try
+            {
+                using (MasterMemoryDebugRebuild.AutoRebuild(Database, _ => { }))
+                {
+                    MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 1 });
+                    MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { SummonEnemyId = 99 });
+
+                    var warnings = MasterMemoryDebuggerMessages.Messages.Where(x => x.Type == MasterMemoryDebuggerMessageType.Warning).Select(x => x.Text).ToList();
+                    Assert.AreEqual(1, warnings.Count, string.Join("\n", warnings));
+                    StringAssert.Contains("no longer validated after every change", warnings[0]);
+                    Assert.AreEqual(0, MasterMemoryDebugValidation.NewFailureCount, "not validated after the second change");
+
+                    // the Validation tab still validates on demand
+                    var failures = MasterMemoryDebugValidation.Run();
+                    Assert.AreEqual(1, failures.Count);
+                    Assert.IsTrue(failures[0].IsNew);
+                }
+            }
+            finally
+            {
+                MasterMemoryDebugRebuild.SlowValidateSeconds = previous;
+            }
+        }
     }
 }

@@ -25,7 +25,7 @@ namespace Nesh.MasterMemoryDebugger
         /// Validate() slower than this stops the validation after every change (it would freeze the game on each edit);
         /// the Validation tab still validates on demand.
         /// </summary>
-        internal const double SlowValidateSeconds = 1.0;
+        internal static double SlowValidateSeconds = 1.0;
 
         sealed class BuilderInfo
         {
@@ -222,21 +222,30 @@ namespace Nesh.MasterMemoryDebugger
                 MasterMemoryDebugValidation.NotifyChanged();
             }
 
+            /// <summary>Stops validating after every change when Validate() is slow (it would freeze the game on each edit).</summary>
+            bool StopIfSlow(System.Diagnostics.Stopwatch watch)
+            {
+                if (watch.Elapsed.TotalSeconds <= SlowValidateSeconds) return false;
+                validateOnChange = false;
+                MasterMemoryDebugLog.Warning(
+                    $"Validate: MasterMemory Validate() took {watch.Elapsed.TotalSeconds:0.0} s, so the database is no longer validated after every change. " +
+                    "Use the Validate button of the Validation tab (MasterMemory compiles the Exists() expressions for every record; large tables are slow).");
+                return true;
+            }
+
             void Report(TDatabase database)
             {
                 try
                 {
                     var watch = System.Diagnostics.Stopwatch.StartNew();
-                    baseline ??= Validate(original);
-                    currentResult = Validate(database);
-                    watch.Stop();
-                    if (watch.Elapsed.TotalSeconds > SlowValidateSeconds)
+                    if (baseline == null)
                     {
-                        validateOnChange = false;
-                        MasterMemoryDebugLog.Warning(
-                            $"Validate: MasterMemory Validate() took {watch.Elapsed.TotalSeconds:0.0} s, so the database is no longer validated after every change. " +
-                            "Use the Validate button of the Validation tab (MasterMemory compiles the Exists() expressions for every record; large tables are slow).");
+                        baseline = Validate(original);
+                        // already too slow: do not validate the rebuilt database as well
+                        if (StopIfSlow(watch)) return;
                     }
+                    currentResult = Validate(database);
+                    StopIfSlow(watch);
                     var failures = GetNewFailures(currentResult, baseline);
                     newFailureCount = failures.Count;
                     for (var i = 0; i < failures.Count && i < MaxReportedFailures; i++)
