@@ -1,0 +1,26 @@
+{
+    "name": "Nesh.MasterMemoryDebugger.Tests",
+    "rootNamespace": "Nesh.MasterMemoryDebugger.Tests",
+    "references": [
+        "Nesh.MasterMemoryDebugger.Runtime",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "MasterMemory.dll",
+        "MasterMemory.Annotations.dll",
+        "MessagePack.dll",
+        "MessagePack.Annotations.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

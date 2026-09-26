@@ -1,0 +1,91 @@
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace Nesh.MasterMemoryDebugger
+{
+    /// <summary>
+    /// Host of the debugger UI:
+    /// <code>
+    /// MasterMemoryRuntimeDebugger (GameObject, DontDestroyOnLoad)
+    /// ├─ UIDocument
+    /// └─ MasterMemoryDebuggerDocument
+    /// </code>
+    /// </summary>
+    [AddComponentMenu("")]
+    public sealed class MasterMemoryDebuggerDocument : MonoBehaviour
+    {
+        public const string GameObjectName = "MasterMemoryRuntimeDebugger";
+        internal const string ResourcesFolder = "MasterMemoryDebugger/";
+        internal const string LayoutResourcePath = ResourcesFolder + "MasterMemoryDebugger";
+        internal const string StyleResourcePath = ResourcesFolder + "MasterMemoryDebugger";
+        internal const string ThemeResourcePath = ResourcesFolder + "MasterMemoryDebuggerTheme";
+
+        UIDocument document;
+        PanelSettings ownedPanelSettings;
+        MasterMemoryDebuggerController controller;
+
+        public UIDocument Document => document;
+
+        /// <summary>PanelSettings created by the debugger; null when the project supplied its own.</summary>
+        internal PanelSettings OwnedPanelSettings => ownedPanelSettings;
+
+        internal static MasterMemoryDebuggerDocument Create()
+        {
+            var layout = Resources.Load<VisualTreeAsset>(LayoutResourcePath);
+            if (layout == null) throw new MissingReferenceException("Resources/" + LayoutResourcePath + ".uxml was not found.");
+
+            var settings = MasterMemoryDebuggerSettings.Current;
+            var gameObject = new GameObject(GameObjectName);
+            gameObject.SetActive(false);
+            DontDestroyOnLoad(gameObject);
+
+            var host = gameObject.AddComponent<MasterMemoryDebuggerDocument>();
+            host.document = gameObject.AddComponent<UIDocument>();
+            if (settings.PanelSettings != null)
+            {
+                host.document.panelSettings = settings.PanelSettings;
+            }
+            else
+            {
+                host.ownedPanelSettings = CreatePanelSettings(settings);
+                host.document.panelSettings = host.ownedPanelSettings;
+            }
+            host.document.visualTreeAsset = layout;
+
+            gameObject.SetActive(true);
+            return host;
+        }
+
+        static PanelSettings CreatePanelSettings(MasterMemoryDebuggerSettings settings)
+        {
+            var panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+            panelSettings.name = "MasterMemoryDebuggerPanelSettings";
+            panelSettings.hideFlags = HideFlags.DontSave;
+            panelSettings.themeStyleSheet = Resources.Load<ThemeStyleSheet>(ThemeResourcePath);
+            panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+            panelSettings.referenceResolution = new Vector2Int(1600, 900);
+            panelSettings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
+            panelSettings.match = 0.5f;
+            panelSettings.sortingOrder = settings.SortingOrder;
+            panelSettings.clearColor = false;
+            return panelSettings;
+        }
+
+        void Start()
+        {
+            // UIDocument builds its visual tree in its own OnEnable; binding in Start guarantees the tree exists.
+            var root = document.rootVisualElement;
+            var style = Resources.Load<StyleSheet>(StyleResourcePath);
+            if (style != null) root.styleSheets.Add(style);
+            controller = new MasterMemoryDebuggerController(root, this);
+        }
+
+        void OnDestroy()
+        {
+            controller?.Dispose();
+            controller = null;
+            if (ownedPanelSettings != null) Destroy(ownedPanelSettings);
+            RuntimeMasterMemoryDebugger.NotifyDestroyed(this);
+        }
+    }
+}

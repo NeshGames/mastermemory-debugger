@@ -1,0 +1,16 @@
+{
+    "name": "Nesh.MasterMemoryDebugger.Samples.BasicExample",
+    "rootNamespace": "Nesh.MasterMemoryDebugger.Samples.BasicExample",
+    "references": [
+        "Nesh.MasterMemoryDebugger.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

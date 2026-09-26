@@ -1,0 +1,494 @@
+/* MasterMemory Runtime Debugger. Every selector is scoped under .mm-debugger to avoid polluting game UI. */
+
+.mm-debugger {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    font-size: 13px;
+    color: rgb(226, 229, 235);
+}
+
+.mm-debugger__window {
+    position: absolute;
+    left: 2%;
+    top: 3%;
+    right: 2%;
+    bottom: 3%;
+    min-width: 760px;
+    min-height: 480px;
+    flex-direction: column;
+    background-color: rgba(22, 24, 29, 0.97);
+    border-width: 1px;
+    border-color: rgb(58, 63, 75);
+    border-radius: 6px;
+    padding: 6px;
+}
+
+.mm-debugger Label {
+    color: rgb(226, 229, 235);
+}
+
+.mm-debugger__spacer {
+    flex-grow: 1;
+}
+
+/* ------------------------------------------------------------------ header */
+
+.mm-debugger__header {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    height: 30px;
+    padding: 0 4px;
+    margin-bottom: 6px;
+    border-bottom-width: 1px;
+    border-color: rgb(58, 63, 75);
+}
+
+.mm-debugger__title {
+    font-size: 15px;
+    -unity-font-style: bold;
+    margin-right: 16px;
+}
+
+.mm-debugger__header-info {
+    color: rgb(150, 157, 171);
+    margin-right: 16px;
+}
+
+.mm-debugger__override-count--active {
+    color: rgb(255, 184, 76);
+    -unity-font-style: bold;
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+.mm-debugger__button {
+    height: 24px;
+    padding: 0 10px;
+    margin: 0 0 0 4px;
+    border-radius: 3px;
+    border-width: 1px;
+    border-color: rgb(70, 76, 90);
+    background-color: rgb(46, 50, 60);
+    color: rgb(226, 229, 235);
+}
+
+.mm-debugger__button:hover {
+    background-color: rgb(60, 66, 79);
+}
+
+.mm-debugger__button:active {
+    background-color: rgb(38, 42, 50);
+}
+
+.mm-debugger__button:disabled {
+    opacity: 0.4;
+}
+
+.mm-debugger__button--primary {
+    background-color: rgb(40, 96, 178);
+    border-color: rgb(66, 127, 214);
+}
+
+.mm-debugger__button--primary:hover {
+    background-color: rgb(52, 112, 198);
+}
+
+.mm-debugger__button--danger {
+    background-color: rgb(138, 44, 40);
+    border-color: rgb(186, 66, 60);
+}
+
+.mm-debugger__button--danger:hover {
+    background-color: rgb(160, 54, 49);
+}
+
+.mm-debugger__header-button {
+    min-width: 36px;
+}
+
+/* ------------------------------------------------------------------ panels */
+
+.mm-debugger__main {
+    flex-direction: row;
+    flex-grow: 1;
+    flex-basis: 0;
+    min-height: 200px;
+}
+
+.mm-debugger__panel {
+    background-color: rgb(30, 33, 40);
+    border-width: 1px;
+    border-color: rgb(52, 57, 68);
+    border-radius: 4px;
+    padding: 4px;
+}
+
+.mm-debugger__section-title {
+    -unity-font-style: bold;
+    color: rgb(150, 190, 255);
+    margin: 2px 4px 4px 4px;
+}
+
+.mm-debugger__table-panel {
+    width: 220px;
+    min-width: 160px;
+    flex-shrink: 0;
+    margin-right: 6px;
+}
+
+.mm-debugger__table-list {
+    flex-grow: 1;
+}
+
+.mm-debugger__table-row {
+    flex-direction: row;
+    align-items: center;
+    height: 100%;
+    padding: 0 6px;
+}
+
+.mm-debugger__table-name {
+    flex-grow: 1;
+    overflow: hidden;
+    -unity-text-overflow-position: end;
+    text-overflow: ellipsis;
+}
+
+.mm-debugger__table-count {
+    color: rgb(255, 184, 76);
+    -unity-font-style: bold;
+}
+
+.mm-debugger__content-panel {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.mm-debugger__search-toolbar {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    margin-bottom: 4px;
+}
+
+.mm-debugger__search {
+    flex-grow: 1;
+    margin: 0 8px 0 0;
+}
+
+.mm-debugger__modified-only {
+    margin: 0;
+}
+
+.mm-debugger__modified-only > Label {
+    min-width: 0;
+    margin-right: 4px;
+}
+
+.mm-debugger__record-header {
+    flex-direction: row;
+    flex-shrink: 0;
+    padding: 2px 6px;
+    border-bottom-width: 1px;
+    border-color: rgb(52, 57, 68);
+}
+
+.mm-debugger__record-header Label {
+    color: rgb(150, 157, 171);
+    -unity-font-style: bold;
+}
+
+.mm-debugger__record-list {
+    flex-grow: 1;
+}
+
+.mm-debugger__record-row {
+    flex-direction: row;
+    align-items: center;
+    height: 100%;
+    padding: 0 6px;
+}
+
+.mm-debugger__record-key {
+    width: 160px;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-debugger__record-name {
+    flex-grow: 1;
+    flex-basis: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-debugger__record-modified {
+    width: 36px;
+    flex-shrink: 0;
+    -unity-text-align: middle-center;
+    color: rgb(255, 184, 76);
+    -unity-font-style: bold;
+}
+
+.mm-debugger__record-row--modified .mm-debugger__record-key,
+.mm-debugger__record-row--modified .mm-debugger__record-name {
+    color: rgb(255, 214, 150);
+}
+
+.mm-debugger__record-count {
+    flex-shrink: 0;
+    color: rgb(150, 157, 171);
+    font-size: 11px;
+    margin: 4px 4px 0 4px;
+}
+
+/* ------------------------------------------------------------------ inspector */
+
+.mm-debugger__inspector-panel {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-height: 160px;
+    margin-top: 6px;
+}
+
+.mm-debugger__inspector-header {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    margin-bottom: 4px;
+}
+
+.mm-debugger__record-state {
+    margin-left: 8px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: rgb(150, 157, 171);
+}
+
+.mm-debugger__record-state--modified {
+    color: rgb(22, 24, 29);
+    background-color: rgb(255, 184, 76);
+}
+
+.mm-debugger__record-state--dirty {
+    color: rgb(22, 24, 29);
+    background-color: rgb(120, 190, 255);
+}
+
+.mm-debugger__inspector {
+    flex-grow: 1;
+}
+
+.mm-debugger__hint {
+    color: rgb(150, 157, 171);
+    margin: 8px;
+}
+
+.mm-debugger__field {
+    flex-direction: row;
+    align-items: center;
+    min-height: 24px;
+    padding: 1px 4px;
+    border-bottom-width: 1px;
+    border-color: rgb(40, 44, 53);
+}
+
+.mm-debugger__field--modified {
+    background-color: rgba(255, 184, 76, 0.08);
+}
+
+.mm-debugger__field-name-container {
+    flex-direction: row;
+    align-items: center;
+    width: 240px;
+    flex-shrink: 0;
+}
+
+.mm-debugger__field-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-debugger__field--modified .mm-debugger__field-name {
+    color: rgb(255, 184, 76);
+    -unity-font-style: bold;
+}
+
+.mm-debugger__field-value {
+    flex-grow: 1;
+    flex-basis: 0;
+    margin: 0 8px 0 0;
+}
+
+.mm-debugger__field-readonly {
+    color: rgb(170, 176, 190);
+    padding: 2px 4px;
+    white-space: normal;
+}
+
+.mm-debugger__field-readonly--key {
+    color: rgb(150, 190, 255);
+    -unity-font-style: bold;
+}
+
+.mm-debugger__field-original {
+    width: 220px;
+    flex-shrink: 0;
+    color: rgb(255, 184, 76);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-debugger__field-editor--invalid .unity-base-text-field__input {
+    border-color: rgb(229, 83, 75);
+}
+
+.mm-debugger__badge {
+    font-size: 9px;
+    -unity-font-style: bold;
+    padding: 0 3px;
+    margin-left: 4px;
+    border-radius: 2px;
+    color: rgb(22, 24, 29);
+}
+
+.mm-debugger__badge--pk {
+    background-color: rgb(150, 190, 255);
+}
+
+.mm-debugger__badge--sk {
+    background-color: rgb(160, 220, 170);
+}
+
+.mm-debugger__badge--ro {
+    background-color: rgb(150, 157, 171);
+}
+
+.mm-debugger__nullable {
+    flex-direction: row;
+    align-items: center;
+}
+
+.mm-debugger__nullable > .mm-debugger__field-editor {
+    flex-grow: 1;
+}
+
+.mm-debugger__nullable-toggle {
+    margin-right: 4px;
+}
+
+.mm-debugger__color {
+    flex-direction: row;
+    align-items: center;
+}
+
+.mm-debugger__color-swatch {
+    width: 22px;
+    height: 18px;
+    margin-right: 6px;
+    border-width: 1px;
+    border-color: rgb(90, 96, 110);
+    border-radius: 2px;
+}
+
+.mm-debugger__color-channel {
+    flex-grow: 1;
+    flex-basis: 0;
+    margin: 0 4px 0 0;
+}
+
+.mm-debugger__color-channel > Label {
+    min-width: 0;
+    margin-right: 2px;
+}
+
+/* ------------------------------------------------------------------ bottom toolbar */
+
+.mm-debugger__bottom-toolbar {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    height: 32px;
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top-width: 1px;
+    border-color: rgb(58, 63, 75);
+}
+
+.mm-debugger__status {
+    flex-grow: 1;
+    flex-basis: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgb(170, 176, 190);
+}
+
+.mm-debugger__status--error {
+    color: rgb(255, 120, 110);
+}
+
+/* ------------------------------------------------------------------ dialog */
+
+.mm-debugger__dialog-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.55);
+}
+
+.mm-debugger__dialog {
+    width: 460px;
+    max-width: 90%;
+    padding: 16px;
+    background-color: rgb(34, 37, 44);
+    border-width: 1px;
+    border-color: rgb(70, 76, 90);
+    border-radius: 6px;
+}
+
+.mm-debugger__dialog-title {
+    font-size: 15px;
+    -unity-font-style: bold;
+    margin-bottom: 8px;
+}
+
+.mm-debugger__dialog-message {
+    white-space: normal;
+    margin-bottom: 16px;
+}
+
+.mm-debugger__dialog-buttons {
+    flex-direction: row;
+    justify-content: flex-end;
+}
+
+/* ------------------------------------------------------------------ built-in controls inside the debugger */
+
+.mm-debugger .unity-base-text-field__input,
+.mm-debugger .unity-base-popup-field__input {
+    background-color: rgb(20, 22, 27);
+    border-color: rgb(64, 70, 83);
+    color: rgb(226, 229, 235);
+}
+
+.mm-debugger .unity-base-field__label {
+    color: rgb(170, 176, 190);
+}
+
+.mm-debugger .unity-collection-view__item--selected {
+    background-color: rgb(40, 76, 130);
+}
+
+.mm-debugger .unity-collection-view__item--alternative-background {
+    background-color: rgba(255, 255, 255, 0.03);
+}
