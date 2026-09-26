@@ -17,6 +17,12 @@ namespace Nesh.MasterMemoryDebugger
 
         public event Action Changed;
 
+        /// <summary>
+        /// Raised for every changed record, before <see cref="Changed"/>: the key, the previous override (null when there
+        /// was none) and the new one (null when removed). Used by the undo history.
+        /// </summary>
+        internal event Action<MasterDataOverrideKey, object, object> EntryChanged;
+
         public int Count
         {
             get
@@ -80,29 +86,35 @@ namespace Nesh.MasterMemoryDebugger
                 throw new ArgumentException($"Value type {value.GetType().FullName} is not assignable to {recordType.FullName}.", nameof(value));
             }
 
+            var overrideKey = new MasterDataOverrideKey(recordType, key);
+            object before;
             lock (gate)
             {
-                var overrideKey = new MasterDataOverrideKey(recordType, key);
-                if (!overrides.ContainsKey(overrideKey))
+                if (!overrides.TryGetValue(overrideKey, out before))
                 {
                     countByType.TryGetValue(recordType, out var count);
                     countByType[recordType] = count + 1;
                 }
                 overrides[overrideKey] = value;
             }
+            EntryChanged?.Invoke(overrideKey, before, value);
             RaiseChanged();
         }
 
         public bool Remove(Type recordType, object key)
         {
             if (recordType == null || key == null) return false;
+            var overrideKey = new MasterDataOverrideKey(recordType, key);
+            object before;
             lock (gate)
             {
-                if (!overrides.Remove(new MasterDataOverrideKey(recordType, key))) return false;
+                if (!overrides.TryGetValue(overrideKey, out before)) return false;
+                overrides.Remove(overrideKey);
                 var count = countByType[recordType] - 1;
                 if (count == 0) countByType.Remove(recordType);
                 else countByType[recordType] = count;
             }
+            EntryChanged?.Invoke(overrideKey, before, null);
             RaiseChanged();
             return true;
         }
@@ -142,11 +154,18 @@ namespace Nesh.MasterMemoryDebugger
 
         public void Clear()
         {
+            List<KeyValuePair<MasterDataOverrideKey, object>> removed;
             lock (gate)
             {
                 if (overrides.Count == 0) return;
+                removed = new List<KeyValuePair<MasterDataOverrideKey, object>>(overrides);
                 overrides.Clear();
                 countByType.Clear();
+            }
+            var entryChanged = EntryChanged;
+            if (entryChanged != null)
+            {
+                foreach (var pair in removed) entryChanged(pair.Key, pair.Value, null);
             }
             RaiseChanged();
         }

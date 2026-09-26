@@ -67,7 +67,7 @@ namespace UnityEngine
         public static bool isEditor => true;
         public static void OpenURL(string url) { }
     }
-    public enum KeyCode { UpArrow = 273, DownArrow = 274, None = 0, Backspace = 8, Tab = 9, Return = 13, Escape = 27, Space = 32, BackQuote = 96, Alpha0 = 48, Alpha1, Alpha2, Alpha3, Alpha4, Alpha5, Alpha6, Alpha7, Alpha8, Alpha9, A = 97, Keypad0 = 256, Keypad1, Keypad2, Keypad3, Keypad4, Keypad5, Keypad6, Keypad7, Keypad8, Keypad9, KeypadEnter = 271, F1 = 282, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, Print = 316 }
+    public enum KeyCode { UpArrow = 273, DownArrow = 274, None = 0, Backspace = 8, Tab = 9, Return = 13, Escape = 27, Space = 32, BackQuote = 96, Alpha0 = 48, Alpha1, Alpha2, Alpha3, Alpha4, Alpha5, Alpha6, Alpha7, Alpha8, Alpha9, A = 97, Y = 121, Z = 122, Keypad0 = 256, Keypad1, Keypad2, Keypad3, Keypad4, Keypad5, Keypad6, Keypad7, Keypad8, Keypad9, KeypadEnter = 271, F1 = 282, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, Print = 316 }
     public static class Input { public static bool GetKeyDown(KeyCode key) => false; public static int touchCount => 0; }
     public enum RuntimeInitializeLoadType { AfterSceneLoad = 0, BeforeSceneLoad = 1, AfterAssembliesLoaded = 2, BeforeSplashScreen = 3, SubsystemRegistration = 4 }
     [AttributeUsage(AttributeTargets.Method)] public class RuntimeInitializeOnLoadMethodAttribute : Attribute

@@ -61,10 +61,10 @@ IL2CPP 還需要把產生的 `MasterMemoryResolver` 註冊到 MessagePack（參�
 Package Manager → `+` → **Add package from git URL...**
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.5.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.6.0
    ```
 
-   URL 最後的 `#v0.5.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
+   URL 最後的 `#v0.6.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
 
 Runtime assembly (`Nesh.MasterMemoryDebugger.Runtime`) 會自動參考 NuGetForUnity 安裝的 `MasterMemory.dll`。
 
@@ -238,7 +238,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 │ MasterMemory Debugger [Data][Changes (2)][Patches (3)][Validation (1 new)] Master: v1 [zh-TW ▼][Close] │
 ├────────────┬┬─────────────────────────────────────────────┬┬──────────────────────────┤
 │ Tables [TSV]││ [技能 ×][武器 ×] [+ Pin]                      ││ 技能 1001  Overridden     │
-│ ▼ Battle(6)││ [Damage>100 Element=Fire..] [ ] Mod [Columns▾][Copy]││ Id  PK                   │
+│ ▼ Battle(6)││ [Damage>100..] [ ]Mod [Columns▾][Batch Edit…][Copy]││ Id  PK             │
 │   技能     ││ ● │ Id (PK)┃ 分類 (SK)│ 名稱    │ 傷害 ▼│ ...   ││ 1001                     │
 │   武器     ││   │   1004 ┃        1 │ Thunder │   180 │       ││ 傷害       Original: 120 │
 │ ▶ Economy  ││ ● │   1001 ┃        1 │ Fireball│   185 │       ││ [185                   ] │
@@ -246,7 +246,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 │            ││                                             ││   角色.初始技能 3 [Show] │
 │            ││                                             ││ [Apply][Revert][Reset]   │
 ├────────────┴┴─────────────────────────────────────────────┴┴──────────────────────────┤
-│ status...                                                                     [Log (12)] │
+│ status...                                                   [↶ Undo][↷ Redo][Log (12)] │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -265,6 +265,13 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
   拖曳欄位標題的右邊界可以手動調整；**雙擊**右邊界回到自動寬度。
 - 點欄位標題排序（遞增 → 遞減 → 不排序）。排序會套用在所有符合條件的資料上，再取前 `Max Search Results` 筆（預設 500）。
 - 欄位的顯示、凍結與手動寬度會依 Table 記在 PlayerPrefs，重新執行後仍會保留（`Reset` 回到預設）。
+- **Batch Edit…**：對「符合目前搜尋條件的所有 Record」（不只畫面上顯示的前 500 筆）一次修改一個欄位，結果存成 Override：
+  - **Set**：全部設成同一個值（數字、文字直接輸入；enum 與 bool 從下拉選單選擇；Flags 用 `|` 連接；Nullable 欄位可以輸入 / 選擇 `null`）
+  - **Add**：數字加上一個值（負數為減少），例如 `Price + 100`
+  - **Multiply**：數字乘上一個值，例如 `Damage × 1.1`；整數以四捨五入（.5 遠離 0）取整
+  - 主鍵 / SecondaryKey、Array / List 與複雜型別不能批次修改。改完後所有值都和原始值相同的 Record 會移除 Override。
+  - 無法修改的 Record（值是 null、超出型別範圍）會略過並列在 Console；整次修改是**一個 Undo 步驟**。
+  - 程式中：`MasterMemoryBatchEdit.Apply(records, field, MasterMemoryBatchOperation.Multiply, "1.1")`。
 - **Copy**：把目前顯示的資料列與欄位（套用搜尋、排序、欄位顯示設定後的結果，凍結欄位在前）複製成 Tab 分隔文字，可以直接貼到 Excel / Google 試算表。WebGL 會下載成 `.tsv`。
 - 範例的 `ExampleManyColumnsMaster`（75 欄、120 筆，Test 群組）與 `ExampleWeaponMaster`（27 欄）可以用來確認超出一個畫面時的水平捲動。
 - **釘選頁籤**：表格上方的 `+ Pin` 把目前的 Table 釘選成頁籤，點頁籤快速切換，`×` 取消釘選。釘選清單記在 PlayerPrefs，下次開啟仍會保留。
@@ -320,6 +327,20 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 標題列的 **Changes (N)** 會把主畫面切換成所有 Override 的總覽：每筆 Record 的修改欄位（原始值 → 目前值），可以 **Open**（跳到該筆 Record）或 **Reset**。
 原始 Record 已不存在（例如主資料刪掉了）或 Table 沒有註冊的 Override 會以紅色標示。程式中可用 `MasterMemoryChangeSummary.Build()` 取得同樣的資料。
 
+**Copy TSV** 會把所有修改過的欄位複製成 `table / key / name / field / original / current` 的 Tab 分隔表格，
+可以貼到試算表，對照著把調整好的數值回填到主資料的原始檔（WebGL 下載成 `changes.tsv`；程式中：`MasterMemoryChangeSummary.ToTsv(...)`）。
+
+### Undo / Redo
+
+狀態列的 **↶ Undo / ↷ Redo**（**Ctrl+Z / Ctrl+Y**，macOS 為 Cmd；Ctrl+Shift+Z 也是 Redo）可以復原 Debugger 做的修改：
+Inspector 的 Apply / Reset、Changes 的 Reset、Reset All、套用 / 合併 Patch、Batch Edit，每個操作是一個步驟（最多 50 步）。
+按鈕的 Tooltip 會顯示下一個要復原的操作。
+
+- Undo 只會把受影響的 Record 恢復成操作前的 Override（或沒有 Override），不會動到其他 Record。
+- 遊戲程式直接呼叫 `SetOverride` 等 API 修改 Override 時，歷史紀錄會清空（避免 Undo 覆蓋掉程式的修改）。
+- 焦點在搜尋框時 Ctrl+Z 不會觸發 Undo。
+- 程式中：`using (MasterMemoryDebugHistory.Record("說明")) { ... }` 把自己的修改記成一個步驟，`MasterMemoryDebugHistory.Undo()` / `Redo()`。
+
 ### Validation（驗證結果）
 
 使用 `MasterMemoryDebugRebuild.AutoRebuild(...)`（預設 `validate: true`）時，**Validation** 頁籤會列出重建後 database 的所有 `Validate()` 失敗：
@@ -351,6 +372,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 | 三指長按 1 秒 | 觸控裝置上開關 Debugger（手指數與秒數可在 Settings 修改，0 指停用） |
 | Enter | Inspector 中：Apply；對話框中：執行主要按鈕（刪除 / 覆蓋 / Reset All 等危險操作不會被 Enter 觸發） |
 | ↑ / ↓、Tab / Enter | 搜尋框自動完成：選擇、套用 |
+| Ctrl+Z / Ctrl+Y（Ctrl+Shift+Z） | Undo / Redo（macOS 為 Cmd）；焦點在搜尋框時不作用 |
 | Esc | 依序關閉：對話框、自動完成清單、Columns 清單；都沒有時關閉 Debugger |
 | Shift + 滾輪 | 表格水平捲動 |
 
@@ -361,15 +383,23 @@ Runtime 的 UI Toolkit 沒有 `ColorField`、`ToolbarSearchField`、`EnumFlagsFi
 
 ## Open / Close / Toggle
 
+其他專案（或遊戲自己的 Debug Menu / 按鈕 / 指令）可以直接用 API 開關 Debugger：
+
 ```csharp
-RuntimeMasterMemoryDebugger.Open();
+RuntimeMasterMemoryDebugger.Open();    // 開啟；無法開啟時回傳 false（正式版 Build、Settings 停用、非 Play Mode）
 RuntimeMasterMemoryDebugger.Close();
 RuntimeMasterMemoryDebugger.Toggle();
 bool isOpen = RuntimeMasterMemoryDebugger.IsOpen;
+bool canOpen = RuntimeMasterMemoryDebugger.IsAvailable;  // 例如用來決定 Debug Menu 要不要顯示按鈕
+
+// 開關時通知（例如開啟時暫停遊戲、關閉遊戲自己的輸入）
+RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpen ? 0f : 1f;
 ```
 
-- 預設熱鍵 **F8**（可在 Project Settings 修改），支援 Input System 與舊的 Input Manager。
-- 行動裝置：沒有內建手勢，請從專案既有的 Debug Menu 呼叫 `Toggle()`。
+- 預設熱鍵 **F8**（Settings 的 `Toggle Key`），支援 Input System 與舊的 Input Manager。
+- 觸控裝置：預設**三指長按 1 秒**開關（Settings 的 `Touch Toggle Fingers` / `Touch Toggle Seconds`）。
+- 只想由自己的 UI 開關時，在 Settings 把 `Toggle Key` 設為 `None`、`Touch Toggle Fingers` 設為 `0`，內建的熱鍵與手勢就會停用。
+- 正式版 Build 中這些 API 都不會做任何事，呼叫端不需要 `#if`。
 - UI 採 Lazy Create：開啟時才建立 `MasterMemoryRuntimeDebugger` GameObject + `UIDocument`，關閉時整個銷毀。關閉狀態下只有熱鍵 listener 存在，不會做任何 Reflection、UI 更新或 List refresh。
 - Editor 選單：`Tools > MasterMemory Debugger`。
 

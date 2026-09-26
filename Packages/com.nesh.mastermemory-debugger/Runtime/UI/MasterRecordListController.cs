@@ -220,6 +220,18 @@ namespace Nesh.MasterMemoryDebugger
             return value.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ').Replace('\t', ' ');
         }
 
+        /// <summary>Every record of the table that matches the search and the Modified Only filter (not limited to the shown rows).</summary>
+        internal List<MasterMemoryRecordDescriptor> GetAllMatches()
+        {
+            var result = new List<MasterMemoryRecordDescriptor>();
+            if (table == null) return result;
+            Filter(snapshot, MasterRecordQuery.Parse(Query, table.TypeDescriptor), ModifiedOnly, int.MaxValue, result);
+            return result;
+        }
+
+        /// <summary>The shown table.</summary>
+        internal MasterMemoryTableDescriptor Table => table;
+
         /// <summary>Table name of the shown table, for file names.</summary>
         internal string TableName => table?.TableName;
 

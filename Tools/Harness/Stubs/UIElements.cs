@@ -90,7 +90,7 @@ namespace UnityEngine.UIElements
         public void SelectRange(int cursorIndex, int selectionIndex) { }
     }
     public class FocusController { public Focusable focusedElement => null; public void IgnoreEvent(EventBase evt) { } }
-    public class Focusable { }
+    public class Focusable { public virtual void Focus() { } }
     public abstract class TextValueField<T> : TextInputBaseField<T> { protected TextValueField(string label) : base(label) { } }
     public class TextField : TextInputBaseField<string> { public TextField() : base(null) { } public TextField(string label) : base(label) { } public bool multiline { get; set; } }
     public class IntegerField : TextValueField<int> { public IntegerField() : base(null) { } public IntegerField(string label, int maxLength = 1000) : base(label) { } }

@@ -2,6 +2,19 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.6.0] - 2026-09-26
+
+### Added
+
+- Batch Edit: Set / Add / Multiply one field of every record that matches the search (all matches, not only the shown rows), as overrides. Enum and bool values are picked from a dropdown. Integers are rounded; keys, lists and complex members are excluded; records that end up equal to the original lose their override; failures (null, overflow) are listed in the Console. `MasterMemoryBatchEdit`.
+- Undo / Redo (status bar, Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, Cmd on macOS) of Apply, Reset, Reset All, patch Apply / Merge and Batch Edit, up to 50 steps. Changes made by game code clear the history. `MasterMemoryDebugHistory.Record` / `Undo` / `Redo`.
+- Changes tab: Copy TSV of every changed field (table, key, name, field, original, current) to copy tuned values back into the master data source. `MasterMemoryChangeSummary.ToTsv`.
+
+### Changed
+
+- The search toolbar wraps its buttons below the search box when the panel is narrow.
+- README: the Open / Close section documents `IsAvailable`, `OpenStateChanged` and how to turn off the built-in hotkey and touch gesture.
+
 ## [0.5.0] - 2026-09-26
 
 ### Added

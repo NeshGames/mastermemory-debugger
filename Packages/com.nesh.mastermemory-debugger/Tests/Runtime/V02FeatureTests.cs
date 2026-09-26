@@ -150,5 +150,21 @@ namespace Nesh.MasterMemoryDebugger.Tests
             StringAssert.Contains("Damage: 120 → 185", message.Text);
             StringAssert.DoesNotContain("<color", message.Text);
         }
+
+        [Test]
+        public void ChangesTsv_ShouldListEveryChangedField()
+        {
+            RegisterTestDatabase();
+            MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 185, Name = "Fire\tball" });
+            MasterMemoryDebugRuntime.SetOverride((2, 1), Database.TestEnemyLevelTable.FindByEnemyIdAndLevel((2, 1)) with { Hp = 1 });
+
+            var lines = MasterMemoryChangeSummary.ToTsv(MasterMemoryChangeSummary.Build()).TrimEnd('\n').Split('\n');
+
+            Assert.AreEqual("table\tkey\tname\tfield\toriginal\tcurrent", lines[0]);
+            Assert.AreEqual(4, lines.Length, string.Join("\n", lines));
+            Assert.IsTrue(lines.All(x => x.Split('\t').Length == 6), "tabs inside values are replaced");
+            CollectionAssert.Contains(lines.Select(x => string.Join("|", x.Split('\t').Skip(3))).ToList(), "Damage|120|185");
+            Assert.IsTrue(lines.Any(x => x.StartsWith("TestEnemyLevel\t") && x.EndsWith("\tHp\t400\t1")));
+        }
     }
 }
