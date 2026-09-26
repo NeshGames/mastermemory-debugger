@@ -97,7 +97,13 @@ namespace Nesh.MasterMemoryDebugger
             snapshot = table != null ? table.CreateRecordSnapshot() : new List<MasterMemoryRecordDescriptor>();
             var keepKey = preferredKey ?? (sameTable && SelectedRecord != null ? SelectedRecord.PrimaryKey : null);
             SelectedRecord = null;
-            if (!sameTable) RebuildColumns();
+            if (!sameTable)
+            {
+                // the rows still hold records of the previous table: never bind them to the new columns
+                filtered.Clear();
+                listView.RefreshItems();
+                RebuildColumns();
+            }
             ApplyFilter();
             if (keepKey != null) SelectByKey(keepKey);
         }
@@ -175,8 +181,15 @@ namespace Nesh.MasterMemoryDebugger
         Column CreateFieldColumn(MasterMemoryFieldDescriptor field, string title, string cellClass)
         {
             var isNumber = IsNumber(field.Kind);
+            var recordType = table.RecordType;
             var column = CreateColumn(field.Name, title, field.IsSimpleValue ? (isNumber ? 90 : 130) : 160, (label, record) =>
             {
+                // a row may still be bound to a record of the previous table while the columns change
+                if (record.Table.RecordType != recordType)
+                {
+                    label.text = string.Empty;
+                    return;
+                }
                 var value = field.GetValue(record.Current);
                 label.text = value == null ? "NULL" : MasterDataValueUtility.Format(value);
                 label.EnableInClassList(NullCellClass, value == null);
