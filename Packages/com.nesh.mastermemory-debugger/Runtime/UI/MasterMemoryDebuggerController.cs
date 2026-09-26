@@ -138,6 +138,7 @@ namespace Nesh.MasterMemoryDebugger
 
             tableList.TableSelected += OnTableSelected;
             recordList.RecordSelected += OnRecordSelected;
+            editor.ReferenceRequested += OpenReference;
             MasterMemoryDebugRegistry.TablesChanged += OnTablesChanged;
             MasterMemoryDebugRuntime.OverridesChanged += OnOverridesChanged;
             MasterMemoryDebuggerMessages.Changed += OnMessagesChanged;
@@ -177,6 +178,7 @@ namespace Nesh.MasterMemoryDebugger
             root.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             tableList.TableSelected -= OnTableSelected;
             recordList.RecordSelected -= OnRecordSelected;
+            editor.ReferenceRequested -= OpenReference;
             foreach (var (button, action) in buttons) button.clicked -= action;
             buttons.Clear();
 
@@ -288,6 +290,61 @@ namespace Nesh.MasterMemoryDebugger
                     recordList.SetTable(table, key);
                 }
             }, () => { });
+        }
+
+        /// <summary>Opens the referenced record, or the target table filtered by the referenced member.</summary>
+        void OpenReference(MasterMemoryReference reference, object value)
+        {
+            if (!MasterMemoryDebugRegistry.TryGetTable(reference.TargetType, out var target))
+            {
+                SetStatus($"{reference.TargetType.Name} is not registered.", true);
+                return;
+            }
+
+            var keys = target.TypeDescriptor.PrimaryKeyFields;
+            if (keys.Count == 1 && keys[0].Name == reference.TargetMember && TryConvertKey(value, target.KeyType, out var key))
+            {
+                if (target.TryFindOriginal(key, out _) || MasterMemoryDebugRuntime.Store.TryGet(target.RecordType, key, out _))
+                {
+                    OpenRecord(target, key);
+                    return;
+                }
+                SetStatus($"{reference}: {MasterDataValueUtility.Format(value)} does not exist in {target.TableName}.", true);
+                return;
+            }
+
+            // not the primary key: show every record whose member has this value
+            var query = reference.TargetMember + "=" + FormatQueryValue(value);
+            RunAfterEditGuard(() =>
+            {
+                HideChanges();
+                recordList.SetState(query, false);
+                tableList.RestoreSelection(target);
+                ShowTable(target);
+            }, () => { });
+        }
+
+        static bool TryConvertKey(object value, Type keyType, out object key)
+        {
+            key = value;
+            if (value == null) return false;
+            if (keyType.IsInstanceOfType(value)) return true;
+            try
+            {
+                key = Convert.ChangeType(value, keyType, System.Globalization.CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        static string FormatQueryValue(object value)
+        {
+            if (value == null) return "null";
+            var text = MasterDataValueUtility.Format(value);
+            return text.IndexOf(' ') >= 0 ? "\"" + text.Replace("\"", string.Empty) + "\"" : text;
         }
 
         // ------------------------------------------------------------------ log panel

@@ -60,6 +60,9 @@ namespace Nesh.MasterMemoryDebugger
 
         public MasterMemoryRecordDescriptor Record => record;
 
+        /// <summary>A reference button was clicked: the reference and the value currently in the editor.</summary>
+        public event Action<MasterMemoryReference, object> ReferenceRequested;
+
         public bool IsDirty => isDirty;
 
         /// <summary>The panel that contains the field editors (used to route Enter to Apply).</summary>
@@ -160,6 +163,19 @@ namespace Nesh.MasterMemoryDebugger
             }
             editor.AddToClassList("mm-debugger__field-value");
             row.Root.Add(editor);
+
+            var reference = MasterMemoryReferences.Find(record.Table, field.Name);
+            if (reference != null && MasterMemoryDebugRegistry.TryGetTable(reference.TargetType, out var target))
+            {
+                var jump = new Button(() => ReferenceRequested?.Invoke(reference, field.GetValue(workingCopy)))
+                {
+                    text = "→ " + target.TableName,
+                    tooltip = reference + "  (MasterMemory Validate)",
+                };
+                jump.AddToClassList("mm-debugger__button");
+                jump.AddToClassList("mm-debugger__reference-button");
+                row.Root.Add(jump);
+            }
 
             row.OriginalLabel = new Label();
             row.OriginalLabel.AddToClassList("mm-debugger__field-original");

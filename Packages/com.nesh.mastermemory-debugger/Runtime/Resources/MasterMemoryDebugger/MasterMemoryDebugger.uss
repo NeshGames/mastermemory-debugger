@@ -347,6 +347,19 @@
     -unity-font-style: bold;
 }
 
+/* jump to the record referenced by this field (MasterMemory Validate Exists) */
+.mm-debugger__reference-button {
+    flex-shrink: 0;
+    margin: 0 6px 0 4px;
+    padding: 0 6px;
+    min-height: 18px;
+    font-size: 11px;
+}
+
+.mm-debugger .mm-debugger__reference-button {
+    color: rgb(120, 180, 255);
+}
+
 .mm-debugger__field-original {
     width: 220px;
     flex-shrink: 0;
