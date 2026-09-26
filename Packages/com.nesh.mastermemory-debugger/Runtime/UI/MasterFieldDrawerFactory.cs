@@ -14,9 +14,10 @@ namespace Nesh.MasterMemoryDebugger
         public const string ReadOnlyClass = "mm-debugger__field-readonly";
         public const string InvalidClass = "mm-debugger__field-editor--invalid";
 
-        /// <summary>Read-only text of any value.</summary>
+        /// <summary>Read-only view of any value: text, or a foldout tree for arrays / lists / nested objects.</summary>
         public static VisualElement CreateReadOnly(object value)
         {
+            if (MasterValueTreeFactory.IsExpandable(value)) return MasterValueTreeFactory.Create(value);
             var label = new Label(MasterDataValueUtility.Format(value));
             label.AddToClassList(ReadOnlyClass);
             label.selection.isSelectable = true;

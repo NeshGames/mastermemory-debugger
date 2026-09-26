@@ -113,6 +113,14 @@ namespace Nesh.MasterMemoryDebugger
             }
         }
 
+        /// <summary>Selects a table without raising <see cref="TableSelected"/> (cancelled change, or selection driven by the caller).</summary>
+        public void RestoreSelection(MasterMemoryTableDescriptor table)
+        {
+            SelectedTable = table;
+            if (table != null && idByTable.TryGetValue(table, out var id)) treeView.SetSelectionByIdWithoutNotify(new[] { id });
+            else treeView.ClearSelection();
+        }
+
         /// <summary>Refreshes the modified counts.</summary>
         public void RefreshCounts()
         {

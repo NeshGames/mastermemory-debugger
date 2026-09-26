@@ -2,6 +2,23 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.2.0] - 2026-09-26
+
+### Added
+
+- Record table: `MultiColumnListView` with a column per member, sortable headers (sorting covers every match before the result limit) and highlighted overridden cells.
+- Search conditions: space separated terms combined with AND, `Field op Value` with `= != > >= < <= ~`, quoted values, `null`; invalid terms are reported and ignored (`MasterRecordQuery`).
+- Changes view (header button): every overridden record with its changed fields, Open / Reset, overrides without an original record or table flagged (`MasterMemoryChangeSummary`).
+- Read-only foldout tree for arrays, lists, dictionaries and nested objects in the inspector.
+- Copy JSON of a record (clipboard; WebGL download) (`MasterDataRecordJson`).
+- Import patches into the patch list: Editor file dialog, WebGL browser upload, paste dialog on other platforms (`MasterDataPatchImporter`).
+- Apply / Discard / Cancel when leaving a record with unapplied edits; Enter applies, Esc closes the dialog or the debugger.
+- Log panel with the latest 50 messages (status, warnings, changes) for devices without a Console (`MasterMemoryDebuggerMessages`).
+
+### Changed
+
+- Package depends on `com.unity.modules.imgui` (system clipboard).
+
 ## [0.1.0] - 2026-09-26
 
 Requires Unity 6000.0 or newer and MasterMemory 3.x (NuGetForUnity). Tested on Unity 6000.6.

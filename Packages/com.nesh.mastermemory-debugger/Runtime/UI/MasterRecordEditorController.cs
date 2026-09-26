@@ -23,6 +23,7 @@ namespace Nesh.MasterMemoryDebugger
         readonly Button applyButton;
         readonly Button revertButton;
         readonly Button resetButton;
+        readonly Button copyJsonButton;
         readonly Action<string, bool> setStatus;
         readonly List<FieldRow> rows = new List<FieldRow>();
 
@@ -38,6 +39,7 @@ namespace Nesh.MasterMemoryDebugger
             Button applyButton,
             Button revertButton,
             Button resetButton,
+            Button copyJsonButton,
             Action<string, bool> setStatus)
         {
             this.titleLabel = titleLabel;
@@ -46,11 +48,13 @@ namespace Nesh.MasterMemoryDebugger
             this.applyButton = applyButton;
             this.revertButton = revertButton;
             this.resetButton = resetButton;
+            this.copyJsonButton = copyJsonButton;
             this.setStatus = setStatus;
 
-            applyButton.clicked += Apply;
+            applyButton.clicked += OnApplyClicked;
             revertButton.clicked += Revert;
             resetButton.clicked += ResetRecord;
+            copyJsonButton.clicked += CopyJson;
             Show(null);
         }
 
@@ -58,11 +62,15 @@ namespace Nesh.MasterMemoryDebugger
 
         public bool IsDirty => isDirty;
 
+        /// <summary>The panel that contains the field editors (used to route Enter to Apply).</summary>
+        public VisualElement Container => container;
+
         public void Dispose()
         {
-            applyButton.clicked -= Apply;
+            applyButton.clicked -= OnApplyClicked;
             revertButton.clicked -= Revert;
             resetButton.clicked -= ResetRecord;
+            copyJsonButton.clicked -= CopyJson;
         }
 
         public void Show(MasterMemoryRecordDescriptor newRecord)
@@ -73,6 +81,14 @@ namespace Nesh.MasterMemoryDebugger
             }
             record = newRecord;
             Rebuild();
+        }
+
+        /// <summary>Drops unapplied edits (the user chose Discard).</summary>
+        public void DiscardEdits()
+        {
+            if (!isDirty) return;
+            Rebuild();
+            setStatus("Unapplied edits discarded.", false);
         }
 
         /// <summary>Overrides changed elsewhere (reset all, patch load, code): reload from the store.</summary>
@@ -196,6 +212,7 @@ namespace Nesh.MasterMemoryDebugger
             var isOverridden = hasRecord && record.IsModified;
 
             applyButton.SetEnabled(hasRecord && settings.AllowEditing && isDirty);
+            copyJsonButton.SetEnabled(hasRecord);
             revertButton.SetEnabled(hasRecord && isDirty);
             resetButton.SetEnabled(isOverridden);
             applyButton.style.display = settings.AllowEditing ? DisplayStyle.Flex : DisplayStyle.None;
@@ -210,9 +227,13 @@ namespace Nesh.MasterMemoryDebugger
             stateLabel.EnableInClassList("mm-debugger__record-state--modified", !isDirty && isOverridden);
         }
 
-        void Apply()
+        void OnApplyClicked() => TryApply();
+
+        /// <summary>Applies the edits. Returns false when nothing was applied because of an error.</summary>
+        public bool TryApply()
         {
-            if (record == null || !isDirty) return;
+            if (record == null) return false;
+            if (!isDirty) return true;
             var table = record.Table;
 
             object key;
@@ -223,12 +244,12 @@ namespace Nesh.MasterMemoryDebugger
             catch (Exception e)
             {
                 setStatus("Apply failed: " + e.Message, true);
-                return;
+                return false;
             }
             if (!Equals(key, record.PrimaryKey))
             {
                 setStatus("Apply failed: the primary key can not be changed.", true);
-                return;
+                return false;
             }
 
             var store = MasterMemoryDebugRuntime.Store;
@@ -255,6 +276,7 @@ namespace Nesh.MasterMemoryDebugger
                 isWritingStore = false;
             }
             Rebuild();
+            return true;
         }
 
         bool DiffersFromOriginal(object candidate)
@@ -264,6 +286,25 @@ namespace Nesh.MasterMemoryDebugger
                 if (!MasterDataValueUtility.AreEqual(field.GetValue(record.Original), field.GetValue(candidate))) return true;
             }
             return false;
+        }
+
+        /// <summary>Copies the record as shown (including unapplied edits) as JSON.</summary>
+        void CopyJson()
+        {
+            if (record == null) return;
+            string json;
+            try
+            {
+                json = MasterDataRecordJson.ToJson(workingCopy ?? record.Current);
+            }
+            catch (Exception e)
+            {
+                setStatus("Copy failed: " + e.Message, true);
+                return;
+            }
+            var fileName = MasterDataPatchStorage.NormalizeName($"{record.Table.TableName}_{record.KeyText}") + ".json";
+            var result = MasterDataPatchExporter.CopyToClipboard(json, fileName);
+            setStatus($"{record.Table.TableName} {record.KeyText}: {result.Message}", !result.Succeeded);
         }
 
         void Revert()

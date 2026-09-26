@@ -203,33 +203,68 @@ Package 本身永遠不會重建或替換 database。完整範例見 `Samples~/B
 ## UI Toolkit Runtime Debugger
 
 ```text
-┌───────────────────────────────────────────────────────────────┐
-│ MasterMemory Runtime Debugger   Master: v1   2 overrides [A-][A+][Close] │
-├──────────────┬────────────────────────────────────────────────┤
-│ Tables       │ [Search.....................] [ ] Modified Only │
-│ ItemMaster   │ Primary Key    Name                        Mod │
-│ SkillMaster*2│ 1001           Fireball                     *  │
-│              │ 1002           Ice Blast                       │
-├──────────────┴────────────────────────────────────────────────┤
-│ SkillMaster 1001  [Overridden]   [Apply Override][Revert Edits][Reset Record] │
-│ Id        PK   1001                                          │
-│ Category  SK   1                                             │
-│ Damage         [185            ]          Original: 120      │
-│ Cooldown       [2.5            ]                             │
-├───────────────────────────────────────────────────────────────┤
-│ status...          [Save Patch][Load Patch][Export][Open Folder][Reset All] │
-└───────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ MasterMemory Runtime Debugger  Master: v1  2 overrides   [Changes (2)][A-][A+][Close] │
+├──────────────┬───────────────────────────────────────────────────────────────┤
+│ Tables       │ [Damage>100 Element=Fire.................] [ ] Modified Only   │
+│ ▼ Battle (5) │ Primary Key │ Name      │ Mod │ Category (SK) │ Damage ▼│ ...   │
+│   SkillM. *2 │ 1004        │ Thunder   │     │ 1             │ 180     │       │
+│   ItemMaster │ 1001        │ Fireball  │  *  │ 1             │ 185     │       │
+│ ▶ Economy (1)│ 2 / 2005 records                                              │
+├──────────────┴───────────────────────────────────────────────────────────────┤
+│ SkillMaster 1001 [Overridden]  [Copy JSON][Apply Override][Revert Edits][Reset Record] │
+│ Id        PK   1001                                                          │
+│ Damage         [185            ]                         Original: 120       │
+│ EffectIds RO   ▶ [2] 10, 11                                                  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Patch [balance-A ▼][balance-A] [Save][Load][Delete][Import][Export][Open Folder] [Reset All] │
+│ status...                                                             [Log (12)] │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Table / Record List 都使用 `ListView` virtualization。
-- 搜尋會比對 PrimaryKey、Display Name、所有 string 欄位；只在查詢字串、Table、Override 變更時重新計算（輸入時有 150ms debounce）。最多顯示 `Max Search Results` 筆（預設 500）。
-- Inspector 會列出所有 public property / field：
+### Record 表格
+
+- Record 列表是可排序的多欄表格（`MultiColumnListView`，virtualization）：Primary Key、Name、Mod，以及每個欄位一欄（SecondaryKey 標 `(SK)`，複雜型別顯示預覽）。
+- 點欄位標題排序（再點一次反向）；排序會套用在所有符合條件的資料上，再取前 `Max Search Results` 筆（預設 500）。
+- 有 Override 的格子若和原始值不同，會以橘色顯示。
+
+### 搜尋 / 篩選
+
+以空白分隔多個條件，**全部符合**才會顯示：
+
+| 寫法 | 意義 |
+| --- | --- |
+| `ice` | PrimaryKey / Display Name / string 欄位包含 `ice`（不分大小寫） |
+| `Damage>100` | 欄位比較，運算子 `=` `!=` `>` `>=` `<` `<=` |
+| `Name~blast` | 欄位文字包含 |
+| `Element=Fire` | enum 用名稱（不分大小寫） |
+| `IsPassive=true` | bool |
+| `Name="Ice Blast"` | 值有空白時加引號 |
+| `UnlockLevel=null` | null |
+| `Category=1 Damage > 100` | 多個條件（運算子前後可以有空格） |
+
+欄位名稱不分大小寫；比較的是目前值（有 Override 時用 Override）。欄位不存在或值格式錯誤時，筆數旁會顯示警告並忽略該條件。
+只在查詢、Table、排序、Override 變更時重新計算（輸入時有 150ms debounce）。
+
+### Inspector
+
+- 列出所有 public property / field：
   - `PK` / `SK`：永遠唯讀
   - 支援編輯：`int uint short ushort long ulong byte sbyte float double bool string enum`、`[Flags] enum`（以文字輸入）、`Vector2 Vector3 Vector2Int Vector3Int Color`、以及上述型別的 `Nullable<T>`
-  - Array / List / Dictionary / 巢狀物件 / 其他型別：唯讀預覽（`RO`）
+  - Array / List / Dictionary / 巢狀物件：唯讀的可折疊樹狀檢視（最多 3 層、每層最多 100 項，展開時才建立）
   - 有修改的欄位會顯示 `Original: xxx`
 - **Apply Override** 會把編輯中的副本存進 Override Store；如果所有值都和原始值相同，會改為移除 Override。
-- **Reset All** 會先跳出確認視窗：`Reset all MasterMemory runtime overrides?`
+- **Copy JSON**：把整筆 Record（包含陣列與巢狀物件、未套用的編輯）複製為 JSON。Editor / Windows 複製到剪貼簿，WebGL 下載成檔案。
+- 有未套用的編輯時切換 Record / Table，會詢問 **Apply / Discard / Cancel**。
+
+### Changes（修改總覽）
+
+標題列的 **Changes (N)** 會把主畫面切換成所有 Override 的總覽：每筆 Record 的修改欄位（原始值 → 目前值），可以 **Open**（跳到該筆 Record）或 **Reset**。
+原始 Record 已不存在（例如主資料刪掉了）或 Table 沒有註冊的 Override 會以紅色標示。程式中可用 `MasterMemoryChangeSummary.Build()` 取得同樣的資料。
+
+### Log 與 Console
+
+- 狀態列右側的 **Log (N)** 會展開最近 50 則訊息（狀態、Patch 警告、修改內容），在沒有 Console 的實機上也看得到。
 - Apply Override / Reset Record / Reset All / Load Patch 都會在 Console 印出修改內容（可在 Settings 關閉）：
 
   ```text
@@ -240,6 +275,16 @@ Package 本身永遠不會重建或替換 database。完整範例見 `Samples~/B
 
   Editor Console 中標題為橘色、欄位名稱為黃色、舊值灰色、新值綠色；Development Build 的 log 檔不含顏色標籤。
   專案也可以用 `MasterDataDiffUtility.GetChanges(before, after)` / `Format(...)` 產生同樣的比對結果。
+
+### 快捷鍵與其他
+
+| 按鍵 | 行為 |
+| --- | --- |
+| F8 | 開關 Debugger（可在 Settings 修改） |
+| Enter | Inspector 中：Apply Override；對話框中：執行主要按鈕（刪除 / 覆蓋 / Reset All 等危險操作不會被 Enter 觸發） |
+| Esc | 關閉對話框，沒有對話框時關閉 Debugger |
+
+- **Reset All** 會先跳出確認視窗：`Reset all MasterMemory runtime overrides?`
 - `A-` / `A+` 可調整 UI 縮放（只在使用 Debugger 自己建立的 PanelSettings 時顯示）。
 
 Runtime 的 UI Toolkit 沒有 `ColorField`、`ToolbarSearchField`、`EnumFlagsField`，所以 Color 使用 RGBA 四個 `FloatField`，搜尋框使用 `TextField`，Flags enum 使用文字輸入。
@@ -298,7 +343,7 @@ Patch 只記錄 **有修改的可編輯欄位** 與其 **原始值**，不會保
 | 按鈕 | 行為 |
 | --- | --- |
 Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger/<名稱>.patch.json`。
-底部工具列：`Patch [已儲存的 Patch ▼] [名稱] [Save Patch] [Load Patch] [Delete] [Export] [Open Folder] ... [Reset All]`
+底部工具列：`Patch [已儲存的 Patch ▼] [名稱] [Save Patch] [Load Patch] [Delete] [Import] [Export] [Open Folder] ... [Reset All]`
 
 | 控制項 | 行為 |
 | --- | --- |
@@ -307,6 +352,7 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 | Save Patch | 以名稱欄位儲存；名稱已存在且不是目前選取的 Patch 時會先確認是否覆蓋 |
 | Load Patch | 載入下拉選單選取的 Patch，**取代**目前所有 Override |
 | Delete | 刪除下拉選單選取的 Patch（目前的 Override 不受影響） |
+| Import | 把 Patch 檔加入清單（之後用 Load Patch 套用）。Editor：檔案對話框；**WebGL：瀏覽器上傳**；其他平台：貼上 JSON。同名時會確認是否覆蓋 |
 | Export | 匯出目前的 Override（檔名 `<名稱>-<時間>.json`）。Editor：存檔對話框；**WebGL：瀏覽器下載**；其他平台：`.../MasterMemoryDebugger/exports/` |
 | Open Folder | 開啟資料夾（Editor / Windows / macOS / Linux） |
 
@@ -375,7 +421,8 @@ Override Layer **只保證經過 `TryGetOverride` / `Resolve` 的 PrimaryKey 查
 
 - 沒有使用 `Reflection.Emit`、`DynamicMethod`、Thread、原生檔案對話框、`System.Diagnostics.Process`。
 - Patch 寫在 `Application.persistentDataPath`（IndexedDB），每次寫入後會呼叫 `FS.syncfs` 同步。
-- Export 會透過 `Plugins/WebGL/MasterMemoryDebugger.jslib` 觸發瀏覽器下載。
+- Export / Copy JSON 會透過 `Plugins/WebGL/MasterMemoryDebugger.jslib` 觸發瀏覽器下載，Import 會開啟瀏覽器的檔案選擇器。
+  瀏覽器只允許在使用者點擊後開啟檔案選擇器，若被擋下請再按一次 Import。
 
 ## IL2CPP Notes
 
