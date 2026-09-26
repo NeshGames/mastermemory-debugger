@@ -60,7 +60,8 @@ namespace Nesh.MasterMemoryDebugger
                 record => getPrimaryKey((TRecord)record),
                 getDisplayName != null
                     ? record => getDisplayName((TRecord)record)
-                    : CreateDefaultDisplayName(typeof(TRecord)));
+                    : CreateDefaultDisplayName(typeof(TRecord)),
+                getDisplayName != null);
             Add(descriptor);
         }
 

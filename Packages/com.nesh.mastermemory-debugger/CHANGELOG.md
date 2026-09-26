@@ -2,6 +2,13 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.3.1] - 2026-09-26
+
+### Changed
+
+- Database viewer layout: tables | record grid | record detail side by side, with draggable dividers (`TwoPaneSplitView`). The inspector field rows put the name, badges, original value and reference button above a full width editor; Apply / Revert / Reset / Copy JSON moved to the bottom of the detail panel.
+- Record grid: dark, readable column headers; a `●` state column; primary key members as their own `(PK)` columns; the `Display` column only when the project supplies display names; numbers right aligned; `NULL` for null values; grid lines, alternating rows and a clearer selection.
+
 ## [0.3.0] - 2026-09-26
 
 ### Added

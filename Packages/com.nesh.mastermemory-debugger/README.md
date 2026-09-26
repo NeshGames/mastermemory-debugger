@@ -206,28 +206,28 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 ## UI Toolkit Runtime Debugger
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ MasterMemory Runtime Debugger  Master: v1  2 overrides   [Changes (2)][A-][A+][Close] │
-├──────────────┬───────────────────────────────────────────────────────────────┤
-│ Tables       │ [Damage>100 Element=Fire.................] [ ] Modified Only   │
-│ ▼ Battle (5) │ Primary Key │ Name      │ Mod │ Category (SK) │ Damage ▼│ ...   │
-│   SkillM. *2 │ 1004        │ Thunder   │     │ 1             │ 180     │       │
-│   ItemMaster │ 1001        │ Fireball  │  *  │ 1             │ 185     │       │
-│ ▶ Economy (1)│ 2 / 2005 records                                              │
-├──────────────┴───────────────────────────────────────────────────────────────┤
-│ SkillMaster 1001 [Overridden]  [Copy JSON][Apply Override][Revert Edits][Reset Record] │
-│ Id        PK   1001                                                          │
-│ Damage         [185            ]                         Original: 120       │
-│ EffectIds RO   ▶ [2] 10, 11                                                  │
-├──────────────────────────────────────────────────────────────────────────────┤
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│ MasterMemory Runtime Debugger  Master: v1  2 overrides        [Changes (2)][A-][A+][Close] │
+├────────────┬┬───────────────────────────────────────────┬┬──────────────────────────┤
+│ Tables     ││ [Damage>100 Element=Fire........] [ ] Mod ││ SkillMaster 1001 Overridden│
+│ ▼ Battle(5)││ ● │ Id (PK)│ Category (SK)│ Name    │Damage▼││ Id  PK                   │
+│   SkillM.  ││   │   1004 │            1 │ Thunder │   180 ││ 1001                     │
+│   ItemM.   ││ ● │   1001 │            1 │ Fireball│   185 ││ Damage     Original: 120 │
+│ ▶ Economy  ││ 2 / 2005 records                          ││ [185                   ] │
+│            ││                                           ││ [Apply][Revert][Reset]   │
+├────────────┴┴───────────────────────────────────────────┴┴──────────────────────────┤
 │ Patch [balance-A ▼][balance-A] [Save][Load][Delete][Import][Export][Open Folder] [Reset All] │
-│ status...                                                             [Log (12)] │
-└──────────────────────────────────────────────────────────────────────────────┘
+│ status...                                                                  [Log (12)] │
+└──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Record 表格
 
-- Record 列表是可排序的多欄表格（`MultiColumnListView`，virtualization）：Primary Key、Name、Mod，以及每個欄位一欄（SecondaryKey 標 `(SK)`，複雜型別顯示預覽）。
+- 版面和一般資料庫檢視工具相同：左側 Table 清單、中間資料表格、右側 Record 詳細資料；兩條分隔線都可以拖曳調整寬度。
+- 資料表格是可排序的多欄表格（`MultiColumnListView`，virtualization）：
+  - 第一欄 `●` 標示有 Override 的 Record，接著是主鍵欄位（`(PK)`，複合主鍵每個成員一欄），然後每個欄位一欄（SecondaryKey 標 `(SK)`，複雜型別顯示預覽）。
+  - 專案用 `SetDisplayName` / `RegisterTable(getDisplayName)` 提供顯示名稱時，會多一欄 `Display`；預設的顯示名稱只是重複某個欄位，所以不另外顯示。
+  - 數字靠右對齊、`null` 顯示為灰色的 `NULL`、有格線與交錯底色。
 - 點欄位標題排序（再點一次反向）；排序會套用在所有符合條件的資料上，再取前 `Max Search Results` 筆（預設 500）。
 - 有 Override 的格子若和原始值不同，會以橘色顯示。
 
@@ -268,7 +268,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
   - **關聯跳轉**：Record 有實作 MasterMemory 的 `IValidatable<T>` 並用 `GetReferenceSet<T>().Exists(x => x.ItemId, y => y.Id)` 宣告關聯時，
     該欄位旁會出現 `→ ItemMaster` 按鈕，點擊會開啟被參照的 Record（參照的不是主鍵時，改為以 `Id=值` 篩選目標 Table）。
     不需要額外設定：關聯是從 `Validate` 的 `Exists()` 讀出來的（`MasterMemoryReferences.Get(table)`）；沒有寫 Validate 的 Record 就不會顯示按鈕。
-- **Apply Override** 會把編輯中的副本存進 Override Store；如果所有值都和原始值相同，會改為移除 Override。
+- **Apply** 會把編輯中的副本存進 Override Store；如果所有值都和原始值相同，會改為移除 Override。
 - **Copy JSON**：把整筆 Record（包含陣列與巢狀物件、未套用的編輯）複製為 JSON。Editor / Windows 複製到剪貼簿，WebGL 下載成檔案。
 - 有未套用的編輯時切換 Record / Table，會詢問 **Apply / Discard / Cancel**。
 
@@ -280,7 +280,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 ### Log 與 Console
 
 - 狀態列右側的 **Log (N)** 會展開最近 50 則訊息（狀態、Patch 警告、修改內容），在沒有 Console 的實機上也看得到。
-- Apply Override / Reset Record / Reset All / Load Patch 都會在 Console 印出修改內容（可在 Settings 關閉）：
+- Apply / Reset / Reset All / Load Patch 都會在 Console 印出修改內容（可在 Settings 關閉）：
 
   ```text
   [MasterMemoryDebugger] Override applied: SkillMaster 1001 (Fireball)
@@ -297,7 +297,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 | --- | --- |
 | F8 | 開關 Debugger（可在 Settings 修改） |
 | 三指長按 1 秒 | 觸控裝置上開關 Debugger（手指數與秒數可在 Settings 修改，0 指停用） |
-| Enter | Inspector 中：Apply Override；對話框中：執行主要按鈕（刪除 / 覆蓋 / Reset All 等危險操作不會被 Enter 觸發） |
+| Enter | Inspector 中：Apply；對話框中：執行主要按鈕（刪除 / 覆蓋 / Reset All 等危險操作不會被 Enter 觸發） |
 | ↑ / ↓、Tab / Enter | 搜尋框自動完成：選擇、套用 |
 | Esc | 關閉對話框或自動完成清單，都沒有時關閉 Debugger |
 

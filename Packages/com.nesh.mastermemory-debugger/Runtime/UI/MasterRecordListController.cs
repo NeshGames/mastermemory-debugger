@@ -7,7 +7,8 @@ namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
     /// Search box, Modified Only filter and the virtualized record table
-    /// (Primary Key, Name, Mod, then one column per member; click a header to sort).
+    /// (state ●, primary key members, a Display column when the project supplies display names, then one column per member;
+    /// click a header to sort).
     /// Results are rebuilt only when the query, the filter, the sorting, the table or the overrides change.
     /// </summary>
     internal sealed class MasterRecordListController : IDisposable
@@ -19,6 +20,10 @@ namespace Nesh.MasterMemoryDebugger
         const string ModifiedColumn = "mm-modified";
         const string CellClass = "mm-debugger__cell";
         const string ModifiedCellClass = "mm-debugger__cell--modified";
+        const string NumberCellClass = "mm-debugger__cell--number";
+        const string NullCellClass = "mm-debugger__cell--null";
+        const string KeyCellClass = "mm-debugger__cell--key";
+        const string StateCellClass = "mm-debugger__cell--state";
 
         readonly TextField searchField;
         readonly Toggle modifiedOnlyToggle;
@@ -135,30 +140,84 @@ namespace Nesh.MasterMemoryDebugger
             listView.columns.Clear();
             if (table != null)
             {
-                listView.columns.Add(CreateColumn(KeyColumn, "Primary Key", 130, (label, record) => label.text = record.KeyText));
-                listView.columns.Add(CreateColumn(NameColumn, "Name", 170, (label, record) => label.text = record.GetDisplayName() ?? string.Empty));
-                listView.columns.Add(CreateColumn(ModifiedColumn, "Mod", 42, (label, record) =>
+                // state gutter: ● for overridden records
+                var state = CreateColumn(ModifiedColumn, string.Empty, 24, (label, record) =>
                 {
                     var modified = record.IsModified;
-                    label.text = modified ? "*" : string.Empty;
+                    label.text = modified ? "●" : string.Empty;
                     label.EnableInClassList(ModifiedCellClass, modified);
-                }));
+                });
+                state.resizable = false;
+                state.makeCell = () => CreateCell(StateCellClass);
+                listView.columns.Add(state);
+
+                // primary key members first, like the columns of a database table
+                foreach (var field in table.TypeDescriptor.PrimaryKeyFields)
+                {
+                    listView.columns.Add(CreateFieldColumn(field, field.Name + " (PK)", KeyCellClass));
+                }
+
+                // the default display name repeats a member; only a project supplied one gets its own column
+                if (table.HasCustomDisplayName)
+                {
+                    listView.columns.Add(CreateColumn(NameColumn, "Display", 170, (label, record) => label.text = record.GetDisplayName() ?? string.Empty));
+                }
 
                 foreach (var field in table.TypeDescriptor.Fields)
                 {
                     if (field.IsPrimaryKey) continue;
-                    var f = field;
-                    var column = CreateColumn(field.Name, field.Name, field.IsSimpleValue ? 110 : 160, (label, record) =>
-                    {
-                        var value = f.GetValue(record.Current);
-                        label.text = MasterDataValueUtility.Format(value);
-                        label.EnableInClassList(ModifiedCellClass, record.IsModified && !MasterDataValueUtility.AreEqual(value, f.GetValue(record.Original)));
-                    });
-                    column.title = field.IsSecondaryKey ? field.Name + " (SK)" : field.Name;
-                    listView.columns.Add(column);
+                    listView.columns.Add(CreateFieldColumn(field, field.IsSecondaryKey ? field.Name + " (SK)" : field.Name, null));
                 }
             }
             listView.Rebuild();
+        }
+
+        Column CreateFieldColumn(MasterMemoryFieldDescriptor field, string title, string cellClass)
+        {
+            var isNumber = IsNumber(field.Kind);
+            var column = CreateColumn(field.Name, title, field.IsSimpleValue ? (isNumber ? 90 : 130) : 160, (label, record) =>
+            {
+                var value = field.GetValue(record.Current);
+                label.text = value == null ? "NULL" : MasterDataValueUtility.Format(value);
+                label.EnableInClassList(NullCellClass, value == null);
+                label.EnableInClassList(ModifiedCellClass, record.IsModified && !MasterDataValueUtility.AreEqual(value, field.GetValue(record.Original)));
+            });
+            column.makeCell = () =>
+            {
+                var label = CreateCell(cellClass);
+                // numbers are right aligned, like in database viewers
+                if (isNumber) label.AddToClassList(NumberCellClass);
+                return label;
+            };
+            return column;
+        }
+
+        static bool IsNumber(MasterDataValueKind kind)
+        {
+            switch (kind)
+            {
+                case MasterDataValueKind.Int32:
+                case MasterDataValueKind.UInt32:
+                case MasterDataValueKind.Int16:
+                case MasterDataValueKind.UInt16:
+                case MasterDataValueKind.Int64:
+                case MasterDataValueKind.UInt64:
+                case MasterDataValueKind.Byte:
+                case MasterDataValueKind.SByte:
+                case MasterDataValueKind.Single:
+                case MasterDataValueKind.Double:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        static Label CreateCell(string extraClass)
+        {
+            var label = new Label();
+            label.AddToClassList(CellClass);
+            if (extraClass != null) label.AddToClassList(extraClass);
+            return label;
         }
 
         Column CreateColumn(string name, string title, float width, Action<Label, MasterMemoryRecordDescriptor> bind)
@@ -168,15 +227,10 @@ namespace Nesh.MasterMemoryDebugger
                 name = name,
                 title = title,
                 width = width,
-                minWidth = 30,
+                minWidth = 24,
                 sortable = true,
                 stretchable = false,
-                makeCell = () =>
-                {
-                    var label = new Label();
-                    label.AddToClassList(CellClass);
-                    return label;
-                },
+                makeCell = () => CreateCell(null),
                 bindCell = (element, index) => bind((Label)element, filtered[index]),
             };
         }

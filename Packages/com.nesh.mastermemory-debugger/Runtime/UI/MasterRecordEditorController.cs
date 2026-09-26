@@ -148,6 +148,27 @@ namespace Nesh.MasterMemoryDebugger
             if (field.IsPrimaryKey) nameContainer.Add(CreateBadge("PK", "mm-debugger__badge--pk", "Primary key (read-only)"));
             if (field.IsSecondaryKey) nameContainer.Add(CreateBadge("SK", "mm-debugger__badge--sk", "Secondary key (read-only: MasterMemory indexes are not updated by overrides)"));
             if (!field.IsKey && !field.CanEdit) nameContainer.Add(CreateBadge("RO", "mm-debugger__badge--ro", "Read-only type"));
+            var spacer = new VisualElement();
+            spacer.AddToClassList("mm-debugger__spacer");
+            nameContainer.Add(spacer);
+
+            // name line: name, badges, original value, reference jump; the editor takes the full width below
+            row.OriginalLabel = new Label();
+            row.OriginalLabel.AddToClassList("mm-debugger__field-original");
+            nameContainer.Add(row.OriginalLabel);
+
+            var reference = MasterMemoryReferences.Find(record.Table, field.Name);
+            if (reference != null && MasterMemoryDebugRegistry.TryGetTable(reference.TargetType, out var target))
+            {
+                var jump = new Button(() => ReferenceRequested?.Invoke(reference, field.GetValue(workingCopy)))
+                {
+                    text = "→ " + target.TableName,
+                    tooltip = reference + "  (MasterMemory Validate)",
+                };
+                jump.AddToClassList("mm-debugger__button");
+                jump.AddToClassList("mm-debugger__reference-button");
+                nameContainer.Add(jump);
+            }
             row.Root.Add(nameContainer);
 
             var value = field.GetValue(workingCopy);
@@ -163,23 +184,6 @@ namespace Nesh.MasterMemoryDebugger
             }
             editor.AddToClassList("mm-debugger__field-value");
             row.Root.Add(editor);
-
-            var reference = MasterMemoryReferences.Find(record.Table, field.Name);
-            if (reference != null && MasterMemoryDebugRegistry.TryGetTable(reference.TargetType, out var target))
-            {
-                var jump = new Button(() => ReferenceRequested?.Invoke(reference, field.GetValue(workingCopy)))
-                {
-                    text = "→ " + target.TableName,
-                    tooltip = reference + "  (MasterMemory Validate)",
-                };
-                jump.AddToClassList("mm-debugger__button");
-                jump.AddToClassList("mm-debugger__reference-button");
-                row.Root.Add(jump);
-            }
-
-            row.OriginalLabel = new Label();
-            row.OriginalLabel.AddToClassList("mm-debugger__field-original");
-            row.Root.Add(row.OriginalLabel);
             return row;
         }
 
