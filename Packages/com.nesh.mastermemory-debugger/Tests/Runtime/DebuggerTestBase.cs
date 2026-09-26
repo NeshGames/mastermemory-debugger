@@ -30,6 +30,8 @@ namespace Nesh.MasterMemoryDebugger.Tests
         public void BaseTearDown()
         {
             ResetState();
+            MasterMemoryDebugLocalization.EndTests();
+            MasterTablePins.EndTests();
             MasterMemoryDebuggerSettings.SetCurrent(previousSettings);
             Object.DestroyImmediate(Settings);
         }
@@ -56,6 +58,8 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterDataCloneUtility.ClearProviders();
             MasterMemoryReferences.ClearCache();
             MasterGridLayout.ClearSettings();
+            MasterMemoryDebugLocalization.ResetForTests();
+            MasterTablePins.ResetForTests();
         }
     }
 }

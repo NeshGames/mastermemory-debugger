@@ -14,6 +14,7 @@ namespace Nesh.MasterMemoryDebugger
         {
             public MasterMemoryFieldDescriptor Field;
             public VisualElement Root;
+            public Label NameLabel;
             public Label OriginalLabel;
         }
 
@@ -112,6 +113,7 @@ namespace Nesh.MasterMemoryDebugger
             {
                 workingCopy = null;
                 titleLabel.text = "Record Inspector";
+                titleLabel.tooltip = null;
                 var hint = new Label("Select a record.");
                 hint.AddToClassList("mm-debugger__hint");
                 container.Add(hint);
@@ -122,7 +124,7 @@ namespace Nesh.MasterMemoryDebugger
             var settings = MasterMemoryDebuggerSettings.Current;
             var editable = settings.AllowEditing;
             workingCopy = editable ? MasterDataCloneUtility.Clone(record.Current) : record.Current;
-            titleLabel.text = $"{record.Table.TableName}   {record.KeyText}";
+            RefreshTitle();
 
             foreach (var field in record.Table.TypeDescriptor.Fields)
             {
@@ -142,9 +144,10 @@ namespace Nesh.MasterMemoryDebugger
 
             var nameContainer = new VisualElement();
             nameContainer.AddToClassList("mm-debugger__field-name-container");
-            var nameLabel = new Label(field.Name) { tooltip = field.FieldType.FullName };
-            nameLabel.AddToClassList("mm-debugger__field-name");
-            nameContainer.Add(nameLabel);
+            row.NameLabel = new Label();
+            row.NameLabel.AddToClassList("mm-debugger__field-name");
+            nameContainer.Add(row.NameLabel);
+            RefreshLabel(row);
             if (field.IsPrimaryKey) nameContainer.Add(CreateBadge("PK", "mm-debugger__badge--pk", "Primary key (read-only)"));
             if (field.IsSecondaryKey) nameContainer.Add(CreateBadge("SK", "mm-debugger__badge--sk", "Secondary key (read-only: MasterMemory indexes are not updated by overrides)"));
             if (!field.IsKey && !field.CanEdit) nameContainer.Add(CreateBadge("RO", "mm-debugger__badge--ro", "Read-only type"));
@@ -185,6 +188,26 @@ namespace Nesh.MasterMemoryDebugger
             editor.AddToClassList("mm-debugger__field-value");
             row.Root.Add(editor);
             return row;
+        }
+
+        /// <summary>Shows the labels of the selected language without rebuilding the editors (unapplied edits are kept).</summary>
+        public void RefreshLabels()
+        {
+            if (record == null) return;
+            RefreshTitle();
+            foreach (var row in rows) RefreshLabel(row);
+        }
+
+        void RefreshTitle()
+        {
+            titleLabel.text = $"{MasterMemoryDebugLocalization.GetTableLabel(record.Table)}   {record.KeyText}";
+            titleLabel.tooltip = MasterMemoryDebugLocalization.GetTableTooltip(record.Table);
+        }
+
+        void RefreshLabel(FieldRow row)
+        {
+            row.NameLabel.text = MasterMemoryDebugLocalization.GetFieldLabel(record.Table, row.Field);
+            row.NameLabel.tooltip = MasterMemoryDebugLocalization.GetFieldTooltip(record.Table, row.Field);
         }
 
         static Label CreateBadge(string text, string modifierClass, string tooltip)

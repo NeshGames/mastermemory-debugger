@@ -13,6 +13,7 @@
                 <ui:VisualElement class="mm-debugger__spacer" />
                 <ui:Label name="mm-master-version" class="mm-debugger__header-info" />
                 <ui:Label name="mm-override-count" class="mm-debugger__header-info mm-debugger__override-count" />
+                <ui:DropdownField name="mm-language" tooltip="Language of the table and field names" class="mm-debugger__language" />
                 <ui:Button name="mm-scale-down" text="A-" tooltip="Smaller UI" class="mm-debugger__button mm-debugger__header-button" />
                 <ui:Button name="mm-scale-up" text="A+" tooltip="Larger UI" class="mm-debugger__button mm-debugger__header-button" />
                 <ui:Button name="mm-close" text="Close" tooltip="Close (F8)" class="mm-debugger__button mm-debugger__header-button" />
@@ -27,6 +28,7 @@
 
                 <ui:TwoPaneSplitView name="mm-data-split" fixed-pane-index="1" fixed-pane-initial-dimension="400" orientation="Horizontal" class="mm-debugger__data-split">
                     <ui:VisualElement name="mm-content-panel" class="mm-debugger__panel mm-debugger__content-panel">
+                        <ui:VisualElement name="mm-table-tabs" class="mm-debugger__table-tabs" />
                         <ui:VisualElement name="mm-search-toolbar" class="mm-debugger__search-toolbar">
                             <ui:TextField name="mm-search" class="mm-debugger__search" />
                             <ui:Toggle name="mm-modified-only" label="Modified Only" class="mm-debugger__modified-only" />

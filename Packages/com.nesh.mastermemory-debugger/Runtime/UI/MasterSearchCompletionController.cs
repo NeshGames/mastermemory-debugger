@@ -21,6 +21,7 @@ namespace Nesh.MasterMemoryDebugger
         readonly VisualElement popup;
         readonly VisualElement anchor;
         readonly Func<MasterDataTypeDescriptor> typeProvider;
+        readonly Func<string, string> fieldLabelProvider;
         readonly List<Label> items = new List<Label>();
 
         MasterRecordQueryCompletion.Context context;
@@ -29,8 +30,10 @@ namespace Nesh.MasterMemoryDebugger
         // closed with Esc: stays closed until the text changes
         string dismissedText;
 
-        public MasterSearchCompletionController(TextField searchField, VisualElement popup, VisualElement anchor, Func<MasterDataTypeDescriptor> typeProvider)
+        public MasterSearchCompletionController(TextField searchField, VisualElement popup, VisualElement anchor, Func<MasterDataTypeDescriptor> typeProvider,
+            Func<string, string> fieldLabelProvider = null)
         {
+            this.fieldLabelProvider = fieldLabelProvider;
             this.searchField = searchField;
             this.popup = popup;
             this.anchor = anchor;
@@ -225,7 +228,10 @@ namespace Nesh.MasterMemoryDebugger
             var last = Math.Min(count, firstVisible + MaxVisibleItems);
             for (var i = firstVisible; i < last; i++)
             {
-                var item = new Label(context.Candidates[i]) { userData = i };
+                var candidate = context.Candidates[i];
+                // field names: the label of the selected language next to the code name that is inserted
+                var label = context.IsValue ? null : fieldLabelProvider?.Invoke(candidate);
+                var item = new Label(label != null && label != candidate ? $"{candidate}    {label}" : candidate) { userData = i };
                 item.AddToClassList(ItemClass);
                 item.EnableInClassList(SelectedItemClass, i == selected);
                 item.RegisterCallback<PointerDownEvent>(OnItemPointerDown);

@@ -17,7 +17,7 @@ namespace Nesh.MasterMemoryDebugger
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
             "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json",
-            "mm-close", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel",
+            "mm-close", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel",
             "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary",
             "mm-log", "mm-log-toggle",
         };
@@ -60,6 +60,8 @@ namespace Nesh.MasterMemoryDebugger
         MasterMemoryTableDescriptor shownTable;
         readonly MasterTableListController tableList;
         readonly MasterRecordListController recordList;
+        readonly MasterTableTabsController tableTabs;
+        readonly DropdownField languageField;
         readonly MasterSearchCompletionController searchCompletion;
         readonly MasterRecordEditorController editor;
         readonly MasterMemoryDebuggerDialog dialog;
@@ -91,7 +93,8 @@ namespace Nesh.MasterMemoryDebugger
                 Required<TextField>(root, "mm-search"),
                 Required<VisualElement>(root, "mm-search-completion"),
                 Required<VisualElement>(root, "mm-search-toolbar"),
-                () => recordList.TypeDescriptor);
+                () => recordList.TypeDescriptor,
+                recordList.FindFieldLabel);
             editor = new MasterRecordEditorController(
                 Required<Label>(root, "mm-inspector-title"),
                 Required<Label>(root, "mm-record-state"),
@@ -101,6 +104,11 @@ namespace Nesh.MasterMemoryDebugger
                 Required<Button>(root, "mm-reset-record"),
                 Required<Button>(root, "mm-copy-json"),
                 SetStatus);
+
+            tableTabs = new MasterTableTabsController(Required<VisualElement>(root, "mm-table-tabs"), () => shownTable, SelectTableFromTab);
+            languageField = Required<DropdownField>(root, "mm-language");
+            languageField.RegisterValueChangedCallback(OnLanguageSelected);
+            RefreshLanguageChoices();
 
             mainPanel = Required<VisualElement>(root, "mm-main");
             patchesPanel = Required<VisualElement>(root, "mm-patches-panel");
@@ -137,6 +145,7 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugRegistry.TablesChanged += OnTablesChanged;
             MasterMemoryDebugRuntime.OverridesChanged += OnOverridesChanged;
             MasterMemoryDebuggerMessages.Changed += OnMessagesChanged;
+            MasterMemoryDebugLocalization.Changed += OnLabelsChanged;
             root.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
 
             // restore the previous session
@@ -169,6 +178,8 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugRegistry.TablesChanged -= OnTablesChanged;
             MasterMemoryDebugRuntime.OverridesChanged -= OnOverridesChanged;
             MasterMemoryDebuggerMessages.Changed -= OnMessagesChanged;
+            MasterMemoryDebugLocalization.Changed -= OnLabelsChanged;
+            languageField.UnregisterValueChangedCallback(OnLanguageSelected);
             root.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             tableList.TableSelected -= OnTableSelected;
             recordList.RecordSelected -= OnRecordSelected;
@@ -181,6 +192,7 @@ namespace Nesh.MasterMemoryDebugger
             searchCompletion.Dispose();
             editor.Dispose();
             patches.Dispose();
+            tableTabs.Dispose();
         }
 
         // ------------------------------------------------------------------ events
@@ -188,7 +200,50 @@ namespace Nesh.MasterMemoryDebugger
         void OnTablesChanged()
         {
             tableList.Reload();
+            tableTabs.Refresh();
             RefreshHeader();
+        }
+
+        /// <summary>A pinned tab was clicked.</summary>
+        void SelectTableFromTab(MasterMemoryTableDescriptor table)
+        {
+            if (table == shownTable && currentTab == Tab.Data) return;
+            RunAfterEditGuard(() =>
+            {
+                SelectTab(Tab.Data);
+                if (table == shownTable) return;
+                tableList.RestoreSelection(table);
+                ShowTable(table);
+            }, () => { });
+        }
+
+        // ------------------------------------------------------------------ labels (language)
+
+        const string CodeNamesChoice = "Code names";
+
+        void RefreshLanguageChoices()
+        {
+            var languages = MasterMemoryDebugLocalization.Languages;
+            var choices = new List<string> { CodeNamesChoice };
+            choices.AddRange(languages);
+            languageField.choices = choices;
+            var language = MasterMemoryDebugLocalization.Language;
+            languageField.SetValueWithoutNotify(string.IsNullOrEmpty(language) || !choices.Contains(language) ? CodeNamesChoice : language);
+            languageField.style.display = languages.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        void OnLanguageSelected(ChangeEvent<string> evt)
+        {
+            MasterMemoryDebugLocalization.Language = evt.newValue == CodeNamesChoice ? MasterMemoryDebugLocalization.CodeNames : evt.newValue;
+        }
+
+        void OnLabelsChanged()
+        {
+            RefreshLanguageChoices();
+            tableList.RefreshCounts();
+            recordList.RefreshLabels();
+            editor.RefreshLabels();
+            tableTabs.Refresh();
         }
 
         void OnTableSelected(MasterMemoryTableDescriptor table)
@@ -203,6 +258,7 @@ namespace Nesh.MasterMemoryDebugger
             editor.Show(null);
             recordList.SetTable(table);
             searchCompletion.Refresh();
+            tableTabs.Refresh();
         }
 
         void OnRecordSelected(MasterMemoryRecordDescriptor record)

@@ -185,6 +185,67 @@
     margin: 0 3px;
 }
 
+/* pinned table tabs above the grid */
+.mm-debugger__table-tabs {
+    flex-direction: row;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    margin-bottom: 4px;
+    border-bottom-width: 1px;
+    border-color: rgb(52, 57, 68);
+}
+
+.mm-debugger__table-tab {
+    flex-direction: row;
+    align-items: center;
+    height: 24px;
+    padding: 0 4px 0 10px;
+    margin-right: 2px;
+    border-width: 1px 1px 0 1px;
+    border-color: rgb(52, 57, 68);
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    background-color: rgb(34, 37, 45);
+}
+
+.mm-debugger__table-tab:hover {
+    background-color: rgb(42, 47, 58);
+}
+
+.mm-debugger__table-tab--selected,
+.mm-debugger__table-tab--selected:hover {
+    background-color: rgb(44, 82, 140);
+    border-color: rgb(80, 140, 230);
+}
+
+.mm-debugger .mm-debugger__table-tab-label {
+    font-size: 12px;
+}
+
+.mm-debugger .mm-debugger__table-tab-close {
+    margin-left: 6px;
+    padding: 0 4px;
+    color: rgb(150, 157, 171);
+    border-radius: 3px;
+}
+
+.mm-debugger .mm-debugger__table-tab-close:hover {
+    color: rgb(255, 255, 255);
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.mm-debugger__table-tab-pin {
+    height: 22px;
+    margin: 1px 0 1px 4px;
+    font-size: 11px;
+}
+
+/* label language (shown when the project registered labels) */
+.mm-debugger__language {
+    width: 130px;
+    margin: 0 8px 0 4px;
+}
+
 .mm-debugger__search-toolbar {
     flex-direction: row;
     align-items: center;

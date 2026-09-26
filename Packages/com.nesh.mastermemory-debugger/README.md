@@ -261,7 +261,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 - 列出所有 public property / field：
   - `PK` / `SK`：永遠唯讀
   - 支援編輯：`int uint short ushort long ulong byte sbyte float double bool string enum`、`[Flags] enum`（以文字輸入）、`Vector2 Vector3 Vector2Int Vector3Int Color`、以及上述型別的 `Nullable<T>`
-  - **Array / List**（`T[]`、`List<T>`、`IReadOnlyList<T>` 等，元素為上述簡單型別）：逐項編輯、`✕` 刪除、`+ Add` 新增（複製最後一項）。
+  - **Array / List**（`T[]`、`List<T>`、`IReadOnlyList<T>` 等，元素為上述簡單型別）：逐項編輯、`×` 刪除、`+ Add` 新增（複製最後一項）。
     每次修改都會建立新的陣列 / List，原始 Record 與已套用的 Override 不會被改到；Patch 會把整個 List 存成 JSON 陣列。超過 200 項時唯讀。
   - Dictionary / 巢狀物件 / 元素為複雜型別的 List：唯讀的可折疊樹狀檢視（最多 3 層、每層最多 100 項，展開時才建立）
   - 有修改的欄位會顯示 `Original: xxx`

@@ -46,6 +46,9 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>Members of the shown table, used by the search conditions and their completion.</summary>
         public MasterDataTypeDescriptor TypeDescriptor => table?.TypeDescriptor;
 
+        /// <summary>Label of a field of the shown table in the selected language, or null.</summary>
+        public string FindFieldLabel(string fieldName) => table == null ? null : MasterMemoryDebugLocalization.FindFieldLabel(table, fieldName);
+
         public bool IsColumnsPopupOpen => columnsPopup != null && columnsPopup.IsOpen;
 
         internal IReadOnlyList<MasterGridColumn> Columns => columns;
@@ -102,6 +105,17 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         public void CloseColumnsPopup() => columnsPopup?.Close();
+
+        /// <summary>Recreates the column titles after the label language changed; visibility, freezing and widths are kept.</summary>
+        public void RefreshLabels()
+        {
+            if (table == null) return;
+            SaveColumns();
+            columns = CreateColumns(table);
+            MasterGridLayout.Restore(table.TableName, columns);
+            grid.SetContent(columns, filtered);
+            if (columnsPopup != null && columnsPopup.IsOpen) columnsPopup.Open();
+        }
 
         /// <summary>Takes a new snapshot of the table records, rebuilds the columns and the results.</summary>
         public void SetTable(MasterMemoryTableDescriptor newTable, object preferredKey = null)
@@ -197,7 +211,7 @@ namespace Nesh.MasterMemoryDebugger
             // primary key members first, like the columns of a database table; frozen by default
             foreach (var field in table.TypeDescriptor.PrimaryKeyFields)
             {
-                var column = CreateFieldColumn(field, field.Name + " (PK)", KeyCellClass);
+                var column = CreateFieldColumn(table, field, " (PK)", KeyCellClass);
                 column.Frozen = column.DefaultFrozen = true;
                 result.Add(column);
             }
@@ -211,14 +225,15 @@ namespace Nesh.MasterMemoryDebugger
             foreach (var field in table.TypeDescriptor.Fields)
             {
                 if (field.IsPrimaryKey) continue;
-                result.Add(CreateFieldColumn(field, field.IsSecondaryKey ? field.Name + " (SK)" : field.Name, null));
+                result.Add(CreateFieldColumn(table, field, field.IsSecondaryKey ? " (SK)" : string.Empty, null));
             }
             return result;
         }
 
-        static MasterGridColumn CreateFieldColumn(MasterMemoryFieldDescriptor field, string title, string cellClass)
+        static MasterGridColumn CreateFieldColumn(MasterMemoryTableDescriptor table, MasterMemoryFieldDescriptor field, string suffix, string cellClass)
         {
             var isNumber = IsNumber(field.Kind);
+            var title = MasterMemoryDebugLocalization.GetFieldLabel(table, field) + suffix;
             return new MasterGridColumn(field.Name, title, field.IsSimpleValue ? (isNumber ? 90 : 130) : 160, (label, record) =>
             {
                 var value = field.GetValue(record.Current);
@@ -227,7 +242,7 @@ namespace Nesh.MasterMemoryDebugger
                 label.EnableInClassList(ModifiedCellClass, record.IsModified && !MasterDataValueUtility.AreEqual(value, field.GetValue(record.Original)));
             })
             {
-                Tooltip = $"{field.Name} ({field.FieldType.Name})",
+                Tooltip = MasterMemoryDebugLocalization.GetFieldTooltip(table, field),
                 // numbers are right aligned, like in database viewers
                 CellClass = isNumber ? (cellClass == null ? NumberCellClass : cellClass + " " + NumberCellClass) : cellClass,
             };
