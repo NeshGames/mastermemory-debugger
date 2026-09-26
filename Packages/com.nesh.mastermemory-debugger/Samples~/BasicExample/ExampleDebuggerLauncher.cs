@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Text;
 using UnityEngine;
@@ -13,11 +14,12 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         [Tooltip("Open the debugger on start (useful on devices without a keyboard).")]
         [SerializeField] bool openOnStart = false;
 
-        [Tooltip("Rebuild the gameplay database with ImmutableBuilder whenever overrides change (optional pattern).")]
-        [SerializeField] bool rebuildDatabaseOnOverride = false;
+        [Tooltip("Rebuild the gameplay database with the overrides (MasterMemoryDebugRebuild.AutoRebuild) so that " +
+                 "secondary key / range queries see them, and report MasterMemory validation failures.")]
+        [SerializeField] bool rebuildDatabaseOnOverride = true;
 
         ExampleMasterDataService service;
-        ExampleDatabaseRebuilder rebuilder;
+        IDisposable rebuild;
 
         public ExampleMasterDataService Service => service;
 
@@ -26,7 +28,8 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
             var database = ExampleDatabaseBootstrap.Load();
             service = new ExampleMasterDataService(database);
             ExampleDebugRegistration.Register();
-            if (rebuildDatabaseOnOverride) rebuilder = new ExampleDatabaseRebuilder(service);
+            // one line: gameplay reads service.Database, which is replaced by a rebuilt database whenever overrides change
+            if (rebuildDatabaseOnOverride) rebuild = MasterMemoryDebugRebuild.AutoRebuild(database, db => service.Database = db);
             MasterMemoryDebugRuntime.OverridesChanged += LogCurrentValues;
         }
 
@@ -39,7 +42,7 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         void OnDestroy()
         {
             MasterMemoryDebugRuntime.OverridesChanged -= LogCurrentValues;
-            rebuilder?.Dispose();
+            rebuild?.Dispose();
         }
 
         /// <summary>Hook this to a button of an existing debug menu (mobile).</summary>

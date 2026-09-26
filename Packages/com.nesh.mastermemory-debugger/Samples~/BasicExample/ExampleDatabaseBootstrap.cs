@@ -51,9 +51,9 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
 
             var characters = new[]
             {
-                new ExampleCharacterMaster { Id = 1, Name = "Knight", Hp = 1200, Attack = 80, Defense = 60, MoveSpeed = 1.0f, Element = ExampleElement.None },
-                new ExampleCharacterMaster { Id = 2, Name = "Mage", Hp = 700, Attack = 140, Defense = 25, MoveSpeed = 1.1f, Element = ExampleElement.Fire },
-                new ExampleCharacterMaster { Id = 3, Name = "Archer", Hp = 850, Attack = 110, Defense = 35, MoveSpeed = 1.3f, Element = ExampleElement.Thunder },
+                new ExampleCharacterMaster { Id = 1, Name = "Knight", Hp = 1200, Attack = 80, Defense = 60, MoveSpeed = 1.0f, Element = ExampleElement.None, StartSkillId = 1005 },
+                new ExampleCharacterMaster { Id = 2, Name = "Mage", Hp = 700, Attack = 140, Defense = 25, MoveSpeed = 1.1f, Element = ExampleElement.Fire, StartSkillId = 1001 },
+                new ExampleCharacterMaster { Id = 3, Name = "Archer", Hp = 850, Attack = 110, Defense = 35, MoveSpeed = 1.3f, Element = ExampleElement.Thunder, StartSkillId = 1004 },
             };
 
             var effects = new[]

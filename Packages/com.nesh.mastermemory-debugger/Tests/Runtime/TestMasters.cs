@@ -36,7 +36,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
     }
 
     [MemoryTable("test_skill")]
-    public sealed record TestSkill
+    public sealed record TestSkill : IValidatable<TestSkill>
     {
         [PrimaryKey]
         public int Id { get; init; }
@@ -52,6 +52,18 @@ namespace Nesh.MasterMemoryDebugger.Tests
         public int? UnlockLevel { get; init; }
         public ulong BigValue { get; init; }
         public int[] Tags { get; init; }
+
+        /// <summary>0 = none; otherwise an EnemyId of <see cref="TestEnemyLevel"/>.</summary>
+        public int SummonEnemyId { get; init; }
+
+        void IValidatable<TestSkill>.Validate(IValidator<TestSkill> validator)
+        {
+            if (SummonEnemyId != 0)
+            {
+                validator.GetReferenceSet<TestEnemyLevel>().Exists(x => x.SummonEnemyId, y => y.EnemyId);
+            }
+            validator.Validate(x => x.Damage >= 0);
+        }
     }
 
     /// <summary>Composite primary key.</summary>
@@ -90,7 +102,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             // tables expect data sorted by primary key
             var skills = new[]
             {
-                new TestSkill { Id = 1001, Category = 1, Name = "Fireball", Damage = 120, Cooldown = 2.5f, Element = TestElement.Fire, UnlockLevel = 3, BigValue = ulong.MaxValue - 1, Tags = new[] { 1, 2 } },
+                new TestSkill { Id = 1001, Category = 1, Name = "Fireball", Damage = 120, Cooldown = 2.5f, Element = TestElement.Fire, UnlockLevel = 3, BigValue = ulong.MaxValue - 1, Tags = new[] { 1, 2 }, SummonEnemyId = 2 },
                 new TestSkill { Id = 1002, Category = 1, Name = "Ice Blast", Damage = 100, Cooldown = 3f, Element = TestElement.Ice },
                 new TestSkill { Id = 1003, Category = 2, Name = "Heal", Damage = 0, Cooldown = 5f, IsPassive = true },
             };
