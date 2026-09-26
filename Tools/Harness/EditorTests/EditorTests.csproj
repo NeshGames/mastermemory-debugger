@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>Nesh.MasterMemoryDebugger.Editor.Tests</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PackageRoot)Tests/Editor/**/*.cs" />
+    <Compile Include="$(PackageRoot)Tests/Runtime/RuntimeDebuggerTests.cs" />
+    <Compile Include="$(PackageRoot)Tests/Runtime/DebuggerTestBase.cs" />
+    <Compile Include="$(PackageRoot)Tests/Runtime/TestMasters.cs" />
+    <ProjectReference Include="../Editor/Editor.csproj" />
+    <ProjectReference Include="../Runtime/Runtime.csproj" />
+    <ProjectReference Include="../Stubs/Stubs.csproj" />
+    <PackageReference Include="MasterMemory" Version="3.0.4" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+  </ItemGroup>
+</Project>

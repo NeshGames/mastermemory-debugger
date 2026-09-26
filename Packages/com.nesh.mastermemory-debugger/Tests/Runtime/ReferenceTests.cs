@@ -32,6 +32,27 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void IncomingReferences_ShouldFindTheReferencingRecords()
+        {
+            RegisterTestDatabase();
+            var enemies = Table<TestEnemyLevel>();
+            var incoming = MasterMemoryReferences.GetIncoming(enemies);
+            Assert.AreEqual(1, incoming.Count);
+            Assert.AreEqual("SummonEnemyId", incoming[0].SourceMember);
+            Assert.IsEmpty(MasterMemoryReferences.GetIncoming(Table<TestSkill>()));
+
+            var boss = enemies.CreateRecordSnapshot().Single(x => Equals(x.PrimaryKey, (2, 1)));
+            var value = MasterMemoryReferences.GetReferencedValue(incoming[0], boss);
+            Assert.AreEqual(2, value);
+            CollectionAssert.AreEqual(new object[] { 1001 }, MasterMemoryReferences.FindReferencing(incoming[0], value).Select(x => x.PrimaryKey));
+
+            // current values: an override that points at the boss is found too
+            MasterMemoryDebugRuntime.SetOverride(1002, Database.TestSkillTable.FindById(1002) with { SummonEnemyId = 2 });
+            Assert.AreEqual(2, MasterMemoryReferences.FindReferencing(incoming[0], 2L).Count, "compared by value, not by type");
+            Assert.IsEmpty(MasterMemoryReferences.FindReferencing(incoming[0], null));
+        }
+
+        [Test]
         public void TypesWithoutValidate_ShouldHaveNoReferences()
         {
             RegisterTestDatabase();

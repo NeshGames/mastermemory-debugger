@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 
 namespace Nesh.MasterMemoryDebugger.Tests
@@ -125,6 +126,28 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterTablePins.Unpin("TestSkill");
             Assert.IsFalse(MasterTablePins.IsPinned("TestSkill"));
             Assert.IsTrue(MasterTablePins.IsPinned("TestEnemyLevel"));
+        }
+
+        [Test]
+        public void TsvTemplate_ShouldListEveryTableAndFieldAndLoadBack()
+        {
+            RegisterTestDatabase();
+            MasterMemoryDebugLocalization.SetFieldLabel<TestSkill>("Damage", "zh-TW", "傷害", "line 1\nline 2");
+
+            var template = MasterMemoryDebugLocalization.CreateTsvTemplate("zh-TW");
+            var lines = template.TrimEnd('\n').Split('\n');
+            Assert.AreEqual("table\tfield\tlanguage\tlabel\ttip", lines[0]);
+            CollectionAssert.Contains(lines, "TestSkill\t\tzh-TW\t\t");
+            CollectionAssert.Contains(lines, "TestSkill\tDamage\tzh-TW\t傷害\tline 1\\nline 2");
+            var fieldCount = Table<TestSkill>().TypeDescriptor.Fields.Count + Table<TestEnemyLevel>().TypeDescriptor.Fields.Count;
+            Assert.AreEqual(1 + 2 + fieldCount, lines.Length);
+
+            MasterMemoryDebugLocalization.Clear();
+            Assert.AreEqual(1, MasterMemoryDebugLocalization.LoadTsv(template), "unfilled lines are skipped");
+            MasterMemoryDebugLocalization.Language = "zh-TW";
+            var damage = Table<TestSkill>().TypeDescriptor.Fields.Single(x => x.Name == "Damage");
+            Assert.AreEqual("傷害", MasterMemoryDebugLocalization.GetFieldLabel(Table<TestSkill>(), damage));
+            StringAssert.EndsWith("line 1\nline 2", MasterMemoryDebugLocalization.GetFieldTooltip(Table<TestSkill>(), damage));
         }
     }
 }

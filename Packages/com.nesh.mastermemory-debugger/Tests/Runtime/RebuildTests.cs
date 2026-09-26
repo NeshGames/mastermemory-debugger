@@ -90,5 +90,71 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.AreEqual(1, failures.Count);
             Assert.IsEmpty(MasterMemoryDebugRebuild.GetNewFailures(result, result));
         }
+
+        [Test]
+        public void Validation_ShouldListTheFailuresOfTheRebuiltDatabase()
+        {
+            RegisterTestDatabase();
+            Assert.IsFalse(MasterMemoryDebugValidation.IsAvailable);
+            var changed = 0;
+            void OnChanged() => changed++;
+            MasterMemoryDebugValidation.Changed += OnChanged;
+            try
+            {
+                using (MasterMemoryDebugRebuild.AutoRebuild(Database, _ => { }))
+                {
+                    Assert.IsTrue(MasterMemoryDebugValidation.IsAvailable);
+                    Assert.IsEmpty(MasterMemoryDebugValidation.Run());
+                    Assert.AreEqual(0, MasterMemoryDebugValidation.NewFailureCount);
+
+                    changed = 0;
+                    MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { SummonEnemyId = 99 });
+                    Assert.AreEqual(1, changed);
+                    Assert.AreEqual(1, MasterMemoryDebugValidation.NewFailureCount);
+
+                    var failures = MasterMemoryDebugValidation.Run();
+                    Assert.AreEqual(1, failures.Count);
+                    Assert.IsTrue(failures[0].IsNew);
+                    Assert.AreEqual(typeof(TestSkill), failures[0].RecordType);
+                    Assert.AreEqual(1001, Table<TestSkill>().GetPrimaryKey(failures[0].Record), "the failing record can be opened");
+                    StringAssert.Contains("SummonEnemyId", failures[0].Message);
+
+                    MasterMemoryDebugRuntime.ClearAllOverrides();
+                    Assert.AreEqual(0, MasterMemoryDebugValidation.NewFailureCount);
+                    Assert.IsEmpty(MasterMemoryDebugValidation.Run());
+                }
+                Assert.IsFalse(MasterMemoryDebugValidation.IsAvailable, "disposed");
+            }
+            finally
+            {
+                MasterMemoryDebugValidation.Changed -= OnChanged;
+            }
+        }
+
+        [Test]
+        public void Validation_ShouldNotListDatabasesRebuiltWithoutValidation()
+        {
+            using (MasterMemoryDebugRebuild.AutoRebuild(Database, _ => { }, validate: false))
+            {
+                Assert.IsFalse(MasterMemoryDebugValidation.IsAvailable);
+            }
+        }
+
+        [Test]
+        public void Validation_ShouldNotMarkFailuresOfTheOriginalAsNew()
+        {
+            MasterMemoryDebugRuntime.SetOverride(1003, Database.TestSkillTable.FindById(1003) with { Damage = -1 });
+            var rebuilt = MasterMemoryDebugRebuild.Apply(Database);
+            var result = MasterMemoryDebugRebuild.Validate(rebuilt);
+
+            var failures = new List<MasterMemoryValidationFailure>();
+            MasterMemoryDebugValidation.Convert(result, MasterMemoryDebugRebuild.Validate(rebuilt), failures);
+            Assert.AreEqual(1, failures.Count);
+            Assert.IsFalse(failures[0].IsNew, "the same failure in the baseline");
+
+            failures.Clear();
+            MasterMemoryDebugValidation.Convert(result, MasterMemoryDebugRebuild.Validate(Database), failures);
+            Assert.IsTrue(failures[0].IsNew);
+        }
     }
 }

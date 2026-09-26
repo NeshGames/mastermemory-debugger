@@ -61,10 +61,10 @@ IL2CPP 還需要把產生的 `MasterMemoryResolver` 註冊到 MessagePack（參�
 Package Manager → `+` → **Add package from git URL...**
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.5.0
    ```
 
-   指定版本：在 URL 最後加上 `#v0.1.0` 之類的 tag。
+   URL 最後的 `#v0.5.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
 
 Runtime assembly (`Nesh.MasterMemoryDebugger.Runtime`) 會自動參考 NuGetForUnity 安裝的 `MasterMemory.dll`。
 
@@ -182,7 +182,9 @@ SkillMaster	Damage	zh-TW	傷害	基礎傷害\n未含角色加成
 ```
 
 - Table 名稱可以用註冊名稱（`RegisterDatabase` 時是 Record 類別名稱）或 `[MemoryTable]` 名稱。
-- Tip 中的 `\n` 會換行；`#` 開頭的行會被略過。
+- Tip 中的 `\n` 會換行；`#` 開頭的行、label 與 tip 都空白的行會被略過。
+- **範本**：Debugger 的 Tables 標題旁 **Labels TSV** 會把所有 Table 與欄位名稱複製成上面的格式（已設定的名稱與 Tip 會一併填入，
+  語言欄是目前選擇的語言；選 Code names 時留空）。貼到試算表填好後，存成文字交給 `LoadTsv`。程式中：`MasterMemoryDebugLocalization.CreateTsvTemplate("zh-TW")`。
 - 中文、日文等名稱需要字型支援：在 Settings 的 **Font** 指定含有這些字的字型（例如 Noto Sans TC），否則會顯示成方框。
 
 ## Integrate Override
@@ -222,7 +224,8 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 - 內部使用 MasterMemory 官方的 `ToImmutableBuilder().Diff(records).Build()`（透過 reflection 找到每張表的 `Diff`，不需要手寫）。
 - 每次 Override 變更都會從**原始** database 重建，所以 Reset 會回到原始值；沒有 Override 時直接給原始 database。
 - **驗證**：如果 Record 有實作 MasterMemory 的 `IValidatable<T>`，每次重建後會執行 `Validate()`，
-  並把「原始資料沒有、Override 之後才出現」的失敗寫進 Log（例如把 `StartSkillId` 改成不存在的 99）。可用 `validate: false` 關閉。
+  並把「原始資料沒有、Override 之後才出現」的失敗寫進 Log（例如把 `StartSkillId` 改成不存在的 99），
+  所有失敗也會列在 Debugger 的 **Validation** 頁籤（見下方）。可用 `validate: false` 關閉。
 - 只想重建一次：`var db = MasterMemoryDebugRebuild.Apply(originalDatabase);`
 - 正式版 Build 中 `AutoRebuild` 只會呼叫一次 `apply(originalDatabase)`，不會訂閱任何事件。
 
@@ -232,20 +235,22 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ MasterMemory Runtime Debugger  [Data][Changes (2)][Patches (3)]   Master: v1  [zh-TW ▼] [A-][A+][Close] │
+│ MasterMemory Debugger [Data][Changes (2)][Patches (3)][Validation (1 new)] Master: v1 [zh-TW ▼][Close] │
 ├────────────┬┬─────────────────────────────────────────────┬┬──────────────────────────┤
-│ Tables     ││ [技能 ×][武器 ×] [+ Pin]                      ││ 技能 1001  Overridden     │
-│ ▼ Battle(6)││ [Damage>100 Element=Fire....] [ ] Mod [Columns▾]││ Id  PK                   │
+│ Tables [TSV]││ [技能 ×][武器 ×] [+ Pin]                      ││ 技能 1001  Overridden     │
+│ ▼ Battle(6)││ [Damage>100 Element=Fire..] [ ] Mod [Columns▾][Copy]││ Id  PK                   │
 │   技能     ││ ● │ Id (PK)┃ 分類 (SK)│ 名稱    │ 傷害 ▼│ ...   ││ 1001                     │
 │   武器     ││   │   1004 ┃        1 │ Thunder │   180 │       ││ 傷害       Original: 120 │
 │ ▶ Economy  ││ ● │   1001 ┃        1 │ Fireball│   185 │       ││ [185                   ] │
-│            ││ 2 / 2005 records                ◀━━━━━━━━▶   ││ [Apply][Revert][Reset]   │
+│            ││ 2 / 2005 records                ◀━━━━━━━━▶   ││ ▼ Referenced by           │
+│            ││                                             ││   角色.初始技能 3 [Show] │
+│            ││                                             ││ [Apply][Revert][Reset]   │
 ├────────────┴┴─────────────────────────────────────────────┴┴──────────────────────────┤
 │ status...                                                                     [Log (12)] │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- 標題列的頁籤：**Data**（瀏覽與編輯）、**Changes**（所有修改的總覽）、**Patches**（Patch 管理，見下方）。
+- 標題列的頁籤：**Data**（瀏覽與編輯）、**Changes**（所有修改的總覽）、**Patches**（Patch 管理，見下方）、**Validation**（MasterMemory 驗證結果）。
 - Data 頁的版面和一般資料庫檢視工具相同：左側 Table 清單、中間資料表格、右側 Record 詳細資料；兩條分隔線都可以拖曳調整寬度。
 
 ### Record 表格
@@ -259,7 +264,8 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 - **欄寬自動調整**：依欄位名稱與前 200 筆的內容估算寬度（40～320px，太長的內容以 `…` 截斷，完整內容看右側 Inspector）。
   拖曳欄位標題的右邊界可以手動調整；**雙擊**右邊界回到自動寬度。
 - 點欄位標題排序（遞增 → 遞減 → 不排序）。排序會套用在所有符合條件的資料上，再取前 `Max Search Results` 筆（預設 500）。
-- 欄位的顯示、凍結與手動寬度會依 Table 記住（本次執行期間）。
+- 欄位的顯示、凍結與手動寬度會依 Table 記在 PlayerPrefs，重新執行後仍會保留（`Reset` 回到預設）。
+- **Copy**：把目前顯示的資料列與欄位（套用搜尋、排序、欄位顯示設定後的結果，凍結欄位在前）複製成 Tab 分隔文字，可以直接貼到 Excel / Google 試算表。WebGL 會下載成 `.tsv`。
 - 範例的 `ExampleManyColumnsMaster`（75 欄、120 筆，Test 群組）與 `ExampleWeaponMaster`（27 欄）可以用來確認超出一個畫面時的水平捲動。
 - **釘選頁籤**：表格上方的 `+ Pin` 把目前的 Table 釘選成頁籤，點頁籤快速切換，`×` 取消釘選。釘選清單記在 PlayerPrefs，下次開啟仍會保留。
 - 表格是自己實作的 virtualized grid（`ListView` + 同步捲動的表頭），沒有使用 `MultiColumnListView`。
@@ -302,6 +308,9 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
   - **關聯跳轉**：Record 有實作 MasterMemory 的 `IValidatable<T>` 並用 `GetReferenceSet<T>().Exists(x => x.ItemId, y => y.Id)` 宣告關聯時，
     該欄位旁會出現 `→ ItemMaster` 按鈕，點擊會開啟被參照的 Record（參照的不是主鍵時，改為以 `Id=值` 篩選目標 Table）。
     不需要額外設定：關聯是從 `Validate` 的 `Exists()` 讀出來的（`MasterMemoryReferences.Get(table)`）；沒有寫 Validate 的 Record 就不會顯示按鈕。
+  - **Referenced by**（反向關聯）：Inspector 最下方列出參照這筆 Record 的其他 Table 欄位與筆數（使用目前值，包含 Override），
+    **Show** 會開啟來源 Table 並以 `StartSkillId=1001` 篩選。修改或刪減資料前可以先確認影響範圍。
+    區塊可以折疊（折疊時不計算）；程式中可用 `MasterMemoryReferences.GetIncoming(table)` / `FindReferencing(reference, value)`。
 - **Apply** 會把編輯中的副本存進 Override Store；如果所有值都和原始值相同，會改為移除 Override。
 - **Copy JSON**：把整筆 Record（包含陣列與巢狀物件、未套用的編輯）複製為 JSON。Editor / Windows 複製到剪貼簿，WebGL 下載成檔案。
 - 有未套用的編輯時切換 Record / Table，會詢問 **Apply / Discard / Cancel**。
@@ -310,6 +319,15 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 
 標題列的 **Changes (N)** 會把主畫面切換成所有 Override 的總覽：每筆 Record 的修改欄位（原始值 → 目前值），可以 **Open**（跳到該筆 Record）或 **Reset**。
 原始 Record 已不存在（例如主資料刪掉了）或 Table 沒有註冊的 Override 會以紅色標示。程式中可用 `MasterMemoryChangeSummary.Build()` 取得同樣的資料。
+
+### Validation（驗證結果）
+
+使用 `MasterMemoryDebugRebuild.AutoRebuild(...)`（預設 `validate: true`）時，**Validation** 頁籤會列出重建後 database 的所有 `Validate()` 失敗：
+
+- Override 造成的失敗（原始資料沒有）標示為紅色 **NEW** 並排在最前面；頁籤標題會顯示 `Validation (N new)`。
+- **Open** 跳到出問題的 Record；**New only** 只顯示 Override 造成的失敗；**Validate** 重新執行。
+- 只在頁籤顯示時執行驗證（原始資料的驗證只做一次並快取）。沒有使用 AutoRebuild 時會顯示設定說明。
+- 程式中：`MasterMemoryDebugValidation.Run()` 取得同樣的清單，`NewFailureCount` 取得最近一次重建新增的失敗數。
 
 ### Log 與 Console
 
@@ -529,6 +547,7 @@ Override Layer **只保證經過 `TryGetOverride` / `Resolve` 的 PrimaryKey 查
 ## Tests
 
 Tests 位於 `Tests/Runtime`（Edit Mode + Play Mode）與 `Tests/Editor`。
+Repository 的 `Tools/Harness` 可以不開 Unity、用 .NET SDK 編譯並執行大部分的測試（CI 在每個 PR 執行）。
 在其他專案中執行時，請在 `Packages/manifest.json` 加入：
 
 ```json

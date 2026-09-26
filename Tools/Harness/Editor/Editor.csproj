@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>Nesh.MasterMemoryDebugger.Editor</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PackageRoot)Editor/**/*.cs" />
+    <ProjectReference Include="../Runtime/Runtime.csproj" />
+    <ProjectReference Include="../Stubs/Stubs.csproj" />
+  </ItemGroup>
+</Project>

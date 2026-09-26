@@ -11,8 +11,10 @@ This repository is a Unity 6 project that hosts the UPM package
 2. Package Manager → Add package from git URL:
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.5.0
    ```
+
+   `#v0.5.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
 
 See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for usage.
 
@@ -26,3 +28,16 @@ See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for 
 4. Window > Package Manager > MasterMemory Runtime Debugger > Samples > import **Basic Example**,
    add `ExampleDebuggerLauncher` to a GameObject, enter Play Mode and press **F8**.
 5. Window > General > Test Runner runs the package tests (Edit Mode and Play Mode).
+
+## Tests without Unity and CI
+
+`Tools/Harness/run.sh` builds the package with the .NET 8 SDK in every scripting define configuration (against
+compile-only Unity stubs) and runs the tests that do not need a UI panel. See [Tools/Harness](Tools/Harness/README.md).
+
+- **CI** (`.github/workflows/ci.yml`) runs it on every pull request and push to `main`, and checks that `CHANGELOG.md`
+  has a section for the version in `package.json`.
+- **Release** (`.github/workflows/release.yml`): when a push to `main` changes the version in `package.json`, the
+  `vX.Y.Z` tag and a GitHub Release with that version's CHANGELOG section are created automatically.
+
+Releasing is therefore: bump `version` in `package.json`, add the CHANGELOG section (and update the `#vX.Y.Z` in the
+READMEs), merge to `main`.

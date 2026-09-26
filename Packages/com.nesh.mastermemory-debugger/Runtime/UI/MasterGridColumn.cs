@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Nesh.MasterMemoryDebugger
@@ -67,11 +70,11 @@ namespace Nesh.MasterMemoryDebugger
 
     /// <summary>
     /// Column order and settings of the grid: visible frozen columns first, then the visible scrolled ones, each group in
-    /// declaration order. Visibility, freezing and widths are remembered per table for the play session.
+    /// declaration order. Visibility, freezing and dragged widths are remembered per table in PlayerPrefs (per device).
     /// </summary>
     internal static class MasterGridLayout
     {
-        struct ColumnSettings
+        internal struct ColumnSettings
         {
             public bool Visible;
             public bool Frozen;
@@ -89,8 +92,10 @@ namespace Nesh.MasterMemoryDebugger
         const float CellPadding = 14f;
         const float HeaderExtra = 28f;
         const int MaxSampledRows = 200;
+        const string PrefsKeyPrefix = "Nesh.MasterMemoryDebugger.Columns.";
 
         static readonly Dictionary<string, Dictionary<string, ColumnSettings>> s_settings = new Dictionary<string, Dictionary<string, ColumnSettings>>();
+        static bool s_persist = true;
 
         public static void Split(IReadOnlyList<MasterGridColumn> columns, List<MasterGridColumn> frozen, List<MasterGridColumn> scrolled)
         {
@@ -122,12 +127,19 @@ namespace Nesh.MasterMemoryDebugger
                 settings[column.Key] = new ColumnSettings { Visible = column.Visible, Frozen = column.Frozen, Width = column.Width, UserSized = column.UserSized };
             }
             s_settings[tableName] = settings;
+            if (s_persist) Write(tableName, settings);
         }
 
         /// <summary>Applies the saved settings of the table; columns added since keep their defaults.</summary>
         public static void Restore(string tableName, IReadOnlyList<MasterGridColumn> columns)
         {
-            if (string.IsNullOrEmpty(tableName) || !s_settings.TryGetValue(tableName, out var settings)) return;
+            if (string.IsNullOrEmpty(tableName)) return;
+            if (!s_settings.TryGetValue(tableName, out var settings))
+            {
+                settings = s_persist ? Read(tableName) : null;
+                if (settings == null) return;
+                s_settings[tableName] = settings;
+            }
             foreach (var column in columns)
             {
                 if (!settings.TryGetValue(column.Key, out var s)) continue;
@@ -215,6 +227,74 @@ namespace Nesh.MasterMemoryDebugger
                    || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFE30 && c <= 0xFE4F) || (c >= 0xFF00 && c <= 0xFF60) || (c >= 0xFFE0 && c <= 0xFFE6);
         }
 
-        internal static void ClearSettings() => s_settings.Clear();
+        /// <summary>One line per column: key, visible, frozen, width, user sized (tab separated).</summary>
+        internal static string Serialize(Dictionary<string, ColumnSettings> settings)
+        {
+            var text = new StringBuilder();
+            foreach (var pair in settings)
+            {
+                var s = pair.Value;
+                text.Append(pair.Key).Append('\t')
+                    .Append(s.Visible ? '1' : '0').Append('\t')
+                    .Append(s.Frozen ? '1' : '0').Append('\t')
+                    .Append(s.Width.ToString("0.#", CultureInfo.InvariantCulture)).Append('\t')
+                    .Append(s.UserSized ? '1' : '0').Append('\n');
+            }
+            return text.ToString();
+        }
+
+        internal static Dictionary<string, ColumnSettings> Deserialize(string text)
+        {
+            var settings = new Dictionary<string, ColumnSettings>();
+            if (string.IsNullOrEmpty(text)) return settings;
+            foreach (var line in text.Split('\n'))
+            {
+                var cells = line.Split('\t');
+                if (cells.Length < 5 || cells[0].Length == 0) continue;
+                if (!float.TryParse(cells[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var width)) continue;
+                settings[cells[0]] = new ColumnSettings { Visible = cells[1] == "1", Frozen = cells[2] == "1", Width = width, UserSized = cells[4] == "1" };
+            }
+            return settings;
+        }
+
+        static Dictionary<string, ColumnSettings> Read(string tableName)
+        {
+            try
+            {
+                var text = PlayerPrefs.GetString(PrefsKeyPrefix + tableName, string.Empty);
+                return text.Length == 0 ? null : Deserialize(text);
+            }
+            catch (Exception)
+            {
+                // PlayerPrefs unavailable: defaults
+                return null;
+            }
+        }
+
+        static void Write(string tableName, Dictionary<string, ColumnSettings> settings)
+        {
+            try
+            {
+                PlayerPrefs.SetString(PrefsKeyPrefix + tableName, Serialize(settings));
+                PlayerPrefs.Save();
+            }
+            catch (Exception)
+            {
+                // kept for this session only
+            }
+        }
+
+        /// <summary>Tests: forget the settings and never read or write PlayerPrefs.</summary>
+        internal static void ResetForTests()
+        {
+            s_settings.Clear();
+            s_persist = false;
+        }
+
+        internal static void EndTests()
+        {
+            s_settings.Clear();
+            s_persist = true;
+        }
     }
 }

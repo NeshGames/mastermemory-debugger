@@ -8,7 +8,7 @@ namespace Nesh.MasterMemoryDebugger
     /// <summary>
     /// Search box, Modified Only filter and the record grid
     /// (state ●, primary key members, a Display column when the project supplies display names, then one column per member).
-    /// Columns can be hidden, frozen, resized and sorted; the settings are kept per table for the play session.
+    /// Columns can be hidden, frozen, resized and sorted; the settings are kept per table (PlayerPrefs).
     /// Results are rebuilt only when the query, the filter, the sorting, the table or the overrides change.
     /// </summary>
     internal sealed class MasterRecordListController : IDisposable
@@ -177,6 +177,51 @@ namespace Nesh.MasterMemoryDebugger
             SelectedRecord = record;
             RecordSelected?.Invoke(record);
         }
+
+        /// <summary>
+        /// The shown rows and columns (frozen first, like the grid) as tab separated text with a title line, for
+        /// pasting into a spreadsheet. Tabs and line breaks inside values become spaces.
+        /// </summary>
+        internal string BuildTsv() => BuildTsv(columns, filtered);
+
+        internal static string BuildTsv(IReadOnlyList<MasterGridColumn> columns, IReadOnlyList<MasterMemoryRecordDescriptor> rows)
+        {
+            var shown = new List<MasterGridColumn>();
+            var scrolled = new List<MasterGridColumn>();
+            MasterGridLayout.Split(columns, shown, scrolled);
+            shown.AddRange(scrolled);
+            // the state column has no text
+            shown.RemoveAll(x => x.Text == null);
+
+            var text = new System.Text.StringBuilder();
+            text.AppendLine(string.Join("\t", shown.Select(x => TsvCell(x.Title))));
+            foreach (var record in rows)
+            {
+                text.AppendLine(string.Join("\t", shown.Select(x => TsvCell(CellText(x, record)))));
+            }
+            return text.ToString();
+        }
+
+        static string CellText(MasterGridColumn column, MasterMemoryRecordDescriptor record)
+        {
+            try
+            {
+                return column.Text(record);
+            }
+            catch (Exception e)
+            {
+                return "(" + e.GetType().Name + ")";
+            }
+        }
+
+        static string TsvCell(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            return value.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ').Replace('\t', ' ');
+        }
+
+        /// <summary>Table name of the shown table, for file names.</summary>
+        internal string TableName => table?.TableName;
 
         // ------------------------------------------------------------------ columns
 

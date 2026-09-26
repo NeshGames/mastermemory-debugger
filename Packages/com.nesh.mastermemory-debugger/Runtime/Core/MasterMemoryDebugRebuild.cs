@@ -79,7 +79,8 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>
         /// Calls <paramref name="apply"/> now and every time the overrides change with <see cref="Apply{TDatabase}"/>.
         /// With <paramref name="validate"/>, the rebuilt database is checked with MasterMemory's <c>Validate()</c>
-        /// (<c>IValidatable&lt;T&gt;</c>) and failures that the original database does not have are reported in the log.
+        /// (<c>IValidatable&lt;T&gt;</c>): failures that the original database does not have are reported in the log, and
+        /// every failure is listed in the debugger's Validation tab (<see cref="MasterMemoryDebugValidation"/>).
         /// Dispose to stop; <paramref name="apply"/> then receives the original database again.
         /// In release builds <paramref name="apply"/> is called once with the original database.
         /// </summary>
@@ -144,12 +145,15 @@ namespace Nesh.MasterMemoryDebugger
             return info;
         }
 
-        sealed class AutoRebuilder<TDatabase> : IDisposable where TDatabase : MemoryDatabaseBase
+        sealed class AutoRebuilder<TDatabase> : IDisposable, MasterMemoryDebugValidation.ISource where TDatabase : MemoryDatabaseBase
         {
             readonly TDatabase original;
             readonly Action<TDatabase> apply;
             readonly bool validate;
+            TDatabase current;
             ValidateResult baseline;
+            ValidateResult currentResult;
+            int newFailureCount;
             bool disposed;
 
             public AutoRebuilder(TDatabase original, Action<TDatabase> apply, bool validate)
@@ -157,16 +161,36 @@ namespace Nesh.MasterMemoryDebugger
                 this.original = original;
                 this.apply = apply;
                 this.validate = validate;
+                current = original;
                 if (MasterMemoryDebugBuild.IsEnabled) MasterMemoryDebugRuntime.OverridesChanged += Rebuild;
                 Rebuild();
+                if (validate) MasterMemoryDebugValidation.Add(this);
             }
+
+            public int NewFailureCount => newFailureCount;
 
             public void Dispose()
             {
                 if (disposed) return;
                 disposed = true;
                 if (MasterMemoryDebugBuild.IsEnabled) MasterMemoryDebugRuntime.OverridesChanged -= Rebuild;
+                MasterMemoryDebugValidation.Remove(this);
                 apply(original);
+            }
+
+            /// <summary>Failures of the current database; validates only what the rebuilds did not validate yet.</summary>
+            public void Collect(List<MasterMemoryValidationFailure> failures)
+            {
+                try
+                {
+                    baseline ??= Validate(original);
+                    var result = ReferenceEquals(current, original) ? baseline : currentResult ??= Validate(current);
+                    MasterMemoryDebugValidation.Convert(result, baseline, failures);
+                }
+                catch (Exception e)
+                {
+                    MasterMemoryDebugLog.Warning("Validate threw: " + (e.InnerException ?? e).Message);
+                }
             }
 
             void Rebuild()
@@ -181,8 +205,13 @@ namespace Nesh.MasterMemoryDebugger
                     MasterMemoryDebugLog.Error("Rebuild failed, the original database is used: " + (e.InnerException ?? e).Message);
                     database = original;
                 }
+                current = database;
+                currentResult = null;
+                newFailureCount = 0;
                 apply(database);
-                if (validate && !ReferenceEquals(database, original)) Report(database);
+                if (!validate) return;
+                if (!ReferenceEquals(database, original)) Report(database);
+                MasterMemoryDebugValidation.NotifyChanged();
             }
 
             void Report(TDatabase database)
@@ -190,7 +219,9 @@ namespace Nesh.MasterMemoryDebugger
                 try
                 {
                     baseline ??= Validate(original);
-                    var failures = GetNewFailures(Validate(database), baseline);
+                    currentResult = Validate(database);
+                    var failures = GetNewFailures(currentResult, baseline);
+                    newFailureCount = failures.Count;
                     for (var i = 0; i < failures.Count && i < MaxReportedFailures; i++)
                     {
                         MasterMemoryDebugLog.Warning("Validate: " + failures[i]);

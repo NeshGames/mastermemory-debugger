@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>UnityStubs</AssemblyName>
+    <NoWarn>CS0067;CS0649;CS0169;CS0414;CS1998</NoWarn>
+  </PropertyGroup>
+</Project>
