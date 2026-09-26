@@ -27,7 +27,7 @@
                     </ui:VisualElement>
                     <ui:MultiColumnListView name="mm-record-list" class="mm-debugger__record-list" />
                     <ui:Label name="mm-record-count" class="mm-debugger__record-count" />
-                    <ui:Label name="mm-search-hint" picking-mode="Ignore" class="mm-debugger__search-hint" />
+                    <ui:VisualElement name="mm-search-completion" class="mm-debugger__completion" />
                 </ui:VisualElement>
             </ui:VisualElement>
 

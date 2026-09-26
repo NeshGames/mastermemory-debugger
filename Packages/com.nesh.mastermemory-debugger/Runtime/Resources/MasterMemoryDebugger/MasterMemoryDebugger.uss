@@ -241,21 +241,36 @@
     margin: 4px 4px 0 4px;
 }
 
-/* Tab completion candidates, floating under the search box (top / left set in code) */
-.mm-debugger__search-hint {
+/* completion popup under the search box (top / left set in code) */
+.mm-debugger__completion {
     position: absolute;
-    max-width: 90%;
-    padding: 3px 8px;
+    min-width: 180px;
+    max-width: 60%;
+    padding: 2px 0;
     background-color: rgb(40, 44, 53);
     border-width: 1px;
     border-color: rgb(84, 92, 110);
     border-radius: 3px;
-    font-size: 11px;
-    white-space: normal;
 }
 
-.mm-debugger .mm-debugger__search-hint {
-    color: rgb(190, 200, 215);
+.mm-debugger__completion-item {
+    padding: 2px 10px;
+    font-size: 12px;
+}
+
+.mm-debugger__completion-item:hover {
+    background-color: rgb(52, 58, 70);
+}
+
+.mm-debugger__completion-item--selected,
+.mm-debugger__completion-item--selected:hover {
+    background-color: rgb(46, 92, 160);
+}
+
+.mm-debugger .mm-debugger__completion-info {
+    padding: 1px 10px;
+    font-size: 11px;
+    color: rgb(150, 157, 171);
 }
 
 /* ------------------------------------------------------------------ inspector */

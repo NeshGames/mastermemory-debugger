@@ -15,7 +15,7 @@ namespace Nesh.MasterMemoryDebugger
         internal static readonly string[] RequiredElementNames =
         {
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
-            "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-hint", "mm-modified-only", "mm-record-list", "mm-record-count",
+            "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-list", "mm-record-count",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json",
             "mm-close", "mm-patch-list", "mm-patch-name", "mm-save-patch", "mm-load-patch", "mm-delete-patch", "mm-import-patch",
             "mm-export-patch", "mm-open-folder", "mm-reset-all",
@@ -87,7 +87,7 @@ namespace Nesh.MasterMemoryDebugger
                 Required<Label>(root, "mm-record-count"));
             searchCompletion = new MasterSearchCompletionController(
                 Required<TextField>(root, "mm-search"),
-                Required<Label>(root, "mm-search-hint"),
+                Required<VisualElement>(root, "mm-search-completion"),
                 Required<VisualElement>(root, "mm-search-toolbar"),
                 () => recordList.TypeDescriptor);
             editor = new MasterRecordEditorController(
@@ -395,6 +395,7 @@ namespace Nesh.MasterMemoryDebugger
             {
                 case KeyCode.Escape:
                     if (dialog.IsVisible) dialog.Cancel();
+                    else if (searchCompletion.IsOpen) searchCompletion.Close();
                     else RuntimeMasterMemoryDebugger.Close();
                     evt.StopPropagation();
                     break;

@@ -6,109 +6,85 @@ namespace Nesh.MasterMemoryDebugger.Tests
     {
         static MasterDataTypeDescriptor Skill => MasterDataReflectionCache.Get<TestSkill>();
 
-        static string Complete(MasterRecordQueryCompletion completion, ref string text, ref int caret, MasterDataTypeDescriptor type = null, bool backwards = false)
+        static MasterRecordQueryCompletion.Context Context(string text, int caret = -1, MasterDataTypeDescriptor type = null)
         {
-            if (completion.TryComplete(text, caret, type ?? Skill, backwards, out var newText, out var newCaret))
-            {
-                text = newText;
-                caret = newCaret;
-            }
-            return text;
+            return MasterRecordQueryCompletion.GetContext(text, caret < 0 ? text.Length : caret, type ?? Skill);
         }
 
-        static string CompleteOnce(string text, int caret = -1, MasterDataTypeDescriptor type = null)
+        /// <summary>Accepts the first candidate, like Tab / Enter on the default selection.</summary>
+        static string AcceptFirst(string text, int caret = -1, MasterDataTypeDescriptor type = null)
         {
-            if (caret < 0) caret = text.Length;
-            return Complete(new MasterRecordQueryCompletion(), ref text, ref caret, type);
+            var context = Context(text, caret, type);
+            Assert.IsNotNull(context, text);
+            return MasterRecordQueryCompletion.Apply(text, context, context.Candidates[0], out _);
         }
 
         [Test]
         public void FieldNames_ShouldComplete()
         {
-            Assert.AreEqual("Damage", CompleteOnce("Da"));
-            Assert.AreEqual("Damage", CompleteOnce("damage"), "fixes the case");
-            Assert.AreEqual("Damage", CompleteOnce("mag"), "contains when nothing starts with the word");
-            Assert.AreEqual("Damage>100 Element", CompleteOnce("Damage>100 el"));
-            Assert.AreEqual("Damage Name~x", CompleteOnce("Dam Name~x", 3), "replaces only the word at the caret");
-            Assert.AreEqual("Damage>1", CompleteOnce("Dam>1", 2), "completes the field in front of an operator");
+            Assert.AreEqual("Damage", AcceptFirst("Da"));
+            Assert.AreEqual("Damage", AcceptFirst("damage"), "fixes the case");
+            Assert.AreEqual("Damage", AcceptFirst("mag"), "contains when nothing starts with the word");
+            Assert.AreEqual("Damage>100 Element", AcceptFirst("Damage>100 el"));
+            Assert.AreEqual("Damage Name~x", AcceptFirst("Dam Name~x", 3), "replaces only the word at the caret");
+            Assert.AreEqual("Damage>1", AcceptFirst("Dam>1", 2), "completes the field in front of an operator");
         }
 
         [Test]
-        public void SeveralCandidates_ShouldCycle()
+        public void Candidates_ShouldListPrefixMatchesInDeclarationOrder()
         {
-            var completion = new MasterRecordQueryCompletion();
+            CollectionAssert.AreEqual(new[] { "Category", "Cooldown" }, Context("c").Candidates);
+
             var text = "c";
-            var caret = 1;
-
-            Assert.AreEqual("Category", Complete(completion, ref text, ref caret));
+            var result = MasterRecordQueryCompletion.Apply(text, Context(text), "Cooldown", out var caret);
+            Assert.AreEqual("Cooldown", result);
             Assert.AreEqual(8, caret);
-            Assert.AreEqual("Cooldown", Complete(completion, ref text, ref caret));
-            Assert.AreEqual("Category", Complete(completion, ref text, ref caret), "wraps around");
-            Assert.AreEqual("Cooldown", Complete(completion, ref text, ref caret, backwards: true));
-
-            text = "Cooldown<3 Cat";
-            caret = text.Length;
-            Assert.AreEqual("Cooldown<3 Category", Complete(completion, ref text, ref caret), "editing the text stops the cycle");
         }
 
         [Test]
         public void PrefixAndContainsMatches_ShouldNotMix()
         {
             var type = MasterDataReflectionCache.Get<TestEnemyLevel>();
-            var completion = new MasterRecordQueryCompletion();
-            var text = "e";
-            var caret = 1;
-            Assert.AreEqual("EnemyId", Complete(completion, ref text, ref caret, type), "names containing the word are used only when none starts with it");
-
-            text = "l";
-            caret = 1;
-            Assert.AreEqual("Level", Complete(new MasterRecordQueryCompletion(), ref text, ref caret, type));
+            CollectionAssert.AreEqual(new[] { "EnemyId" }, Context("e", type: type).Candidates, "names containing the word are used only when none starts with it");
+            CollectionAssert.AreEqual(new[] { "Level" }, Context("l", type: type).Candidates);
         }
 
         [Test]
         public void EnumAndBoolValues_ShouldComplete()
         {
-            Assert.AreEqual("Element=Fire", CompleteOnce("Element=f"));
-            Assert.AreEqual("element!=\"Ice\"", CompleteOnce("element!=\"i\"", 11));
-            Assert.AreEqual("IsPassive = true", CompleteOnce("IsPassive = t"));
-            Assert.AreEqual("Flags=Boss|Flying", CompleteOnce("Flags=Boss|Fl", type: MasterDataReflectionCache.Get<TestEnemyLevel>()));
-
-            var completion = new MasterRecordQueryCompletion();
-            var text = "Element=";
-            var caret = text.Length;
-            Assert.AreEqual("Element=None", Complete(completion, ref text, ref caret));
-            Assert.AreEqual("Element=Fire", Complete(completion, ref text, ref caret));
-            Assert.AreEqual("Fire", completion.CurrentCandidate);
-            Assert.IsTrue(completion.IsCycling(text, caret));
+            Assert.AreEqual("Element=Fire", AcceptFirst("Element=f"));
+            Assert.AreEqual("element!=\"Ice\"", AcceptFirst("element!=\"i\"", 11));
+            Assert.AreEqual("IsPassive = true", AcceptFirst("IsPassive = t"));
+            Assert.AreEqual("Flags=Boss|Flying", AcceptFirst("Flags=Boss|Fl", type: MasterDataReflectionCache.Get<TestEnemyLevel>()));
+            CollectionAssert.AreEqual(new[] { "None", "Fire", "Ice" }, Context("Element=").Candidates);
         }
 
         [Test]
         public void TextTermsAndOtherValues_ShouldNotComplete()
         {
-            Assert.IsNull(MasterRecordQueryCompletion.GetContext("fireball", 8, Skill));
-            Assert.IsNull(MasterRecordQueryCompletion.GetContext("Name~fir", 8, Skill));
-            Assert.IsNull(MasterRecordQueryCompletion.GetContext("Damage>1", 8, Skill));
-            Assert.IsNull(MasterRecordQueryCompletion.GetContext("Damage > ", 9, Skill), "value position of a number field");
-            Assert.IsNull(MasterRecordQueryCompletion.GetContext("Name=\"Ice B", 11, Skill), "inside a quoted text value");
+            Assert.IsNull(Context("fireball"));
+            Assert.IsNull(Context("Name~fir"));
+            Assert.IsNull(Context("Damage>1"));
+            Assert.IsNull(Context("Damage > "), "value position of a number field");
+            Assert.IsNull(Context("Name=\"Ice B"), "inside a quoted text value");
             Assert.IsNull(MasterRecordQueryCompletion.GetContext("Da", 2, null), "no table selected");
-            Assert.AreEqual("Damage", CompleteOnce("Damage"), "nothing left to complete");
         }
 
         [Test]
-        public void Context_ShouldDescribeTheHint()
+        public void Context_ShouldDescribeThePopup()
         {
-            var field = MasterRecordQueryCompletion.GetContext("Damage", 6, Skill);
+            var field = Context("Damage");
             CollectionAssert.AreEqual(new[] { "Damage" }, field.Candidates);
-            Assert.AreEqual("Damage", field.Word);
+            Assert.AreEqual("Damage", field.Word, "complete: the popup shows the operators");
             Assert.IsFalse(field.IsValue);
 
-            var all = MasterRecordQueryCompletion.GetContext("Damage>1 ", 9, Skill);
+            var all = Context("Damage>1 ");
             Assert.AreEqual(Skill.Fields.Count, all.Candidates.Count, "an empty word lists every field");
+            Assert.AreEqual("", all.Word);
 
-            var value = MasterRecordQueryCompletion.GetContext("Element=", 8, Skill);
+            var value = Context("Element=");
             Assert.IsTrue(value.IsValue);
             Assert.AreEqual("Element", value.ValueField.Name);
-            CollectionAssert.AreEqual(new[] { "None", "Fire", "Ice" }, value.Candidates);
         }
     }
 }

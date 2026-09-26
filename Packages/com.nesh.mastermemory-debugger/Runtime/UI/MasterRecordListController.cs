@@ -48,12 +48,12 @@ namespace Nesh.MasterMemoryDebugger
             this.listView = listView;
             this.countLabel = countLabel;
 
-            searchField.textEdition.placeholder = "Search text, or conditions like  Damage>100 Element=Fire Name~ice  (Tab completes)";
+            searchField.textEdition.placeholder = "Search text, or conditions like  Damage>100 Element=Fire Name~ice";
             searchField.tooltip =
                 "Space separated terms, all must match.\n" +
                 "Text: primary key / name / string members (contains).\n" +
                 "Field op Value with = != > >= < <= ~ (contains). Quote values with spaces: Name=\"Ice Blast\". Field=null matches null.\n" +
-                "Tab completes field names, and enum / bool values after an operator. Tab again cycles, Shift+Tab goes back.";
+                "Field names, and enum / bool values after an operator, are suggested while typing: Up / Down select, Tab / Enter accept, Esc closes.";
             searchField.RegisterValueChangedCallback(OnSearchChanged);
             modifiedOnlyToggle.RegisterValueChangedCallback(OnModifiedOnlyChanged);
 
