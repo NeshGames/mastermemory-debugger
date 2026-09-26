@@ -2,13 +2,29 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.3.0] - 2026-09-26
+
+### Added
+
+- `MasterMemoryDebugRebuild`: `Apply(db)` builds a copy of a generated MemoryDatabase with the overrides through `ToImmutableBuilder().Diff().Build()` (found by reflection); `AutoRebuild(db, apply)` keeps the project's database reference up to date and restores the original on Dispose, so secondary key / range / `All` queries see the overrides.
+- Validation after rebuild: MasterMemory `Validate()` (`IValidatable<T>`) runs on the rebuilt database and failures that the original database does not have are reported in the log.
+- Reference jump: references declared with `GetReferenceSet<T>().Exists(...)` in `IValidatable<T>.Validate` are discovered automatically (`MasterMemoryReferences`); the inspector shows a `→ Table` button that opens the referenced record.
+- Array / List editing: `T[]`, `List<T>` and list interfaces of simple element types get per-element editors with add / remove. Every change creates a new collection (copy-on-write); patches store the whole list as a JSON array.
+- Search completion popup: field names, and enum / bool values after an operator; Up / Down select, Tab / Enter / click accept, Esc closes the popup.
+- Touch toggle: holding 3 fingers for 1 second toggles the debugger on touch screens (`Touch Toggle Fingers` / `Touch Toggle Seconds`, 0 fingers disables it).
+- Development builds preserve `[MemoryTable]` records, `MemoryDatabase` and `ImmutableBuilder` from managed code stripping (`IUnityLinkerProcessor`); the sample ships a `link.xml` for manual setups.
+
+### Changed
+
+- The Basic Example uses `MasterMemoryDebugRebuild.AutoRebuild` (enabled by default) and demonstrates `IValidatable` references; `ExampleDatabaseRebuilder` was removed.
+- Tab no longer moves the focus out of the search box.
+
 ## [0.2.0] - 2026-09-26
 
 ### Added
 
 - Record table: `MultiColumnListView` with a column per member, sortable headers (sorting covers every match before the result limit) and highlighted overridden cells.
 - Search conditions: space separated terms combined with AND, `Field op Value` with `= != > >= < <= ~`, quoted values, `null`; invalid terms are reported and ignored (`MasterRecordQuery`).
-- Tab completion in the search box: field names, and enum / bool values after an operator; common prefix first, then Tab / Shift+Tab cycles; candidates shown under the search box.
 - Changes view (header button): every overridden record with its changed fields, Open / Reset, overrides without an original record or table flagged (`MasterMemoryChangeSummary`).
 - Read-only foldout tree for arrays, lists, dictionaries and nested objects in the inspector.
 - Copy JSON of a record (clipboard; WebGL download) (`MasterDataRecordJson`).
