@@ -15,11 +15,11 @@ namespace Nesh.MasterMemoryDebugger
         internal static readonly string[] RequiredElementNames =
         {
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
-            "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template",
+            "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template", "mm-batch-edit",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json",
             "mm-close", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel",
-            "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary",
-            "mm-log", "mm-log-toggle",
+            "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary", "mm-changes-copy",
+            "mm-log", "mm-log-toggle", "mm-undo", "mm-redo",
         };
 
         const float MinScale = 0.5f;
@@ -60,6 +60,8 @@ namespace Nesh.MasterMemoryDebugger
         Tab currentTab;
         readonly ScrollView logView;
         readonly Button logToggle;
+        readonly Button undoButton;
+        readonly Button redoButton;
         MasterMemoryTableDescriptor shownTable;
         readonly MasterTableListController tableList;
         readonly MasterRecordListController recordList;
@@ -124,11 +126,14 @@ namespace Nesh.MasterMemoryDebugger
                 Required<ScrollView>(root, "mm-changes-list"),
                 Required<Label>(root, "mm-changes-summary"),
                 OpenRecord,
-                SetStatus);
+                SetStatus,
+                Required<Button>(root, "mm-changes-copy"));
             patches = new MasterPatchesController(patchesPanel, dialog, SetStatus, Session.PatchName);
             validation = new MasterValidationController(Required<VisualElement>(root, "mm-validation-panel"), OpenRecord);
             logView = Required<ScrollView>(root, "mm-log");
             logToggle = Required<Button>(root, "mm-log-toggle");
+            undoButton = Required<Button>(root, "mm-undo");
+            redoButton = Required<Button>(root, "mm-redo");
             logView.style.display = DisplayStyle.None;
 
             Bind(root, "mm-close", RuntimeMasterMemoryDebugger.Close);
@@ -137,10 +142,15 @@ namespace Nesh.MasterMemoryDebugger
             Bind(root, "mm-tab-patches", () => SelectTab(Tab.Patches));
             Bind(root, "mm-tab-validation", () => SelectTab(Tab.Validation));
             Bind(root, "mm-log-toggle", ToggleLog);
+            Bind(root, "mm-undo", Undo);
+            Bind(root, "mm-redo", Redo);
             Bind(root, "mm-copy-rows", CopyRows);
+            Bind(root, "mm-batch-edit", OpenBatchEdit);
             Bind(root, "mm-label-template", CopyLabelTemplate);
             Bind(root, "mm-scale-down", () => ChangeScale(-ScaleStep));
             Bind(root, "mm-scale-up", () => ChangeScale(ScaleStep));
+
+            SetVisible(root, "mm-batch-edit", settings.AllowEditing);
 
             var canScale = host.OwnedPanelSettings != null;
             SetVisible(root, "mm-scale-down", canScale);
@@ -156,6 +166,7 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebuggerMessages.Changed += OnMessagesChanged;
             MasterMemoryDebugLocalization.Changed += OnLabelsChanged;
             MasterMemoryDebugValidation.Changed += OnValidationChanged;
+            MasterMemoryDebugHistory.Changed += RefreshHistoryButtons;
             root.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
 
             // restore the previous session
@@ -166,6 +177,7 @@ namespace Nesh.MasterMemoryDebugger
 
             SelectTab(Session.Tab);
             OnMessagesChanged();
+            RefreshHistoryButtons();
             if (MasterMemoryDebugRegistry.Tables.Count == 0)
             {
                 SetStatus("No table registered. Call MasterMemoryDebugRegistry.RegisterDatabase / RegisterTable.", true);
@@ -190,6 +202,7 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebuggerMessages.Changed -= OnMessagesChanged;
             MasterMemoryDebugLocalization.Changed -= OnLabelsChanged;
             MasterMemoryDebugValidation.Changed -= OnValidationChanged;
+            MasterMemoryDebugHistory.Changed -= RefreshHistoryButtons;
             languageField.UnregisterValueChangedCallback(OnLanguageSelected);
             root.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             tableList.TableSelected -= OnTableSelected;
@@ -428,6 +441,49 @@ namespace Nesh.MasterMemoryDebugger
             return text.IndexOf(' ') >= 0 ? "\"" + text.Replace("\"", string.Empty) + "\"" : text;
         }
 
+        // ------------------------------------------------------------------ undo / redo
+
+        void Undo()
+        {
+            if (!MasterMemoryDebugHistory.CanUndo) return;
+            RunAfterEditGuard(() =>
+            {
+                var label = MasterMemoryDebugHistory.Undo();
+                if (label != null) SetStatus("Undo: " + label, false);
+            }, () => { });
+        }
+
+        void Redo()
+        {
+            if (!MasterMemoryDebugHistory.CanRedo) return;
+            RunAfterEditGuard(() =>
+            {
+                var label = MasterMemoryDebugHistory.Redo();
+                if (label != null) SetStatus("Redo: " + label, false);
+            }, () => { });
+        }
+
+        void OpenBatchEdit()
+        {
+            var table = recordList.Table;
+            if (table == null)
+            {
+                SetStatus("Select a table first.", true);
+                return;
+            }
+            RunAfterEditGuard(() => MasterBatchEditDialog.Show(dialog, table, recordList.GetAllMatches(), SetStatus), () => { });
+        }
+
+        void RefreshHistoryButtons()
+        {
+            var undoLabel = MasterMemoryDebugHistory.UndoLabel;
+            var redoLabel = MasterMemoryDebugHistory.RedoLabel;
+            undoButton.SetEnabled(undoLabel != null);
+            redoButton.SetEnabled(redoLabel != null);
+            undoButton.tooltip = undoLabel != null ? $"Undo: {undoLabel}  (Ctrl+Z)" : "Nothing to undo";
+            redoButton.tooltip = redoLabel != null ? $"Redo: {redoLabel}  (Ctrl+Y / Ctrl+Shift+Z)" : "Nothing to redo";
+        }
+
         // ------------------------------------------------------------------ copy
 
         void CopyRows()
@@ -495,6 +551,14 @@ namespace Nesh.MasterMemoryDebugger
         {
             switch (evt.keyCode)
             {
+                case KeyCode.Z:
+                case KeyCode.Y:
+                    // Ctrl (Cmd on macOS) + Z / Y; the search box keeps its own keys
+                    if (!evt.actionKey || dialog.IsVisible || IsInSearch(evt.target as VisualElement)) break;
+                    if (evt.keyCode == KeyCode.Y || evt.shiftKey) Redo();
+                    else Undo();
+                    evt.StopPropagation();
+                    break;
                 case KeyCode.Escape:
                     if (dialog.IsVisible) dialog.Cancel();
                     else if (searchCompletion.IsOpen) searchCompletion.Close();
@@ -526,6 +590,12 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         // ------------------------------------------------------------------ helpers
+
+        bool IsInSearch(VisualElement target)
+        {
+            var toolbar = root.Q("mm-search-toolbar");
+            return target != null && toolbar != null && toolbar.Contains(target);
+        }
 
         void ChangeScale(float delta)
         {

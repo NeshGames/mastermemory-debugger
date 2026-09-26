@@ -361,6 +361,7 @@ namespace Nesh.MasterMemoryDebugger
             isWritingStore = true;
             try
             {
+                using var step = MasterMemoryDebugHistory.Record($"Apply {table.TableName} {record.KeyText}");
                 if (DiffersFromOriginal(workingCopy))
                 {
                     store.Set(table.RecordType, record.PrimaryKey, workingCopy);
@@ -425,6 +426,7 @@ namespace Nesh.MasterMemoryDebugger
             isWritingStore = true;
             try
             {
+                using var step = MasterMemoryDebugHistory.Record($"Reset {record.Table.TableName} {record.KeyText}");
                 if (MasterMemoryDebugRuntime.Store.Remove(record.Table.RecordType, record.PrimaryKey))
                 {
                     MasterMemoryChangeLog.Removed(record.Table, record.PrimaryKey, before, record.Original, "reset");

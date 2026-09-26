@@ -101,6 +101,7 @@ namespace Nesh.MasterMemoryDebugger
         static MasterDataOverrideStore CreateStore()
         {
             var store = new MasterDataOverrideStore();
+            store.EntryChanged += MasterMemoryDebugHistory.OnEntryChanged;
             store.Changed += RaiseOverridesChanged;
             return store;
         }
@@ -124,6 +125,7 @@ namespace Nesh.MasterMemoryDebugger
         {
             s_store = CreateStore();
             OverridesChanged = null;
+            MasterMemoryDebugHistory.Clear();
         }
     }
 }

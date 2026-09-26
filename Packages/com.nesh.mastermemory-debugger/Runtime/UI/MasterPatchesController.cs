@@ -338,7 +338,7 @@ namespace Nesh.MasterMemoryDebugger
 
         void Apply(Entry entry, bool replace)
         {
-            var result = MasterDataPatchService.Apply(entry.Patch, force: false, replaceExisting: replace);
+            var result = ApplyPatch(entry, force: false, replace);
             if (result.Status == MasterDataPatchApplyStatus.VersionMismatch)
             {
                 dialog.Show(
@@ -346,10 +346,18 @@ namespace Nesh.MasterMemoryDebugger
                     $"Patch \"{entry.Name}\" was created for master version \"{result.PatchMasterVersion}\" but the current version is \"{result.CurrentMasterVersion}\".\n" +
                     "Records or fields may have changed.",
                     new MasterMemoryDebuggerDialog.DialogButton("Cancel", () => setStatus("Apply cancelled.", false)),
-                    new MasterMemoryDebuggerDialog.DialogButton("Force Apply", () => Report(entry.Name, replace, MasterDataPatchService.Apply(entry.Patch, force: true, replaceExisting: replace)), isDanger: true));
+                    new MasterMemoryDebuggerDialog.DialogButton("Force Apply", () => Report(entry.Name, replace, ApplyPatch(entry, force: true, replace)), isDanger: true));
                 return;
             }
             Report(entry.Name, replace, result);
+        }
+
+        static MasterDataPatchApplyResult ApplyPatch(Entry entry, bool force, bool replace)
+        {
+            using (MasterMemoryDebugHistory.Record($"{(replace ? "Apply" : "Merge")} patch \"{entry.Name}\""))
+            {
+                return MasterDataPatchService.Apply(entry.Patch, force, replaceExisting: replace);
+            }
         }
 
         void Report(string name, bool replace, MasterDataPatchApplyResult result)
@@ -503,7 +511,7 @@ namespace Nesh.MasterMemoryDebugger
                 new MasterMemoryDebuggerDialog.DialogButton("Reset All", () =>
                 {
                     var count = MasterMemoryDebugRuntime.OverrideCount;
-                    MasterMemoryDebugRuntime.ClearAllOverrides();
+                    using (MasterMemoryDebugHistory.Record("Reset All")) MasterMemoryDebugRuntime.ClearAllOverrides();
                     MasterMemoryChangeLog.ResetAll(count);
                     setStatus($"{count} overrides reset.", false);
                 }, isDanger: true));

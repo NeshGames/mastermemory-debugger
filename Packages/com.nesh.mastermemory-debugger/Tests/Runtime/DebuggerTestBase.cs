@@ -52,6 +52,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
         static void ResetState()
         {
             MasterMemoryDebugRuntime.ClearAllOverrides();
+            MasterMemoryDebugHistory.Clear();
             MasterMemoryDebugRegistry.ClearTables();
             MasterMemoryDebugRegistry.SetMasterVersionProvider(null);
             MasterMemoryDebugRegistry.ClearTableGroups();

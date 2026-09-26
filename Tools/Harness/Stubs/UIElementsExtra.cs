@@ -7,8 +7,9 @@ namespace UnityEngine.UIElements
     {
         public PopupField() : base(null) { }
         public virtual List<T> choices { get; set; } = new List<T>();
+        public int index { get; set; }
     }
-    public class DropdownField : PopupField<string> { public DropdownField() { } public DropdownField(string label) { } }
+    public class DropdownField : PopupField<string> { public DropdownField() { } public DropdownField(string label) { } public DropdownField(string label, List<string> choices, int defaultIndex, Func<string, string> formatSelectedValueCallback = null, Func<string, string> formatListItemCallback = null) { } }
     public struct TreeViewItemData<T> { public TreeViewItemData(int id, T data, List<TreeViewItemData<T>> children = null) { } }
     public abstract class BaseTreeView : BaseVerticalCollectionView
     {
@@ -56,7 +57,7 @@ namespace UnityEngine.UIElements
 {
     public enum TrickleDown { NoTrickleDown, TrickleDown }
     public class EventBase { public object currentTarget { get; } public object target { get; } public void StopPropagation() { } }
-    public class KeyboardEventStub : EventBase { public KeyCode keyCode { get; } public char character { get; } public bool shiftKey { get; } public bool ctrlKey { get; } public bool altKey { get; } public bool commandKey { get; } }
+    public class KeyboardEventStub : EventBase { public bool actionKey { get; } public KeyCode keyCode { get; } public char character { get; } public bool shiftKey { get; } public bool ctrlKey { get; } public bool altKey { get; } public bool commandKey { get; } }
     public class KeyDownEvent : KeyboardEventStub { }
     public class KeyUpEvent : KeyboardEventStub { }
     public class PointerUpEvent : EventBase { public int pointerId => 0; }

@@ -16,8 +16,10 @@ namespace Nesh.MasterMemoryDebugger
         readonly Action<MasterMemoryTableDescriptor, object> open;
         readonly Action<string, bool> setStatus;
 
-        public MasterChangesController(VisualElement panel, ScrollView list, Label summaryLabel, Action<MasterMemoryTableDescriptor, object> open, Action<string, bool> setStatus)
+        public MasterChangesController(VisualElement panel, ScrollView list, Label summaryLabel, Action<MasterMemoryTableDescriptor, object> open, Action<string, bool> setStatus,
+            Button copyButton = null)
         {
+            if (copyButton != null) copyButton.clicked += CopyTsv;
             this.panel = panel;
             this.list = list;
             this.summaryLabel = summaryLabel;
@@ -65,6 +67,20 @@ namespace Nesh.MasterMemoryDebugger
             var summary = $"{entries.Count} records, {fieldCount} fields changed";
             if (problemCount > 0) summary += $", {problemCount} need attention";
             summaryLabel.text = summary;
+        }
+
+        void CopyTsv()
+        {
+            var entries = MasterMemoryChangeSummary.Build();
+            var fields = 0;
+            foreach (var entry in entries) fields += entry.Changes.Count;
+            if (fields == 0)
+            {
+                setStatus("No changed field to copy.", true);
+                return;
+            }
+            var result = MasterDataPatchExporter.CopyToClipboard(MasterMemoryChangeSummary.ToTsv(entries), "changes.tsv", "text/tab-separated-values");
+            setStatus($"Changes: {fields} fields of {entries.Count} records. {result.Message}", !result.Succeeded);
         }
 
         VisualElement CreateEntry(MasterMemoryChangeEntry entry)
@@ -140,7 +156,10 @@ namespace Nesh.MasterMemoryDebugger
 
         void Reset(MasterMemoryChangeEntry entry)
         {
-            if (!MasterMemoryDebugRuntime.Store.Remove(entry.RecordType, entry.PrimaryKey)) return;
+            using (MasterMemoryDebugHistory.Record($"Reset {entry.TableName} {entry.KeyText}"))
+            {
+                if (!MasterMemoryDebugRuntime.Store.Remove(entry.RecordType, entry.PrimaryKey)) return;
+            }
             if (entry.Table != null && entry.Original != null)
             {
                 MasterMemoryChangeLog.Removed(entry.Table, entry.PrimaryKey, entry.Current, entry.Original, "reset");

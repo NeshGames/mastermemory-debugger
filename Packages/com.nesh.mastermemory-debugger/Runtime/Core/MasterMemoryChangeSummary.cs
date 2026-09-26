@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace Nesh.MasterMemoryDebugger
 {
@@ -88,6 +89,36 @@ namespace Nesh.MasterMemoryDebugger
                 }
             }
             return result;
+        }
+
+        /// <summary>
+        /// One tab separated line per changed field: table, key, display name, field, original, current (with a title line).
+        /// For pasting into a spreadsheet, for example to copy tuned values back into the master data source.
+        /// Tabs and line breaks inside values become spaces.
+        /// </summary>
+        public static string ToTsv(IEnumerable<MasterMemoryChangeEntry> entries)
+        {
+            var text = new StringBuilder();
+            text.Append("table\tkey\tname\tfield\toriginal\tcurrent\n");
+            foreach (var entry in entries)
+            {
+                foreach (var change in entry.Changes)
+                {
+                    text.Append(Cell(entry.TableName)).Append('\t')
+                        .Append(Cell(entry.KeyText)).Append('\t')
+                        .Append(Cell(entry.DisplayName)).Append('\t')
+                        .Append(Cell(change.Name)).Append('\t')
+                        .Append(Cell(MasterDataValueUtility.Format(change.OldValue))).Append('\t')
+                        .Append(Cell(MasterDataValueUtility.Format(change.NewValue))).Append('\n');
+                }
+            }
+            return text.ToString();
+        }
+
+        static string Cell(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            return value.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ').Replace('\t', ' ');
         }
 
         static int CompareKeys(object a, object b)

@@ -296,15 +296,22 @@
     white-space: nowrap;
 }
 
+/* the buttons wrap below the search box when the panel is narrow */
 .mm-debugger__search-toolbar {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     flex-shrink: 0;
     margin-bottom: 4px;
 }
 
+.mm-debugger__search-toolbar > .mm-debugger__button {
+    flex-shrink: 0;
+}
+
 .mm-debugger__search {
     flex-grow: 1;
+    min-width: 180px;
     margin: 0 8px 0 0;
 }
 
