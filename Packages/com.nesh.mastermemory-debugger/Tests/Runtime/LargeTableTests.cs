@@ -103,6 +103,24 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var boss = enemies.CreateRecordSnapshot().Single(x => Equals(x.PrimaryKey, (2, 1)));
             var referencing = Measure("referenced by", () => MasterMemoryReferences.FindReferencing(incoming[0], MasterMemoryReferences.GetReferencedValue(incoming[0], boss)));
             Assert.AreEqual(RecordCount / 5, referencing.Count);
+
+            Measure("validate (MasterMemory)", () => MasterMemoryDebugRebuild.Validate(database));
+
+            // remote editing: what the game sends when the tool connects, and what the tool does with it
+            MasterMemoryDebugRemote.SerializerOptions = MessagePack.MessagePackSerializerOptions.Standard.WithResolver(MessagePack.Resolvers.ContractlessStandardResolver.Instance);
+            try
+            {
+                var welcome = Measure("remote: collect tables", () => MasterMemoryRemoteServer.CreateWelcome());
+                var bytes = Measure("remote: encode", () => MasterMemoryRemoteProtocol.Encode(welcome));
+                TestContext.Progress.WriteLine($"remote: welcome size {bytes.Length / 1024} KB");
+                var decoded = Measure("remote: decode", () => MasterMemoryRemoteProtocol.DecodeWelcome(bytes));
+                var skillTable = decoded.Tables.Single(x => x.TableName == nameof(TestSkill));
+                Measure("remote: deserialize records", () => skillTable.Records.Select(x => MasterMemoryRemotePeer.Deserialize(typeof(TestSkill), x)).ToList());
+            }
+            finally
+            {
+                MasterMemoryDebugRemote.SerializerOptions = null;
+            }
         }
     }
 }

@@ -265,6 +265,48 @@ namespace Nesh.MasterMemoryDebugger
 
         // ------------------------------------------------------------------ internals
 
+        /// <summary>
+        /// Remote editor tool: a table received from a game build. The records are the game's originals; the primary key
+        /// is read from the <c>[PrimaryKey]</c> members (a ValueTuple of <paramref name="keyType"/> for composite keys).
+        /// Patches are not auto loaded for it.
+        /// </summary>
+        internal static MasterMemoryTableDescriptor RegisterRemoteTable(string tableName, string memoryTableName, Type recordType, Type keyType,
+            IReadOnlyList<object> records, IReadOnlyList<string> displayNames)
+        {
+            var keys = MasterDataReflectionCache.Get(recordType).PrimaryKeyFields;
+            if (keys.Count == 0) throw new InvalidOperationException($"{recordType.Name} has no [PrimaryKey] member.");
+            Func<object, object> getPrimaryKey;
+            if (keys.Count == 1)
+            {
+                var key = keys[0];
+                getPrimaryKey = record => key.GetValue(record);
+            }
+            else
+            {
+                getPrimaryKey = record =>
+                {
+                    var values = new object[keys.Count];
+                    for (var i = 0; i < values.Length; i++) values[i] = keys[i].GetValue(record);
+                    return Activator.CreateInstance(keyType, values);
+                };
+            }
+
+            Func<object, string> getDisplayName = CreateDefaultDisplayName(recordType);
+            if (displayNames != null && displayNames.Count == records.Count)
+            {
+                var byKey = new Dictionary<object, string>();
+                for (var i = 0; i < records.Count; i++) byKey[getPrimaryKey(records[i])] = displayNames[i];
+                getDisplayName = record => byKey.TryGetValue(getPrimaryKey(record), out var name) ? name : null;
+            }
+
+            var descriptor = new MasterMemoryTableDescriptor(tableName, string.IsNullOrEmpty(memoryTableName) ? null : memoryTableName, recordType, keyType,
+                () => records, getPrimaryKey, getDisplayName, displayNames != null);
+            s_tables.RemoveAll(x => x.TableName == descriptor.TableName || x.RecordType == descriptor.RecordType);
+            s_tables.Add(descriptor);
+            TablesChanged?.Invoke();
+            return descriptor;
+        }
+
         static void Add(MasterMemoryTableDescriptor descriptor)
         {
             // one table per name and per record type

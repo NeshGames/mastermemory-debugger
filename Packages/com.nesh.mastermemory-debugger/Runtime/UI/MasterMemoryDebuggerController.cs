@@ -17,7 +17,7 @@ namespace Nesh.MasterMemoryDebugger
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
             "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template", "mm-batch-edit",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json",
-            "mm-close", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel",
+            "mm-close", "mm-remote", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel",
             "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary", "mm-changes-copy", "mm-changes-paste",
             "mm-log", "mm-log-toggle", "mm-undo", "mm-redo",
         };
@@ -60,6 +60,8 @@ namespace Nesh.MasterMemoryDebugger
         Tab currentTab;
         readonly ScrollView logView;
         readonly Button logToggle;
+        readonly Button remoteButton;
+        MasterMemoryRemoteState remoteState;
         readonly Button undoButton;
         readonly Button redoButton;
         MasterMemoryTableDescriptor shownTable;
@@ -134,6 +136,7 @@ namespace Nesh.MasterMemoryDebugger
             validation = new MasterValidationController(Required<VisualElement>(root, "mm-validation-panel"), OpenRecord);
             logView = Required<ScrollView>(root, "mm-log");
             logToggle = Required<Button>(root, "mm-log-toggle");
+            remoteButton = Required<Button>(root, "mm-remote");
             undoButton = Required<Button>(root, "mm-undo");
             redoButton = Required<Button>(root, "mm-redo");
             logView.style.display = DisplayStyle.None;
@@ -144,6 +147,7 @@ namespace Nesh.MasterMemoryDebugger
             Bind(root, "mm-tab-patches", () => SelectTab(Tab.Patches));
             Bind(root, "mm-tab-validation", () => SelectTab(Tab.Validation));
             Bind(root, "mm-log-toggle", ToggleLog);
+            Bind(root, "mm-remote", () => MasterRemoteDialog.Show(dialog, SetStatus));
             Bind(root, "mm-undo", Undo);
             Bind(root, "mm-redo", Redo);
             Bind(root, "mm-copy-rows", CopyRows);
@@ -153,6 +157,7 @@ namespace Nesh.MasterMemoryDebugger
             Bind(root, "mm-scale-up", () => ChangeScale(ScaleStep));
 
             SetVisible(root, "mm-batch-edit", settings.AllowEditing);
+            SetVisible(root, "mm-remote", MasterMemoryDebugRemote.IsSupported);
             SetVisible(root, "mm-changes-paste", settings.AllowEditing);
 
             var canScale = host.OwnedPanelSettings != null;
@@ -170,6 +175,7 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugLocalization.Changed += OnLabelsChanged;
             MasterMemoryDebugValidation.Changed += OnValidationChanged;
             MasterMemoryDebugHistory.Changed += RefreshHistoryButtons;
+            MasterMemoryDebugRemote.Changed += OnRemoteChanged;
             root.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
 
             // restore the previous session
@@ -181,7 +187,15 @@ namespace Nesh.MasterMemoryDebugger
             SelectTab(Session.Tab);
             OnMessagesChanged();
             RefreshHistoryButtons();
-            if (MasterMemoryDebugRegistry.Tables.Count == 0)
+            remoteState = MasterMemoryDebugRemote.State;
+            RefreshRemoteButton();
+            if (MasterMemoryDebugRemote.IsToolMode && remoteState != MasterMemoryRemoteState.Connected && remoteState != MasterMemoryRemoteState.Connecting)
+            {
+                // the remote editor tool starts with the connect dialog
+                statusLabel.text = "Remote editor: connect to a game build.";
+                MasterRemoteDialog.Show(dialog, SetStatus);
+            }
+            else if (MasterMemoryDebugRegistry.Tables.Count == 0)
             {
                 SetStatus("No table registered. Call MasterMemoryDebugRegistry.RegisterDatabase / RegisterTable.", true);
             }
@@ -206,6 +220,7 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugLocalization.Changed -= OnLabelsChanged;
             MasterMemoryDebugValidation.Changed -= OnValidationChanged;
             MasterMemoryDebugHistory.Changed -= RefreshHistoryButtons;
+            MasterMemoryDebugRemote.Changed -= OnRemoteChanged;
             languageField.UnregisterValueChangedCallback(OnLanguageSelected);
             root.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             tableList.TableSelected -= OnTableSelected;
@@ -485,6 +500,31 @@ namespace Nesh.MasterMemoryDebugger
             redoButton.SetEnabled(redoLabel != null);
             undoButton.tooltip = undoLabel != null ? $"Undo: {undoLabel}  (Ctrl+Z)" : "Nothing to undo";
             redoButton.tooltip = redoLabel != null ? $"Redo: {redoLabel}  (Ctrl+Y / Ctrl+Shift+Z)" : "Nothing to redo";
+        }
+
+        // ------------------------------------------------------------------ remote
+
+        void OnRemoteChanged()
+        {
+            var state = MasterMemoryDebugRemote.State;
+            if (state != remoteState && (state == MasterMemoryRemoteState.Connected || state == MasterMemoryRemoteState.Failed))
+            {
+                SetStatus("Remote: " + MasterMemoryDebugRemote.Status, state == MasterMemoryRemoteState.Failed);
+            }
+            remoteState = state;
+            RefreshRemoteButton();
+        }
+
+        void RefreshRemoteButton()
+        {
+            var state = MasterMemoryDebugRemote.State;
+            remoteButton.text = state == MasterMemoryRemoteState.Connected ? "Remote ●"
+                : state == MasterMemoryRemoteState.Listening ? "Remote …"
+                : state == MasterMemoryRemoteState.Connecting ? "Remote …"
+                : "Remote";
+            remoteButton.tooltip = MasterMemoryDebugRemote.Status;
+            remoteButton.EnableInClassList("mm-debugger__remote--connected", state == MasterMemoryRemoteState.Connected);
+            remoteButton.EnableInClassList("mm-debugger__remote--failed", state == MasterMemoryRemoteState.Failed);
         }
 
         // ------------------------------------------------------------------ copy

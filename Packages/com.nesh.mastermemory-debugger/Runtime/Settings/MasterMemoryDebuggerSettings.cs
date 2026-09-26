@@ -58,6 +58,16 @@ namespace Nesh.MasterMemoryDebugger
         [Tooltip("Sorting order of the panel created by the debugger. Higher is drawn on top.")]
         [SerializeField] int sortingOrder = 10000;
 
+        [Header("Remote editing")]
+        [Tooltip("Development Builds: listen for the remote editor tool at startup (not on WebGL). Also started from the Remote dialog or MasterMemoryDebugRemote.StartServer().")]
+        [SerializeField] bool remoteServer = false;
+
+        [Tooltip("TCP port the game listens on for the remote editor tool.")]
+        [SerializeField, Range(1024, 65535)] int remotePort = MasterMemoryDebugRemote.DefaultPort;
+
+        [Tooltip("Code the tool must enter. Empty = a random 6 digit code at every start (shown in the Remote dialog and the log).")]
+        [SerializeField] string remotePairingCode = "";
+
         public bool Enabled { get => enabled; set => enabled = value; }
         public bool AllowEditing { get => allowEditing; set => allowEditing = value; }
         public bool AllowPatchSave { get => allowPatchSave; set => allowPatchSave = value; }
@@ -73,6 +83,9 @@ namespace Nesh.MasterMemoryDebugger
         public PanelSettings PanelSettings { get => panelSettings; set => panelSettings = value; }
         public Font Font { get => font; set => font = value; }
         public int SortingOrder { get => sortingOrder; set => sortingOrder = value; }
+        public bool RemoteServer { get => remoteServer; set => remoteServer = value; }
+        public int RemotePort { get => remotePort; set => remotePort = Mathf.Clamp(value, 1, 65535); }
+        public string RemotePairingCode { get => remotePairingCode; set => remotePairingCode = value; }
 
         static MasterMemoryDebuggerSettings s_current;
 

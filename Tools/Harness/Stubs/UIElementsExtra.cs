@@ -67,6 +67,8 @@ namespace UnityEngine.UIElements
     public class ClickEvent : EventBase { public int clickCount => 1; }
     public class FocusInEvent : EventBase { }
     public class FocusOutEvent : EventBase { }
+    public class AttachToPanelEvent : EventBase { }
+    public class DetachFromPanelEvent : EventBase { }
     public class GeometryChangedEvent : EventBase { public UnityEngine.Rect newRect => default; }
     public class NavigationMoveEvent : EventBase { public enum Direction { None, Left, Up, Right, Down, Next, Previous } public Direction direction { get; } }
     public class Foldout : BindableElementStub, INotifyValueChanged<bool>

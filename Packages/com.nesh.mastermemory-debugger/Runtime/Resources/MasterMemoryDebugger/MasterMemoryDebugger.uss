@@ -1174,6 +1174,44 @@
     color: rgb(150, 157, 171);
 }
 
+/* ------------------------------------------------------------------ remote editing */
+
+.mm-debugger .mm-debugger__remote--connected {
+    background-color: rgb(40, 110, 60);
+}
+
+.mm-debugger .mm-debugger__remote--failed {
+    background-color: rgb(130, 50, 45);
+}
+
+.mm-debugger__remote-info {
+    flex-direction: row;
+    align-items: center;
+    min-height: 22px;
+}
+
+.mm-debugger .mm-debugger__remote-info-name {
+    width: 120px;
+    color: rgb(160, 168, 184);
+}
+
+.mm-debugger .mm-debugger__remote-info-value {
+    flex-grow: 1;
+    flex-shrink: 1;
+    white-space: normal;
+    -unity-font-style: bold;
+}
+
+.mm-debugger .mm-debugger__remote-code {
+    font-size: 20px;
+    color: rgb(255, 210, 127);
+    letter-spacing: 4px;
+}
+
+.mm-debugger .mm-debugger__remote-status {
+    white-space: normal;
+}
+
 /* ------------------------------------------------------------------ validation view */
 
 .mm-debugger__validation {

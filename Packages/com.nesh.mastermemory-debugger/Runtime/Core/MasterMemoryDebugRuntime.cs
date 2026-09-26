@@ -23,6 +23,9 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>Raised after overrides were applied, reset or loaded from a patch.</summary>
         public static event Action OverridesChanged;
 
+        /// <summary>Every changed record: key, previous override (or null), new override (or null when removed). Remote sync.</summary>
+        internal static event Action<MasterDataOverrideKey, object, object> EntryChanged;
+
         /// <summary>The override store used by the debugger.</summary>
         public static IMasterDataOverrideStore Store => s_store;
 
@@ -102,6 +105,7 @@ namespace Nesh.MasterMemoryDebugger
         {
             var store = new MasterDataOverrideStore();
             store.EntryChanged += MasterMemoryDebugHistory.OnEntryChanged;
+            store.EntryChanged += (key, before, after) => EntryChanged?.Invoke(key, before, after);
             store.Changed += RaiseOverridesChanged;
             return store;
         }

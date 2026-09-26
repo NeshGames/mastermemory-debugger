@@ -273,11 +273,12 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
     }
 
     /// <summary>
-    /// Large table (50,000 records) to check that opening, scrolling, searching, sorting, batch edits and
-    /// Referenced by (from <see cref="ExampleSkillMaster"/>) stay responsive.
+    /// Large table (50,000 records) to check that opening, scrolling, searching, sorting and batch edits stay responsive.
+    /// No IValidatable on purpose: MasterMemory's Validate() compiles the Exists() expressions for every record and
+    /// scans the referenced table, which takes seconds for 50,000 records.
     /// </summary>
     [MemoryTable("example_large"), MessagePackObject(true)]
-    public sealed record ExampleLargeMaster : IValidatable<ExampleLargeMaster>
+    public sealed record ExampleLargeMaster
     {
         [PrimaryKey]
         public int Id { get; init; }
@@ -292,10 +293,5 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         public ExampleRarity Rarity { get; init; }
         public bool IsEnabled { get; init; }
         public int SkillId { get; init; }
-
-        void IValidatable<ExampleLargeMaster>.Validate(IValidator<ExampleLargeMaster> validator)
-        {
-            if (SkillId != 0) validator.GetReferenceSet<ExampleSkillMaster>().Exists(x => x.SkillId, skill => skill.Id);
-        }
     }
 }
