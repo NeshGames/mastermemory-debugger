@@ -23,6 +23,13 @@ and Play Mode) as well.
 - [ ] **Patches**: Save As…, Apply, Merge, Rename, Delete.
 - [ ] **Validation**: set `ExampleCharacterMaster.StartSkillId` to 99 → NEW failure, `Validation (1 new)`, Open jumps to it.
 
+## Remote editing
+
+- [ ] Sample with Start Remote Server: Remote dialog shows the addresses, port and pairing code.
+- [ ] Tool (a scene with MasterMemoryRemoteEditor, Play Mode or a Windows Development Build): connect with the code →
+      the tables appear; an edit in the tool changes the game (Console log of the sample) and an edit in the game shows
+      in the tool; a wrong code is refused.
+
 ## Window
 
 - [ ] Language dropdown switches labels; A+ / A- scale without overlapping; a narrow window wraps the header and the

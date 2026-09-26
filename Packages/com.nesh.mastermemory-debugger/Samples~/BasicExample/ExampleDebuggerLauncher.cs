@@ -18,6 +18,10 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
                  "secondary key / range queries see them, and report MasterMemory validation failures.")]
         [SerializeField] bool rebuildDatabaseOnOverride = true;
 
+        [Tooltip("Let the remote editor tool (a desktop build with the MasterMemoryRemoteEditor component) connect to this game. " +
+                 "The address and pairing code are shown in the Remote dialog and the Console.")]
+        [SerializeField] bool startRemoteServer = false;
+
         ExampleMasterDataService service;
         IDisposable rebuild;
 
@@ -36,6 +40,7 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         void Start()
         {
             LogCurrentValues();
+            if (startRemoteServer) MasterMemoryDebugRemote.StartServer();
             if (openOnStart) RuntimeMasterMemoryDebugger.Open();
         }
 

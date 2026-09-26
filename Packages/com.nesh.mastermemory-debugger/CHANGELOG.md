@@ -2,6 +2,17 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.8.0] - 2026-09-26
+
+### Added
+
+- Remote editing: a desktop build of the project (a scene with the `MasterMemoryRemoteEditor` component, Windows / macOS, or the Editor in Play Mode) connects to a running game build (Development Build: Windows, macOS, Android, iOS) and edits its master data with the full debugger UI. The tool mirrors the game's tables, labels, groups, display names and overrides; override changes are synced both ways (batch edits, Paste TSV, Undo and patches included).
+  - Game: `MasterMemoryDebugRemote.StartServer(port, pairingCode)`, the Remote Server settings (auto start, port, fixed pairing code) or the header's Remote → Start. A 6 digit pairing code is required; one tool at a time.
+  - Tool: `MasterMemoryDebugRemote.Connect(host, port, code)` or the connect dialog. Disconnecting keeps the last received tables.
+  - TCP with length prefixed frames; records as MessagePack (`MasterMemoryDebugRemote.SerializerOptions` for IL2CPP resolvers). Not on WebGL.
+- Header: Remote button (status colored) and dialog: addresses, port and pairing code in the game; address, port, code, Connect / Disconnect in the tool.
+- Sample: Start Remote Server option of `ExampleDebuggerLauncher`.
+
 ## [0.7.0] - 2026-09-26
 
 ### Added

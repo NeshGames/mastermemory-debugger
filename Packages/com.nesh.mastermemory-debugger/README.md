@@ -61,10 +61,10 @@ IL2CPP 還需要把產生的 `MasterMemoryResolver` 註冊到 MessagePack（參�
 Package Manager → `+` → **Add package from git URL...**
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.7.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.8.0
    ```
 
-   URL 最後的 `#v0.7.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
+   URL 最後的 `#v0.8.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
 
 Runtime assembly (`Nesh.MasterMemoryDebugger.Runtime`) 會自動參考 NuGetForUnity 安裝的 `MasterMemory.dll`。
 
@@ -418,6 +418,47 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
 - 正式版 Build 中這些 API 都不會做任何事，呼叫端不需要 `#if`。
 - UI 採 Lazy Create：開啟時才建立 `MasterMemoryRuntimeDebugger` GameObject + `UIDocument`，關閉時整個銷毀。關閉狀態下只有熱鍵 listener 存在，不會做任何 Reflection、UI 更新或 List refresh。
 - Editor 選單：`Tools > MasterMemory Debugger`。
+
+## Remote Editing（遠端編輯實機）
+
+用一個 **桌面版的工具 exe**（從同一個專案 build）連到正在執行的遊戲（Development Build：Windows / macOS / Android / iOS），
+用完整的 Debugger UI 瀏覽和修改遊戲裡的主資料。修改會立刻套用到遊戲，遊戲端的修改也會同步回工具（雙向）。
+
+```text
+ 工具 exe（Windows / macOS）                           遊戲（Development Build）
+ MasterMemoryRemoteEditor  ── TCP 7788，配對碼 ──▶  MasterMemoryDebugRemote.StartServer()
+ 表格、Inspector、Batch Edit、Undo、Patch…   ◀── 資料表 + Override 雙向同步 ──▶  Override Store
+```
+
+### 1. 遊戲端：開始等待連線
+
+- Settings 的 **Remote Server** 打勾（啟動時自動開始），或程式中呼叫 `MasterMemoryDebugRemote.StartServer()`，
+  或在 Debugger 標題列按 **Remote → Start**。
+- 會顯示這台裝置的 IP、Port（預設 7788）與 6 位數的**配對碼**（Remote 對話框與 Console）。配對碼可以在 Settings 固定。
+- Windows：第一次開始等待連線時 Windows 防火牆會詢問，請允許（私人網路）。
+- iOS：區域網路存取需要 Info.plist 的 `NSLocalNetworkUsageDescription`，第一次會詢問使用者。
+- Android 用 USB 連線時：在 PC 執行 `adb forward tcp:7788 tcp:7788`，工具連 `127.0.0.1`（不需要同一個 Wi-Fi）。
+
+### 2. 工具端：用專案 build 一個 exe
+
+1. 建立一個空的 Scene，加一個 GameObject，掛上 **MasterMemoryRemoteEditor** 元件（Add Component → MasterMemory Debugger → Remote Editor）。
+2. Build Settings 只勾這個 Scene，平台選 Windows（或 macOS），勾選 **Development Build**，Build。
+3. 執行 exe → 出現連線對話框 → 輸入遊戲的 IP、Port、配對碼 → **Connect**。
+
+- 工具只執行這個 Scene，遊戲本身的邏輯不會跑；它只需要專案的 Record 型別（所以要從**同一個版本**的專案 build）。
+  主資料的類別改了之後請重新 build 工具（可以放進 CI 和遊戲一起 build）。
+- 也可以不 build：在 Editor 開這個 Scene 按 Play，Editor 本身就是工具。
+- 表格、搜尋、Batch Edit、Paste TSV、Undo、Patch（存在 PC 上）都可以用；修改都會送到遊戲。
+  Validation 分頁在工具中不可用（驗證在遊戲端執行，結果會出現在遊戲的 Log）。
+- 斷線後工具保留最後收到的資料，但修改不會再送出；重新 Connect 會以遊戲目前的資料為準。
+
+### 注意
+
+- 只在 Editor / Development Build 可用，而且**需要明確開啟**（Settings 或 API），並且要輸入配對碼才能連線；一次只接受一個工具。
+- WebGL 沒有 socket，不支援。
+- 資料以 MessagePack 傳送（MasterMemory 本來就依賴 MessagePack，不增加套件）。IL2CPP 的遊戲請把載入 MemoryDatabase 時用的 options 設給
+  `MasterMemoryDebugRemote.SerializerOptions`（含 MasterMemory / 專案的 resolver），工具端也設定相同的 options。
+- 通訊內容沒有加密，請在開發用的網路使用。
 
 ## Patch Save / Load / Export
 

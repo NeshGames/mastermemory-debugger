@@ -166,6 +166,27 @@ namespace Nesh.MasterMemoryDebugger
             return text.ToString();
         }
 
+        /// <summary>Every label and tip of every language, in the <see cref="LoadTsv"/> format (remote editor tool).</summary>
+        internal static string ExportTsv()
+        {
+            var text = new StringBuilder();
+            text.Append("table\tfield\tlanguage\tlabel\ttip\n");
+            foreach (var pair in s_texts)
+            {
+                // "table" or "table.field"; table names do not contain dots
+                var dot = pair.Key.IndexOf('.');
+                var table = dot < 0 ? pair.Key : pair.Key.Substring(0, dot);
+                var field = dot < 0 ? string.Empty : pair.Key.Substring(dot + 1);
+                foreach (var byLanguage in pair.Value)
+                {
+                    text.Append(table).Append('\t').Append(field).Append('\t').Append(byLanguage.Key).Append('\t')
+                        .Append(TemplateCell(byLanguage.Value.Label)).Append('\t')
+                        .Append(TemplateCell(byLanguage.Value.Tip)).Append('\n');
+                }
+            }
+            return text.ToString();
+        }
+
         static void AppendTemplateLine(StringBuilder text, string table, string field, string language)
         {
             var key = field.Length == 0 ? table : table + "." + field;
