@@ -26,7 +26,7 @@ All notable changes to this package are documented in this file.
 ### Fixed
 
 - `InvalidCastException` when switching tables in the record grid.
-- Frozen columns lost 2px to the divider and rows could be offset from the header by the default list item padding.
+- Grid cells were 6px wider than their headers (default label margins), so the columns drifted to the right and frozen values were cut; frozen columns also lost 2px to the divider and rows could be offset by the default list item padding.
 - "Runtime cursors other than the default cursor need to be defined using a texture" warnings: the default theme's resize / text cursors are reset for the debugger UI.
 - Header items overlapped when the UI was scaled up: the header wraps and the version text is truncated; the language dropdown is wide enough for its choices; the saved patch list sizes to the panel and truncates long lines.
 

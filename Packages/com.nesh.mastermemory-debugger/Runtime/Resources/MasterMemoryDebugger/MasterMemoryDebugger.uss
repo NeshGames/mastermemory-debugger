@@ -366,6 +366,7 @@
 .mm-debugger .mm-debugger__grid-header-title {
     flex-grow: 1;
     flex-shrink: 1;
+    margin: 0;
     padding: 0;
     color: rgb(205, 211, 222);
     -unity-font-style: bold;
@@ -383,6 +384,7 @@
 
 .mm-debugger .mm-debugger__grid-sort {
     flex-shrink: 0;
+    margin: 0;
     font-size: 9px;
     padding: 0 0 0 2px;
 }
@@ -438,8 +440,12 @@
     background-color: rgb(44, 82, 140);
 }
 
+/* Cells are Labels: the default theme gives labels a 3px left / right margin, which would make every cell 6px wider
+   than its header and shift the columns more and more to the right. The width set in code must be the whole cell. */
 .mm-debugger .mm-debugger__cell {
     flex-shrink: 0;
+    margin: 0;
+    min-width: 0;
     height: 100%;
     border-right-width: 1px;
     border-color: rgb(42, 46, 56);
