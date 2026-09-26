@@ -137,6 +137,8 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         /// <summary>Runs Validate against empty tables, so that every Exists() fails and reports its members.</summary>
+        // created through reflection only
+        [UnityEngine.Scripting.Preserve]
         sealed class RecordingValidator<T> : IValidator<T>, IRecordingValidator
         {
             // MasterMemory formats the primary key into the failure message
@@ -145,6 +147,7 @@ namespace Nesh.MasterMemoryDebugger
             readonly T item;
             readonly List<(Type target, ValidateResult result)> references = new List<(Type, ValidateResult)>();
 
+            [UnityEngine.Scripting.Preserve]
             public RecordingValidator(T item)
             {
                 this.item = item;
