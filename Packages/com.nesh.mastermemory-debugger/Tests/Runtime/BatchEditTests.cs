@@ -105,6 +105,21 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void EnumsAndBooleans_ShouldBePickedFromTheirValues()
+        {
+            CollectionAssert.AreEqual(System.Enum.GetNames(typeof(TestElement)), MasterBatchEditDialog.ValueChoices(Field("Element")));
+            CollectionAssert.AreEqual(new[] { "true", "false" }, MasterBatchEditDialog.ValueChoices(Field("IsPassive")));
+            Assert.IsNull(MasterBatchEditDialog.ValueChoices(Field("Damage")), "typed");
+            Assert.IsNull(MasterBatchEditDialog.ValueChoices(Field("Name")));
+
+            // every choice is accepted by Set
+            foreach (var choice in MasterBatchEditDialog.ValueChoices(Field("Element")))
+            {
+                Assert.IsTrue(MasterMemoryBatchEdit.TryParseValue(Field("Element"), MasterMemoryBatchOperation.Set, choice, out _, out var error), error);
+            }
+        }
+
+        [Test]
         public void BatchEdit_ShouldBeOneUndoStep()
         {
             using (MasterMemoryDebugHistory.Record("batch"))

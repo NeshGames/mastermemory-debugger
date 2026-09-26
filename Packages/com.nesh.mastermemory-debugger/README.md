@@ -266,7 +266,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 - 點欄位標題排序（遞增 → 遞減 → 不排序）。排序會套用在所有符合條件的資料上，再取前 `Max Search Results` 筆（預設 500）。
 - 欄位的顯示、凍結與手動寬度會依 Table 記在 PlayerPrefs，重新執行後仍會保留（`Reset` 回到預設）。
 - **Batch Edit…**：對「符合目前搜尋條件的所有 Record」（不只畫面上顯示的前 500 筆）一次修改一個欄位，結果存成 Override：
-  - **Set**：全部設成同一個值（數字、文字、bool、enum；Flags 用 `|` 連接；Nullable 欄位可以輸入 `null`）
+  - **Set**：全部設成同一個值（數字、文字直接輸入；enum 與 bool 從下拉選單選擇；Flags 用 `|` 連接；Nullable 欄位可以輸入 / 選擇 `null`）
   - **Add**：數字加上一個值（負數為減少），例如 `Price + 100`
   - **Multiply**：數字乘上一個值，例如 `Damage × 1.1`；整數以四捨五入（.5 遠離 0）取整
   - 主鍵 / SecondaryKey、Array / List 與複雜型別不能批次修改。改完後所有值都和原始值相同的 Record 會移除 Override。
@@ -383,15 +383,23 @@ Runtime 的 UI Toolkit 沒有 `ColorField`、`ToolbarSearchField`、`EnumFlagsFi
 
 ## Open / Close / Toggle
 
+其他專案（或遊戲自己的 Debug Menu / 按鈕 / 指令）可以直接用 API 開關 Debugger：
+
 ```csharp
-RuntimeMasterMemoryDebugger.Open();
+RuntimeMasterMemoryDebugger.Open();    // 開啟；無法開啟時回傳 false（正式版 Build、Settings 停用、非 Play Mode）
 RuntimeMasterMemoryDebugger.Close();
 RuntimeMasterMemoryDebugger.Toggle();
 bool isOpen = RuntimeMasterMemoryDebugger.IsOpen;
+bool canOpen = RuntimeMasterMemoryDebugger.IsAvailable;  // 例如用來決定 Debug Menu 要不要顯示按鈕
+
+// 開關時通知（例如開啟時暫停遊戲、關閉遊戲自己的輸入）
+RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpen ? 0f : 1f;
 ```
 
-- 預設熱鍵 **F8**（可在 Project Settings 修改），支援 Input System 與舊的 Input Manager。
-- 行動裝置：沒有內建手勢，請從專案既有的 Debug Menu 呼叫 `Toggle()`。
+- 預設熱鍵 **F8**（Settings 的 `Toggle Key`），支援 Input System 與舊的 Input Manager。
+- 觸控裝置：預設**三指長按 1 秒**開關（Settings 的 `Touch Toggle Fingers` / `Touch Toggle Seconds`）。
+- 只想由自己的 UI 開關時，在 Settings 把 `Toggle Key` 設為 `None`、`Touch Toggle Fingers` 設為 `0`，內建的熱鍵與手勢就會停用。
+- 正式版 Build 中這些 API 都不會做任何事，呼叫端不需要 `#if`。
 - UI 採 Lazy Create：開啟時才建立 `MasterMemoryRuntimeDebugger` GameObject + `UIDocument`，關閉時整個銷毀。關閉狀態下只有熱鍵 listener 存在，不會做任何 Reflection、UI 更新或 List refresh。
 - Editor 選單：`Tools > MasterMemory Debugger`。
 

@@ -42,15 +42,20 @@ namespace Nesh.MasterMemoryDebugger
             var content = new VisualElement();
             var fieldChoice = new DropdownField("Field", labels, selectedIndex);
             var operationChoice = new DropdownField("Operation", new List<string>(s_operationNames), 0);
+            // enums and booleans pick from their values, everything else is typed
             var valueField = new TextField("Value") { value = s_lastValue };
+            var valueChoice = new DropdownField("Value", new List<string> { string.Empty }, 0);
             var hint = new Label();
             hint.AddToClassList("mm-debugger__hint");
             content.Add(fieldChoice);
             content.Add(operationChoice);
             content.Add(valueField);
+            content.Add(valueChoice);
             content.Add(hint);
 
             MasterMemoryFieldDescriptor Selected() => fields[Math.Max(0, fieldChoice.index)];
+            bool IsChoice() => valueChoice.style.display.value != DisplayStyle.None;
+            string ValueText() => IsChoice() ? valueChoice.value : valueField.value;
 
             void RefreshOperations()
             {
@@ -59,6 +64,18 @@ namespace Nesh.MasterMemoryDebugger
                 operationChoice.choices = isNumber ? new List<string>(s_operationNames) : new List<string> { s_operationNames[0] };
                 var operation = isNumber ? s_lastOperation : MasterMemoryBatchOperation.Set;
                 operationChoice.index = (int)operation;
+
+                var choices = ValueChoices(field);
+                valueField.style.display = choices == null ? DisplayStyle.Flex : DisplayStyle.None;
+                valueChoice.style.display = choices == null ? DisplayStyle.None : DisplayStyle.Flex;
+                if (choices != null)
+                {
+                    // start from the value of the first record
+                    var current = field.GetValue(records[0].Current);
+                    var text = current == null ? Null : MasterDataValueUtility.Format(current);
+                    valueChoice.choices = choices;
+                    valueChoice.index = Math.Max(0, choices.FindIndex(x => string.Equals(x, text, StringComparison.OrdinalIgnoreCase)));
+                }
                 hint.text = HintText(field);
             }
 
@@ -76,10 +93,10 @@ namespace Nesh.MasterMemoryDebugger
                     var operation = (MasterMemoryBatchOperation)Math.Max(0, operationChoice.index);
                     s_lastField = field.Name;
                     if (MasterMemoryBatchEdit.IsNumber(field)) s_lastOperation = operation;
-                    s_lastValue = valueField.value;
-                    Apply(table, records, field, operation, valueField.value, setStatus);
+                    if (!IsChoice()) s_lastValue = valueField.value;
+                    Apply(table, records, field, operation, ValueText(), setStatus);
                 }, isPrimary: true));
-            valueField.schedule.Execute(() => valueField.Focus());
+            if (!IsChoice()) valueField.schedule.Execute(() => valueField.Focus());
         }
 
         static void Apply(MasterMemoryTableDescriptor table, List<MasterMemoryRecordDescriptor> records, MasterMemoryFieldDescriptor field,
@@ -104,6 +121,27 @@ namespace Nesh.MasterMemoryDebugger
             setStatus(message, result.Failed > 0);
         }
 
+        const string Null = "null";
+
+        /// <summary>The values of an enum or bool field (and null when nullable); null for the fields typed as text.</summary>
+        internal static List<string> ValueChoices(MasterMemoryFieldDescriptor field)
+        {
+            List<string> choices;
+            switch (field.Kind)
+            {
+                case MasterDataValueKind.Enum:
+                    choices = new List<string>(Enum.GetNames(field.ValueType));
+                    break;
+                case MasterDataValueKind.Boolean:
+                    choices = new List<string> { "true", "false" };
+                    break;
+                default:
+                    return null;
+            }
+            if (field.IsNullable) choices.Add(Null);
+            return choices;
+        }
+
         static string Label(MasterMemoryTableDescriptor table, MasterMemoryFieldDescriptor field)
         {
             var label = MasterMemoryDebugLocalization.GetFieldLabel(table, field);
@@ -116,9 +154,8 @@ namespace Nesh.MasterMemoryDebugger
             switch (field.Kind)
             {
                 case MasterDataValueKind.Boolean:
-                    return "true / false." + nullable;
                 case MasterDataValueKind.Enum:
-                    return "An enum name: " + string.Join(", ", Enum.GetNames(field.ValueType)) + "." + nullable;
+                    return "Every record gets the selected value.";
                 case MasterDataValueKind.FlagsEnum:
                     return "Enum names joined with |: " + string.Join(", ", Enum.GetNames(field.ValueType)) + "." + nullable;
                 case MasterDataValueKind.String:
