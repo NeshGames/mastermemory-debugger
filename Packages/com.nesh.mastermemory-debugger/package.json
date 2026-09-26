@@ -1,0 +1,27 @@
+{
+  "name": "com.nesh.mastermemory-debugger",
+  "version": "0.1.0",
+  "displayName": "MasterMemory Runtime Debugger",
+  "description": "Runtime inspection and development override tools for Cysharp MasterMemory v3, built with UI Toolkit. Browse and search tables, override non-key values of existing records in the Editor / Development Builds, and save or export the changed fields as a JSON patch. Requires MasterMemory 3.x installed with NuGetForUnity.",
+  "unity": "6000.0",
+  "keywords": [
+    "MasterMemory",
+    "Debug",
+    "Runtime",
+    "MasterData",
+    "UI Toolkit"
+  ],
+  "author": {
+    "name": "Nesh"
+  },
+  "dependencies": {
+    "com.unity.modules.uielements": "1.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Example",
+      "description": "Example master tables, database bootstrap, MasterDataService with TryGetOverride, debugger registration and an optional ImmutableBuilder rebuild.",
+      "path": "Samples~/BasicExample"
+    }
+  ]
+}

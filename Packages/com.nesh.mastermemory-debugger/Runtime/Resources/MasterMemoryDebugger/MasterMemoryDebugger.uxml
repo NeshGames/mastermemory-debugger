@@ -1,0 +1,66 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- Layout only. Every event is bound by MasterMemoryDebuggerController. -->
+    <ui:VisualElement name="mm-root" class="mm-debugger" picking-mode="Ignore">
+        <ui:VisualElement name="mm-window" class="mm-debugger__window">
+
+            <ui:VisualElement name="mm-header" class="mm-debugger__header">
+                <ui:Label text="MasterMemory Runtime Debugger" class="mm-debugger__title" />
+                <ui:Label name="mm-master-version" class="mm-debugger__header-info" />
+                <ui:Label name="mm-override-count" class="mm-debugger__header-info mm-debugger__override-count" />
+                <ui:VisualElement class="mm-debugger__spacer" />
+                <ui:Button name="mm-scale-down" text="A-" tooltip="Smaller UI" class="mm-debugger__button mm-debugger__header-button" />
+                <ui:Button name="mm-scale-up" text="A+" tooltip="Larger UI" class="mm-debugger__button mm-debugger__header-button" />
+                <ui:Button name="mm-close" text="Close" tooltip="Close (F8)" class="mm-debugger__button mm-debugger__header-button" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="mm-main" class="mm-debugger__main">
+                <ui:VisualElement name="mm-table-panel" class="mm-debugger__panel mm-debugger__table-panel">
+                    <ui:Label text="Tables" class="mm-debugger__section-title" />
+                    <ui:TreeView name="mm-table-list" class="mm-debugger__table-list" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="mm-content-panel" class="mm-debugger__panel mm-debugger__content-panel">
+                    <ui:VisualElement name="mm-search-toolbar" class="mm-debugger__search-toolbar">
+                        <ui:TextField name="mm-search" class="mm-debugger__search" />
+                        <ui:Toggle name="mm-modified-only" label="Modified Only" class="mm-debugger__modified-only" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="mm-debugger__record-header">
+                        <ui:Label text="Primary Key" class="mm-debugger__record-key" />
+                        <ui:Label text="Name" class="mm-debugger__record-name" />
+                        <ui:Label text="Mod" class="mm-debugger__record-modified" />
+                    </ui:VisualElement>
+                    <ui:ListView name="mm-record-list" class="mm-debugger__record-list" />
+                    <ui:Label name="mm-record-count" class="mm-debugger__record-count" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="mm-inspector-panel" class="mm-debugger__panel mm-debugger__inspector-panel">
+                <ui:VisualElement class="mm-debugger__inspector-header">
+                    <ui:Label name="mm-inspector-title" text="Record Inspector" class="mm-debugger__section-title mm-debugger__inspector-title" />
+                    <ui:Label name="mm-record-state" class="mm-debugger__record-state" />
+                    <ui:VisualElement class="mm-debugger__spacer" />
+                    <ui:Button name="mm-apply" text="Apply Override" class="mm-debugger__button mm-debugger__button--primary" />
+                    <ui:Button name="mm-revert" text="Revert Edits" class="mm-debugger__button" />
+                    <ui:Button name="mm-reset-record" text="Reset Record" class="mm-debugger__button" />
+                </ui:VisualElement>
+                <ui:ScrollView name="mm-inspector" mode="Vertical" class="mm-debugger__inspector" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="mm-bottom-toolbar" class="mm-debugger__bottom-toolbar">
+                <ui:Label text="Patch" class="mm-debugger__toolbar-label" />
+                <ui:DropdownField name="mm-patch-list" tooltip="Saved patches (Load / Delete use this one)" class="mm-debugger__patch-list" />
+                <ui:TextField name="mm-patch-name" tooltip="Name used by Save Patch" class="mm-debugger__patch-name" />
+                <ui:Button name="mm-save-patch" text="Save Patch" tooltip="Save the overrides under the name on the left" class="mm-debugger__button" />
+                <ui:Button name="mm-load-patch" text="Load Patch" tooltip="Load the selected patch (replaces all overrides)" class="mm-debugger__button" />
+                <ui:Button name="mm-delete-patch" text="Delete" tooltip="Delete the selected patch" class="mm-debugger__button" />
+                <ui:Button name="mm-export-patch" text="Export" tooltip="Export changed fields as JSON" class="mm-debugger__button" />
+                <ui:Button name="mm-open-folder" text="Open Folder" tooltip="Open the patch folder" class="mm-debugger__button" />
+                <ui:VisualElement class="mm-debugger__spacer" />
+                <ui:Button name="mm-reset-all" text="Reset All" class="mm-debugger__button mm-debugger__button--danger" />
+            </ui:VisualElement>
+            <ui:Label name="mm-status" class="mm-debugger__status" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="mm-dialog-layer" class="mm-debugger__dialog-layer" />
+    </ui:VisualElement>
+</ui:UXML>
