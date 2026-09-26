@@ -16,7 +16,7 @@
             <ui:VisualElement name="mm-main" class="mm-debugger__main">
                 <ui:VisualElement name="mm-table-panel" class="mm-debugger__panel mm-debugger__table-panel">
                     <ui:Label text="Tables" class="mm-debugger__section-title" />
-                    <ui:ListView name="mm-table-list" class="mm-debugger__table-list" />
+                    <ui:TreeView name="mm-table-list" class="mm-debugger__table-list" />
                 </ui:VisualElement>
 
                 <ui:VisualElement name="mm-content-panel" class="mm-debugger__panel mm-debugger__content-panel">
@@ -47,13 +47,18 @@
             </ui:VisualElement>
 
             <ui:VisualElement name="mm-bottom-toolbar" class="mm-debugger__bottom-toolbar">
-                <ui:Label name="mm-status" class="mm-debugger__status" />
-                <ui:Button name="mm-save-patch" text="Save Patch" tooltip="Save overrides to persistentDataPath" class="mm-debugger__button" />
-                <ui:Button name="mm-load-patch" text="Load Patch" tooltip="Load the saved patch" class="mm-debugger__button" />
+                <ui:Label text="Patch" class="mm-debugger__toolbar-label" />
+                <ui:DropdownField name="mm-patch-list" tooltip="Saved patches (Load / Delete use this one)" class="mm-debugger__patch-list" />
+                <ui:TextField name="mm-patch-name" tooltip="Name used by Save Patch" class="mm-debugger__patch-name" />
+                <ui:Button name="mm-save-patch" text="Save Patch" tooltip="Save the overrides under the name on the left" class="mm-debugger__button" />
+                <ui:Button name="mm-load-patch" text="Load Patch" tooltip="Load the selected patch (replaces all overrides)" class="mm-debugger__button" />
+                <ui:Button name="mm-delete-patch" text="Delete" tooltip="Delete the selected patch" class="mm-debugger__button" />
                 <ui:Button name="mm-export-patch" text="Export" tooltip="Export changed fields as JSON" class="mm-debugger__button" />
                 <ui:Button name="mm-open-folder" text="Open Folder" tooltip="Open the patch folder" class="mm-debugger__button" />
+                <ui:VisualElement class="mm-debugger__spacer" />
                 <ui:Button name="mm-reset-all" text="Reset All" class="mm-debugger__button mm-debugger__button--danger" />
             </ui:VisualElement>
+            <ui:Label name="mm-status" class="mm-debugger__status" />
         </ui:VisualElement>
 
         <ui:VisualElement name="mm-dialog-layer" class="mm-debugger__dialog-layer" />

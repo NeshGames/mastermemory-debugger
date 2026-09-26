@@ -43,6 +43,10 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
             builder.Diff(MasterMemoryDebugRuntime.GetOverrides<ExampleSkillMaster>());
             builder.Diff(MasterMemoryDebugRuntime.GetOverrides<ExampleItemMaster>());
             builder.Diff(MasterMemoryDebugRuntime.GetOverrides<ExampleEnemyLevelMaster>());
+            builder.Diff(MasterMemoryDebugRuntime.GetOverrides<ExampleCharacterMaster>());
+            builder.Diff(MasterMemoryDebugRuntime.GetOverrides<ExampleEffectMaster>());
+            builder.Diff(MasterMemoryDebugRuntime.GetOverrides<ExampleShopMaster>());
+            builder.Diff(MasterMemoryDebugRuntime.GetOverrides<ExampleGameConfigMaster>());
             service.Database = builder.Build();
             Debug.Log($"[Example] Gameplay database rebuilt with {MasterMemoryDebugRuntime.OverrideCount} overrides.");
         }

@@ -2,6 +2,23 @@
 
 All notable changes to this package are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Table groups: `MasterMemoryDebugRegistry.SetTableGroup` shows tables in foldable groups (TreeView).
+- Named patches: save under a name, pick saved patches from a dropdown to load or delete.
+
+### Changed
+
+- Setting `Patch File Name` became `Default Patch Name` (files are `<name>.patch.json`).
+- Field editors apply values while typing; Apply Override could previously miss the last edit.
+- Development builds are detected with `Debug.isDebugBuild` (the `DEVELOPMENT_BUILD` define is deprecated in Unity 6.6).
+
+### Fixed
+
+- Dropdown menus (EnumField / DropdownField) used the light default theme with unreadable text.
+
 ## [0.1.0] - 2026-09-26
 
 ### Added

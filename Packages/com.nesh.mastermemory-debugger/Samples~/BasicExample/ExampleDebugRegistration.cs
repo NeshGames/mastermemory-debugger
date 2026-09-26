@@ -14,8 +14,23 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
                 MemoryDatabase.GetMetaDatabase(),
                 tableName => MemoryDatabase.GetTable(ExampleDatabaseBootstrap.OriginalDatabase, tableName));
 
-            // 3. optional customization
+            // 3. optional: groups of the table list (folders). Names are the registered table names
+            //    (the record class name for RegisterDatabase) or the [MemoryTable] names.
+            //    Groups are listed in this order; tables without a group are listed under "Other".
+            MasterMemoryDebugRegistry.SetTableGroup("Battle",
+                nameof(ExampleCharacterMaster),
+                nameof(ExampleEnemyLevelMaster),
+                nameof(ExampleSkillMaster),
+                nameof(ExampleEffectMaster),
+                nameof(ExampleItemMaster));
+            MasterMemoryDebugRegistry.SetTableGroup("Economy", nameof(ExampleShopMaster));
+            // or by type: MasterMemoryDebugRegistry.SetTableGroup<ExampleShopMaster>("Economy");
+            // ExampleGameConfigMaster has no group -> "Other"
+
+            // 4. optional customization
             MasterMemoryDebugRegistry.SetDisplayName<ExampleEnemyLevelMaster>(x => $"Enemy {x.EnemyId} Lv.{x.Level}");
+            MasterMemoryDebugRegistry.SetDisplayName<ExampleShopMaster>(x =>
+                ExampleDatabaseBootstrap.OriginalDatabase.ExampleItemMasterTable.FindById(x.ItemId).Name);
 
             // Manual registration of a single table is also possible:
             // MasterMemoryDebugRegistry.RegisterTable<ExampleItemMaster, int>(

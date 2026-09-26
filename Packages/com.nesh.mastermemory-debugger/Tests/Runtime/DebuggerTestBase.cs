@@ -19,7 +19,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Settings = ScriptableObject.CreateInstance<MasterMemoryDebuggerSettings>();
             Settings.AutoLoadPatch = false;
             Settings.LogLevel = MasterMemoryDebugLogLevel.None;
-            Settings.PatchFileName = "unit-test.patch.json";
+            Settings.DefaultPatchName = "unit-test";
             MasterMemoryDebuggerSettings.SetCurrent(Settings);
 
             ResetState();
@@ -51,6 +51,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugRuntime.ClearAllOverrides();
             MasterMemoryDebugRegistry.ClearTables();
             MasterMemoryDebugRegistry.SetMasterVersionProvider(null);
+            MasterMemoryDebugRegistry.ClearTableGroups();
             MasterMemoryDebugRegistry.SetDisplayName<ManualItem>(null);
             MasterDataCloneUtility.ClearProviders();
         }

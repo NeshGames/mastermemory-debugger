@@ -84,6 +84,10 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
                         sb.Append($"\n  Enemy ({enemyId}, {level}): Hp={enemy.Hp} (original {source.Hp}), Attack={enemy.Attack}, MoveSpeed={enemy.MoveSpeed}");
                         break;
                     }
+                    default:
+                        // tables without a getter in ExampleMasterDataService
+                        sb.Append($"\n  {entry.Key} overridden: {entry.Value}");
+                        break;
                 }
             }
 

@@ -16,9 +16,15 @@ namespace Nesh.MasterMemoryDebugger
     {
         public const string UnknownMasterVersion = "unknown";
 
+        /// <summary>Group name of tables without an assigned group (only shown when groups are used).</summary>
+        public const string UngroupedName = "Other";
+
         static readonly List<MasterMemoryTableDescriptor> s_tables = new List<MasterMemoryTableDescriptor>();
         static readonly Dictionary<Type, Func<object, string>> s_displayNameOverrides = new Dictionary<Type, Func<object, string>>();
         static Func<string> s_masterVersionProvider;
+        static readonly List<string> s_groupOrder = new List<string>();
+        static readonly Dictionary<string, string> s_groupByTableName = new Dictionary<string, string>(StringComparer.Ordinal);
+        static readonly Dictionary<Type, string> s_groupByRecordType = new Dictionary<Type, string>();
 
         /// <summary>Raised after a table was registered or unregistered.</summary>
         public static event Action TablesChanged;
@@ -155,6 +161,100 @@ namespace Nesh.MasterMemoryDebugger
             }
         }
 
+        // ------------------------------------------------------------------ groups
+
+        /// <summary>
+        /// Puts tables into a group of the table list, for example
+        /// <c>SetTableGroup("Battle", "CharacterMaster", "MonsterMaster", "SkillMaster", "EffectMaster")</c>.
+        /// A name matches the registered table name (e.g. "SkillMaster") or the [MemoryTable] name (e.g. "skill").
+        /// Groups are listed in the order they are first set; tables without a group go to "Other".
+        /// May be called before or after the tables are registered.
+        /// </summary>
+        public static void SetTableGroup(string groupName, params string[] tableNames)
+        {
+            if (!MasterMemoryDebugBuild.IsEnabled || tableNames == null) return;
+            groupName = NormalizeGroupName(groupName);
+            foreach (var tableName in tableNames)
+            {
+                if (string.IsNullOrEmpty(tableName)) continue;
+                if (groupName == null) s_groupByTableName.Remove(tableName);
+                else s_groupByTableName[tableName] = groupName;
+            }
+            AddGroupOrder(groupName);
+            TablesChanged?.Invoke();
+        }
+
+        /// <summary>Puts the table of <typeparamref name="TRecord"/> into a group. Null removes the assignment.</summary>
+        public static void SetTableGroup<TRecord>(string groupName)
+        {
+            if (!MasterMemoryDebugBuild.IsEnabled) return;
+            groupName = NormalizeGroupName(groupName);
+            if (groupName == null) s_groupByRecordType.Remove(typeof(TRecord));
+            else s_groupByRecordType[typeof(TRecord)] = groupName;
+            AddGroupOrder(groupName);
+            TablesChanged?.Invoke();
+        }
+
+        /// <summary>Removes every group assignment.</summary>
+        public static void ClearTableGroups()
+        {
+            if (s_groupOrder.Count == 0 && s_groupByTableName.Count == 0 && s_groupByRecordType.Count == 0) return;
+            s_groupOrder.Clear();
+            s_groupByTableName.Clear();
+            s_groupByRecordType.Clear();
+            TablesChanged?.Invoke();
+        }
+
+        /// <summary>Assigned group of a table, or null.</summary>
+        public static string GetTableGroup(MasterMemoryTableDescriptor table)
+        {
+            if (table == null) return null;
+            if (s_groupByRecordType.TryGetValue(table.RecordType, out var group)) return group;
+            if (s_groupByTableName.TryGetValue(table.TableName, out group)) return group;
+            if (table.MemoryTableName != null && s_groupByTableName.TryGetValue(table.MemoryTableName, out group)) return group;
+            return null;
+        }
+
+        /// <summary>
+        /// Registered tables grouped for display: groups in the order they were first set, tables sorted by name,
+        /// ungrouped tables last in <see cref="UngroupedName"/>. Empty groups are omitted.
+        /// When no table has a group, a single ungrouped group is returned.
+        /// </summary>
+        public static List<MasterMemoryTableGroup> GetGroupedTables()
+        {
+            var groups = new List<MasterMemoryTableGroup>();
+            var byName = new Dictionary<string, MasterMemoryTableGroup>(StringComparer.Ordinal);
+            foreach (var name in s_groupOrder)
+            {
+                var group = new MasterMemoryTableGroup(name, false);
+                groups.Add(group);
+                byName.Add(name, group);
+            }
+            var ungrouped = new MasterMemoryTableGroup(UngroupedName, true);
+
+            foreach (var table in s_tables)
+            {
+                var name = GetTableGroup(table);
+                (name != null && byName.TryGetValue(name, out var group) ? group : ungrouped).Tables.Add(table);
+            }
+
+            groups.Add(ungrouped);
+            groups.RemoveAll(x => x.Tables.Count == 0);
+            foreach (var group in groups) group.Tables.Sort((a, b) => string.CompareOrdinal(a.TableName, b.TableName));
+            return groups;
+        }
+
+        static string NormalizeGroupName(string groupName)
+        {
+            groupName = groupName?.Trim();
+            return string.IsNullOrEmpty(groupName) ? null : groupName;
+        }
+
+        static void AddGroupOrder(string groupName)
+        {
+            if (groupName != null && !s_groupOrder.Contains(groupName)) s_groupOrder.Add(groupName);
+        }
+
         internal static bool HasDisplayNameOverride(Type recordType) => s_displayNameOverrides.ContainsKey(recordType);
 
         internal static Func<object, string> GetDisplayNameOverride(Type recordType)
@@ -257,6 +357,9 @@ namespace Nesh.MasterMemoryDebugger
             s_tables.Clear();
             s_displayNameOverrides.Clear();
             s_masterVersionProvider = null;
+            s_groupOrder.Clear();
+            s_groupByTableName.Clear();
+            s_groupByRecordType.Clear();
             TablesChanged = null;
         }
     }

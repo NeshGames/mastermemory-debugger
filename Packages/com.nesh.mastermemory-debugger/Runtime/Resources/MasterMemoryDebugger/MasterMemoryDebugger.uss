@@ -158,6 +158,15 @@
     text-overflow: ellipsis;
 }
 
+.mm-debugger__table-row--group .mm-debugger__table-name {
+    -unity-font-style: bold;
+    color: rgb(150, 190, 255);
+}
+
+.mm-debugger .unity-tree-view__item-toggle {
+    -unity-background-image-tint-color: rgb(200, 205, 215);
+}
+
 .mm-debugger__table-count {
     color: rgb(255, 184, 76);
     -unity-font-style: bold;
@@ -421,9 +430,25 @@
     border-color: rgb(58, 63, 75);
 }
 
+.mm-debugger__toolbar-label {
+    color: rgb(150, 157, 171);
+    margin-right: 6px;
+}
+
+.mm-debugger__patch-list {
+    width: 200px;
+    margin: 0 4px 0 0;
+}
+
+.mm-debugger__patch-name {
+    width: 180px;
+    margin: 0 2px 0 0;
+}
+
 .mm-debugger__status {
-    flex-grow: 1;
-    flex-basis: 0;
+    flex-shrink: 0;
+    height: 18px;
+    margin-top: 2px;
     overflow: hidden;
     text-overflow: ellipsis;
     color: rgb(170, 176, 190);
@@ -491,4 +516,52 @@
 
 .mm-debugger .unity-collection-view__item--alternative-background {
     background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* ------------------------------------------------------------------ popup fields (EnumField / DropdownField) */
+
+.mm-debugger .unity-base-popup-field__text,
+.mm-debugger .unity-enum-field__text,
+.mm-debugger .unity-base-text-field__input TextElement {
+    color: rgb(226, 229, 235);
+}
+
+.mm-debugger .unity-enum-field__input {
+    background-color: rgb(20, 22, 27);
+    border-color: rgb(64, 70, 83);
+}
+
+.mm-debugger .unity-base-popup-field__arrow,
+.mm-debugger .unity-enum-field__arrow {
+    -unity-background-image-tint-color: rgb(200, 205, 215);
+}
+
+/*
+ * Popup menu. It is added to the panel root, outside .mm-debugger, so these rules are not scoped.
+ * They only apply when the debugger uses its own panel (no PanelSettings in the settings asset).
+ */
+
+.unity-base-dropdown .unity-base-dropdown__container-outer {
+    background-color: rgb(34, 37, 44);
+    border-color: rgb(70, 76, 90);
+}
+
+.unity-base-dropdown .unity-base-dropdown__container-inner {
+    background-color: rgb(34, 37, 44);
+}
+
+.unity-base-dropdown .unity-base-dropdown__label {
+    color: rgb(226, 229, 235);
+}
+
+.unity-base-dropdown .unity-base-dropdown__item:hover {
+    background-color: rgb(52, 112, 198);
+}
+
+.unity-base-dropdown .unity-base-dropdown__checkmark {
+    -unity-background-image-tint-color: rgb(226, 229, 235);
+}
+
+.unity-base-dropdown .unity-base-dropdown__separator {
+    background-color: rgb(70, 76, 90);
 }

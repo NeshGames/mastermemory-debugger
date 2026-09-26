@@ -17,7 +17,8 @@ namespace Nesh.MasterMemoryDebugger.Editor.Tests
             {
                 Assert.IsNotNull(root.Q(name), name);
             }
-            Assert.IsNotNull(root.Q<ListView>("mm-table-list"));
+            Assert.IsNotNull(root.Q<TreeView>("mm-table-list"));
+            Assert.IsNotNull(root.Q<DropdownField>("mm-patch-list"));
             Assert.IsNotNull(root.Q<ListView>("mm-record-list"));
             Assert.IsNotNull(root.Q<ScrollView>("mm-inspector"));
         }
@@ -46,7 +47,7 @@ namespace Nesh.MasterMemoryDebugger.Editor.Tests
                 Assert.IsTrue(settings.AllowEditing);
                 Assert.AreEqual(KeyCode.F8, settings.ToggleKey);
                 Assert.AreEqual(500, settings.MaxSearchResults);
-                Assert.AreEqual("debug.patch.json", settings.PatchFileName);
+                Assert.AreEqual("debug", settings.DefaultPatchName);
             }
             finally
             {

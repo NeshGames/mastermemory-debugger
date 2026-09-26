@@ -76,7 +76,14 @@ namespace Nesh.MasterMemoryDebugger
             // UIDocument builds its visual tree in its own OnEnable; binding in Start guarantees the tree exists.
             var root = document.rootVisualElement;
             var style = Resources.Load<StyleSheet>(StyleResourcePath);
-            if (style != null) root.styleSheets.Add(style);
+            if (style != null)
+            {
+                // Popup menus (EnumField / DropdownField) are added to the panel root, outside the document.
+                // When the panel belongs to the debugger, style the whole panel so the menus get the dark theme;
+                // a panel shared with the game is left untouched.
+                var styleRoot = ownedPanelSettings != null && root.panel != null ? root.panel.visualTree : root;
+                styleRoot.styleSheets.Add(style);
+            }
             controller = new MasterMemoryDebuggerController(root, this);
         }
 

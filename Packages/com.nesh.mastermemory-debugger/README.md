@@ -129,6 +129,24 @@ MasterMemoryDebugRegistry.RegisterTable<SkillMaster, int>(
     getDisplayName: x => x.Name);
 ```
 
+### Table 群組
+
+Table 多的時候，可以在 Table 列表用資料夾分群（可折疊）。名稱可以用註冊的 Table 名稱（`RegisterDatabase` 時是 record 類別名稱）或 `[MemoryTable]` 名稱：
+
+```csharp
+MasterMemoryDebugRegistry.SetTableGroup("Battle",
+    "CharacterMaster", "MonsterMaster", "SkillMaster", "EffectMaster", "ItemMaster");
+MasterMemoryDebugRegistry.SetTableGroup("Economy", "ShopMaster");
+
+// 也可以用型別指定（優先於名稱）
+MasterMemoryDebugRegistry.SetTableGroup<GachaMaster>("Economy");
+```
+
+- 群組依第一次設定的順序排列，群組內的 Table 依名稱排序。
+- 沒有指定群組的 Table 會放在最後的 `Other`；完全沒有設定群組時顯示成一般列表。
+- 可以在註冊 Table 之前或之後呼叫。
+- 點群組列可以展開 / 收合。
+
 ### 其他設定
 
 ```csharp
@@ -269,10 +287,20 @@ Patch 只記錄 **有修改的可編輯欄位** 與其 **原始值**，不會保
 
 | 按鈕 | 行為 |
 | --- | --- |
-| Save Patch | 存到 `Application.persistentDataPath/MasterMemoryDebugger/debug.patch.json` |
-| Load Patch | 讀取上面的檔案，**取代**目前所有 Override |
-| Export | Editor：存檔對話框；**WebGL：瀏覽器下載**；其他平台：`.../MasterMemoryDebugger/exports/` |
+Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger/<名稱>.patch.json`。
+底部工具列：`Patch [已儲存的 Patch ▼] [名稱] [Save Patch] [Load Patch] [Delete] [Export] [Open Folder] ... [Reset All]`
+
+| 控制項 | 行為 |
+| --- | --- |
+| 下拉選單 | 列出已儲存的 Patch；選擇後名稱欄位會帶入同樣的名稱 |
+| 名稱欄位 | Save Patch 使用的名稱（例如 `balance-A`）。不能用在檔名的字元會換成 `_` |
+| Save Patch | 以名稱欄位儲存；名稱已存在且不是目前選取的 Patch 時會先確認是否覆蓋 |
+| Load Patch | 載入下拉選單選取的 Patch，**取代**目前所有 Override |
+| Delete | 刪除下拉選單選取的 Patch（目前的 Override 不受影響） |
+| Export | 匯出目前的 Override（檔名 `<名稱>-<時間>.json`）。Editor：存檔對話框；**WebGL：瀏覽器下載**；其他平台：`.../MasterMemoryDebugger/exports/` |
 | Open Folder | 開啟資料夾（Editor / Windows / macOS / Linux） |
+
+程式碼中也可以直接使用：`MasterDataPatchStorage.Save(patch, "balance-A")`、`Load("balance-A")`、`ListPatchNames()`、`Delete("balance-A")`。
 
 載入時：
 
@@ -280,7 +308,7 @@ Patch 只記錄 **有修改的可編輯欄位** 與其 **原始值**，不會保
 - Record 不存在 → 略過（不能新增 Record）。
 - Key 欄位或不存在的欄位 → 略過。
 - `original` 和目前主資料不同 → 仍然套用，但會列出警告（代表主資料已經改過）。
-- `Auto Load Patch` 開啟時，會在 Table 註冊時自動套用已儲存的 Patch；版本不同時不會自動套用。
+- `Auto Load Patch` 開啟時，會在 Table 註冊時自動套用 `Default Patch Name` 的 Patch；版本不同時不會自動套用。
 
 ## Settings
 
@@ -296,7 +324,7 @@ Patch 只記錄 **有修改的可編輯欄位** 與其 **原始值**，不會保
 | Max Search Results | 500 | |
 | Show Secondary Keys | true | 在 Inspector 顯示 SecondaryKey 欄位（永遠唯讀） |
 | Log Level | Warning | |
-| Patch File Name | debug.patch.json | |
+| Default Patch Name | debug | 預設選取的 Patch 名稱，也是 Auto Load Patch 載入的 Patch |
 | Panel Settings | (none) | 指定專案自己的 PanelSettings；沒指定時 Debugger 會自行建立 |
 | Sorting Order | 10000 | Debugger 自行建立的 Panel 的繪製順序 |
 
@@ -366,6 +394,7 @@ Override Layer **只保證經過 `TryGetOverride` / `Resolve` 的 PrimaryKey 查
 | Load Patch 顯示版本不同 | 用 `SetMasterVersionProvider` 提供正確版本，或在確認後選 Force Load。 |
 | Auto Load 沒有套用 | `SetMasterVersionProvider` 必須在註冊 Table **之前** 呼叫；版本不同時不會自動載入。 |
 | UI 被遊戲 UI 蓋住 | 調高 Settings 的 Sorting Order，或指定自己的 PanelSettings。 |
+| 下拉選單是白底 | 只有在 Settings 指定了專案自己的 PanelSettings 時才會發生（Debugger 不會去改共用 panel 的樣式）。不指定 PanelSettings 時會使用深色選單。 |
 | 編譯錯誤找不到 `MasterMemory` / `PrimaryKeyAttribute` | 請用 NuGetForUnity 安裝 MasterMemory 3.x，並確認 Console 沒有 `MasterMemory.dll will not be loaded` 錯誤。 |
 
 ## Tests

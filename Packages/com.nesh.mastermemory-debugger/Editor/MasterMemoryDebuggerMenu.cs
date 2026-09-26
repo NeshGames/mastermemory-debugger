@@ -16,7 +16,7 @@ namespace Nesh.MasterMemoryDebugger.Editor
         [MenuItem(Root + "Open Patch Folder", false, 20)]
         static void OpenPatchFolder() => MasterDataPatchExporter.RevealDataDirectory();
 
-        [MenuItem(Root + "Delete Saved Patch", false, 21)]
+        [MenuItem(Root + "Delete Default Patch", false, 21)]
         static void DeleteSavedPatch()
         {
             if (!MasterDataPatchStorage.Exists())
@@ -24,7 +24,7 @@ namespace Nesh.MasterMemoryDebugger.Editor
                 EditorUtility.DisplayDialog("MasterMemory Debugger", "No saved patch.\n" + MasterDataPatchStorage.PatchPath, "OK");
                 return;
             }
-            if (EditorUtility.DisplayDialog("MasterMemory Debugger", "Delete the saved patch?\n" + MasterDataPatchStorage.PatchPath, "Delete", "Cancel"))
+            if (EditorUtility.DisplayDialog("MasterMemory Debugger", "Delete the default patch?\n" + MasterDataPatchStorage.PatchPath, "Delete", "Cancel"))
             {
                 MasterDataPatchStorage.Delete();
                 Debug.Log("[MasterMemoryDebugger] Saved patch deleted.");

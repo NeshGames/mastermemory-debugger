@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UIElements;
 
 namespace Nesh.MasterMemoryDebugger
@@ -36,8 +37,8 @@ namespace Nesh.MasterMemoryDebugger
 
         [SerializeField] MasterMemoryDebugLogLevel logLevel = MasterMemoryDebugLogLevel.Warning;
 
-        [Tooltip("File name of the patch saved under Application.persistentDataPath/MasterMemoryDebugger/.")]
-        [SerializeField] string patchFileName = "debug.patch.json";
+        [Tooltip("Patch selected by default and used by Auto Load Patch. Saved as <name>.patch.json under Application.persistentDataPath/MasterMemoryDebugger/.")]
+        [SerializeField, FormerlySerializedAs("patchFileName")] string defaultPatchName = "debug";
 
         [Tooltip("Optional PanelSettings. When empty the debugger creates its own panel.")]
         [SerializeField] PanelSettings panelSettings;
@@ -53,7 +54,7 @@ namespace Nesh.MasterMemoryDebugger
         public int MaxSearchResults { get => maxSearchResults; set => maxSearchResults = Mathf.Max(1, value); }
         public bool ShowSecondaryKeys { get => showSecondaryKeys; set => showSecondaryKeys = value; }
         public MasterMemoryDebugLogLevel LogLevel { get => logLevel; set => logLevel = value; }
-        public string PatchFileName { get => string.IsNullOrEmpty(patchFileName) ? "debug.patch.json" : patchFileName; set => patchFileName = value; }
+        public string DefaultPatchName { get => string.IsNullOrEmpty(defaultPatchName) ? "debug" : defaultPatchName; set => defaultPatchName = value; }
         public PanelSettings PanelSettings { get => panelSettings; set => panelSettings = value; }
         public int SortingOrder { get => sortingOrder; set => sortingOrder = value; }
 

@@ -34,7 +34,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.IsNotNull(host);
             var root = host.GetComponent<UIDocument>().rootVisualElement;
             Assert.IsNotNull(root.Q("mm-window"));
-            Assert.IsNotNull(root.Q<ListView>("mm-table-list"));
+            Assert.IsNotNull(root.Q<TreeView>("mm-table-list"));
             Assert.IsNotNull(root.Q<ListView>("mm-record-list"));
         }
 

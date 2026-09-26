@@ -61,6 +61,37 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void Groups_ShouldBeOrderedAndCollectUngroupedTables()
+        {
+            var items = new[] { new ManualItem(1, "Potion", 50) };
+            MasterMemoryDebugRegistry.RegisterTable<ManualItem, int>("ItemMaster", () => items, x => x.Code);
+
+            // no group assigned: a single ungrouped group (flat list)
+            var flat = MasterMemoryDebugRegistry.GetGroupedTables();
+            Assert.AreEqual(1, flat.Count);
+            Assert.IsTrue(flat[0].IsUngrouped);
+
+            // groups may be set before the tables are registered, by table name or [MemoryTable] name
+            MasterMemoryDebugRegistry.SetTableGroup("Battle", "TestSkill", "test_enemy_level");
+            MasterMemoryDebugRegistry.SetTableGroup("Empty", "DoesNotExist");
+            RegisterTestDatabase();
+
+            var groups = MasterMemoryDebugRegistry.GetGroupedTables();
+            CollectionAssert.AreEqual(new[] { "Battle", MasterMemoryDebugRegistry.UngroupedName }, groups.Select(x => x.Name).ToArray(), "empty groups are omitted, ungrouped last");
+            CollectionAssert.AreEqual(new[] { "TestEnemyLevel", "TestSkill" }, groups[0].Tables.Select(x => x.TableName).ToArray(), "sorted by name");
+            CollectionAssert.AreEqual(new[] { "ItemMaster" }, groups[1].Tables.Select(x => x.TableName).ToArray());
+
+            // the generic overload wins over the name mapping
+            MasterMemoryDebugRegistry.SetTableGroup<TestSkill>("Skills");
+            groups = MasterMemoryDebugRegistry.GetGroupedTables();
+            Assert.AreEqual("Skills", MasterMemoryDebugRegistry.GetTableGroup(Table<TestSkill>()));
+            CollectionAssert.AreEqual(new[] { "Battle", "Skills", MasterMemoryDebugRegistry.UngroupedName }, groups.Select(x => x.Name).ToArray());
+
+            MasterMemoryDebugRegistry.ClearTableGroups();
+            Assert.AreEqual(1, MasterMemoryDebugRegistry.GetGroupedTables().Count);
+        }
+
+        [Test]
         public void MasterVersion_ShouldDefaultToUnknown()
         {
             Assert.AreEqual(MasterMemoryDebugRegistry.UnknownMasterVersion, MasterMemoryDebugRegistry.GetMasterVersion());

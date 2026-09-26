@@ -16,6 +16,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
         public void TearDown()
         {
             MasterDataPatchStorage.Delete();
+            MasterDataPatchStorage.Delete("unit-test-balance A");
         }
 
         void ApplySampleOverrides()
@@ -85,6 +86,37 @@ namespace Nesh.MasterMemoryDebugger.Tests
 
             Assert.IsTrue(result.Succeeded);
             Assert.AreEqual(2, MasterMemoryDebugRuntime.OverrideCount);
+        }
+
+        [Test]
+        public void NamedPatches_ShouldBeListedAndLoadedByName()
+        {
+            ApplySampleOverrides();
+            var path = MasterDataPatchStorage.Save(MasterDataPatchService.CreatePatch(), "unit-test-balance A");
+            StringAssert.EndsWith("unit-test-balance A.patch.json", path);
+            MasterDataPatchStorage.Save(new MasterDataPatch { MasterVersion = "v1" });
+
+            var names = MasterDataPatchStorage.ListPatchNames();
+            CollectionAssert.Contains(names, "unit-test-balance A");
+            CollectionAssert.Contains(names, "unit-test");
+
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            Assert.AreEqual(2, MasterDataPatchService.Apply(MasterDataPatchStorage.Load("unit-test-balance A")).AppliedRecords);
+            Assert.AreEqual(0, MasterDataPatchService.Apply(MasterDataPatchStorage.Load()).AppliedRecords, "default patch is empty");
+
+            Assert.IsTrue(MasterDataPatchStorage.Delete("unit-test-balance A"));
+            CollectionAssert.DoesNotContain(MasterDataPatchStorage.ListPatchNames(), "unit-test-balance A");
+        }
+
+        [TestCase("  balance ", "balance")]
+        [TestCase("balance.patch.json", "balance")]
+        [TestCase("balance.json", "balance")]
+        [TestCase("a/b:c*?", "a_b_c__")]
+        [TestCase("   ", null)]
+        [TestCase(null, null)]
+        public void PatchName_ShouldBeNormalized(string input, string expected)
+        {
+            Assert.AreEqual(expected, MasterDataPatchStorage.NormalizeName(input));
         }
 
         [Test]

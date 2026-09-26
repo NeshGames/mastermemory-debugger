@@ -65,6 +65,55 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         public double DropRate { get; init; }
     }
 
+    [MemoryTable("example_character"), MessagePackObject(true)]
+    public sealed record ExampleCharacterMaster
+    {
+        [PrimaryKey]
+        public int Id { get; init; }
+
+        public string Name { get; init; }
+        public int Hp { get; init; }
+        public int Attack { get; init; }
+        public int Defense { get; init; }
+        public float MoveSpeed { get; init; }
+        public ExampleElement Element { get; init; }
+    }
+
+    [MemoryTable("example_effect"), MessagePackObject(true)]
+    public sealed record ExampleEffectMaster
+    {
+        [PrimaryKey]
+        public int Id { get; init; }
+
+        public string Name { get; init; }
+        public float Duration { get; init; }
+        public int Value { get; init; }
+        public bool IsDebuff { get; init; }
+    }
+
+    [MemoryTable("example_shop"), MessagePackObject(true)]
+    public sealed record ExampleShopMaster
+    {
+        [PrimaryKey]
+        public int Id { get; init; }
+
+        [SecondaryKey(0), NonUnique]
+        public int ItemId { get; init; }
+
+        public long Price { get; init; }
+        public int Stock { get; init; }
+    }
+
+    /// <summary>String primary key example. Left without a group, so it is listed under "Other".</summary>
+    [MemoryTable("example_game_config"), MessagePackObject(true)]
+    public sealed record ExampleGameConfigMaster
+    {
+        [PrimaryKey]
+        public string Key { get; init; }
+
+        public string Value { get; init; }
+    }
+
     /// <summary>Composite primary key example: FindByEnemyIdAndLevel((enemyId, level)).</summary>
     [MemoryTable("example_enemy_level"), MessagePackObject(true)]
     public sealed record ExampleEnemyLevelMaster

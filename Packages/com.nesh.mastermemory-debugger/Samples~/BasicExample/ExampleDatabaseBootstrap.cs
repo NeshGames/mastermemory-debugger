@@ -49,10 +49,42 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
                 new ExampleEnemyLevelMaster { EnemyId = 2, Level = 1, Hp = 400, Attack = 30, MoveSpeed = 0.8f },
             };
 
+            var characters = new[]
+            {
+                new ExampleCharacterMaster { Id = 1, Name = "Knight", Hp = 1200, Attack = 80, Defense = 60, MoveSpeed = 1.0f, Element = ExampleElement.None },
+                new ExampleCharacterMaster { Id = 2, Name = "Mage", Hp = 700, Attack = 140, Defense = 25, MoveSpeed = 1.1f, Element = ExampleElement.Fire },
+                new ExampleCharacterMaster { Id = 3, Name = "Archer", Hp = 850, Attack = 110, Defense = 35, MoveSpeed = 1.3f, Element = ExampleElement.Thunder },
+            };
+
+            var effects = new[]
+            {
+                new ExampleEffectMaster { Id = 10, Name = "Burn", Duration = 3f, Value = 15, IsDebuff = true },
+                new ExampleEffectMaster { Id = 11, Name = "Knockback", Duration = 0f, Value = 2, IsDebuff = true },
+                new ExampleEffectMaster { Id = 20, Name = "Freeze", Duration = 1.5f, Value = 0, IsDebuff = true },
+                new ExampleEffectMaster { Id = 30, Name = "Shock", Duration = 2f, Value = 20, IsDebuff = true },
+            };
+
+            var shops = new[]
+            {
+                new ExampleShopMaster { Id = 1, ItemId = 1, Price = 50, Stock = 99 },
+                new ExampleShopMaster { Id = 2, ItemId = 2, Price = 150, Stock = 20 },
+                new ExampleShopMaster { Id = 3, ItemId = 3, Price = 120000, Stock = 1 },
+            };
+
+            var configs = new[]
+            {
+                new ExampleGameConfigMaster { Key = "MaxLevel", Value = "60" },
+                new ExampleGameConfigMaster { Key = "StartGold", Value = "500" },
+            };
+
             // generated tables expect data sorted by primary key
             OriginalDatabase = new MemoryDatabase(
+                ExampleCharacterMasterTable: new ExampleCharacterMasterTable(characters.OrderBy(x => x.Id).ToArray()),
+                ExampleEffectMasterTable: new ExampleEffectMasterTable(effects.OrderBy(x => x.Id).ToArray()),
                 ExampleEnemyLevelMasterTable: new ExampleEnemyLevelMasterTable(enemyLevels.OrderBy(x => x.EnemyId).ThenBy(x => x.Level).ToArray()),
+                ExampleGameConfigMasterTable: new ExampleGameConfigMasterTable(configs.OrderBy(x => x.Key, System.StringComparer.Ordinal).ToArray()),
                 ExampleItemMasterTable: new ExampleItemMasterTable(items.OrderBy(x => x.Id).ToArray()),
+                ExampleShopMasterTable: new ExampleShopMasterTable(shops.OrderBy(x => x.Id).ToArray()),
                 ExampleSkillMasterTable: new ExampleSkillMasterTable(skills.OrderBy(x => x.Id).ToArray()));
             return OriginalDatabase;
         }
