@@ -158,7 +158,9 @@ namespace Nesh.MasterMemoryDebugger
             {
                 case MasterDataValueKind.String:
                 {
-                    var f = Prepare(new TextField { value = (string)value ?? string.Empty });
+                    // multiline + wrapping shows long values completely; Enter still applies (handled by the controller)
+                    var f = Prepare(new TextField { value = (string)value ?? string.Empty, multiline = true });
+                    f.AddToClassList("mm-debugger__text-editor");
                     f.RegisterValueChangedCallback(evt => onChanged(evt.newValue));
                     return f;
                 }

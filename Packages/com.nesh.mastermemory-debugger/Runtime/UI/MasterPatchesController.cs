@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Nesh.MasterMemoryDebugger
@@ -69,8 +70,17 @@ namespace Nesh.MasterMemoryDebugger
             panel.Add(current);
 
             // ---- saved patches | selected patch
-            var split = new TwoPaneSplitView(0, 280, TwoPaneSplitViewOrientation.Horizontal);
+            var split = new TwoPaneSplitView(0, 260, TwoPaneSplitViewOrientation.Horizontal);
             split.AddToClassList("mm-debugger__patches-split");
+            // the list gets about a third of the width once the panel is laid out (the divider can still be dragged)
+            EventCallback<GeometryChangedEvent> sizeList = null;
+            sizeList = evt =>
+            {
+                if (float.IsNaN(evt.newRect.width) || evt.newRect.width <= 0f) return;
+                split.UnregisterCallback(sizeList);
+                split.fixedPaneInitialDimension = Mathf.Clamp(evt.newRect.width * 0.32f, 200f, 440f);
+            };
+            split.RegisterCallback(sizeList);
 
             var listPanel = new VisualElement();
             listPanel.AddToClassList("mm-debugger__patches-list-panel");
@@ -79,7 +89,7 @@ namespace Nesh.MasterMemoryDebugger
             listPanel.Add(listTitle);
             list = new ListView
             {
-                fixedItemHeight = 38,
+                fixedItemHeight = 44,
                 selectionType = SelectionType.Single,
                 makeItem = MakeItem,
                 bindItem = BindItem,

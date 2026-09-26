@@ -12,6 +12,10 @@ All notable changes to this package are documented in this file.
 - `MasterMemoryDebugLocalization`: display names and tips per language for tables and fields (API or tab separated text). A header dropdown switches between the code names and each language; used by the table list, tabs, grid headers, inspector and search completion.
 - `Font` setting for the debugger UI (fonts with CJK glyphs for localized names).
 - `MasterDataPatchStorage.Rename` / `GetSavedTime`.
+- Automatic column widths from the titles and the values of the first 200 rows; double click a header edge to go back to the automatic width.
+- The state and primary key columns are always shown and frozen.
+- Inspector text fields wrap and grow to show long values.
+- Sample: `ExampleManyColumnsMaster` (75 columns, 120 records).
 - Sample: wide `ExampleWeaponMaster` table (27 columns, 300 records) and Chinese labels / tips.
 
 ### Changed
@@ -22,6 +26,9 @@ All notable changes to this package are documented in this file.
 ### Fixed
 
 - `InvalidCastException` when switching tables in the record grid.
+- Frozen columns lost 2px to the divider and rows could be offset from the header by the default list item padding.
+- "Runtime cursors other than the default cursor need to be defined using a texture" warnings: the default theme's resize / text cursors are reset for the debugger UI.
+- Header items overlapped when the UI was scaled up: the header wraps and the version text is truncated; the language dropdown is wide enough for its choices; the saved patch list sizes to the panel and truncates long lines.
 
 ## [0.3.1] - 2026-09-26
 

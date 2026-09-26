@@ -15,6 +15,8 @@ namespace Nesh.MasterMemoryDebugger
     internal sealed class MasterRecordGrid : IDisposable
     {
         public const float RowHeight = 22f;
+        // border-right of .mm-debugger__grid-frozen; UI Toolkit widths include borders
+        const float FrozenDivider = 2f;
         const float WheelStep = 40f;
         const string CellClass = "mm-debugger__cell";
 
@@ -103,6 +105,9 @@ namespace Nesh.MasterMemoryDebugger
 
         /// <summary>A column was resized by dragging its header edge.</summary>
         public event Action ColumnResized;
+
+        /// <summary>Sizes a column to its content (double click on a header edge).</summary>
+        public Action<MasterGridColumn> AutoFit { get; set; }
 
         public string SortKey { get; private set; }
 
@@ -193,8 +198,17 @@ namespace Nesh.MasterMemoryDebugger
             handle.RegisterCallback<PointerDownEvent>(evt => OnResizeStart(cell, handle, evt));
             handle.RegisterCallback<PointerMoveEvent>(evt => OnResizeMove(handle, evt));
             handle.RegisterCallback<PointerUpEvent>(evt => OnResizeEnd(handle, evt));
-            // a click on the handle must not sort
-            handle.RegisterCallback<ClickEvent>(evt => evt.StopPropagation());
+            handle.RegisterCallback<ClickEvent>(evt =>
+            {
+                // a click on the handle must not sort; a double click sizes the column to its content
+                evt.StopPropagation();
+                if (evt.clickCount < 2 || AutoFit == null) return;
+                column.UserSized = false;
+                AutoFit(column);
+                ApplyWidths();
+                UpdateHorizontalScroll();
+                ColumnResized?.Invoke();
+            });
             cell.Root.Add(handle);
 
             headerCells.Add(cell);
@@ -244,6 +258,7 @@ namespace Nesh.MasterMemoryDebugger
         {
             if (resizing == null || !handle.HasPointerCapture(evt.pointerId)) return;
             resizing.Column.Width = Mathf.Max(MasterGridColumn.MinWidth, resizeStartWidth + evt.position.x - resizeStartX);
+            resizing.Column.UserSized = true;
             ApplyWidths();
             UpdateHorizontalScroll();
             evt.StopPropagation();
@@ -319,10 +334,13 @@ namespace Nesh.MasterMemoryDebugger
 
         // ------------------------------------------------------------------ widths and horizontal scroll
 
+        /// <summary>Width of the frozen part including its divider.</summary>
+        float FrozenWidth => frozen.Count == 0 ? 0f : MasterGridLayout.TotalWidth(frozen) + FrozenDivider;
+
         void ApplyWidths()
         {
             foreach (var cell in headerCells) cell.Root.style.width = cell.Column.Width;
-            headerFrozen.style.width = MasterGridLayout.TotalWidth(frozen);
+            headerFrozen.style.width = FrozenWidth;
             headerContent.style.width = MasterGridLayout.TotalWidth(scrolled);
             foreach (var row in rows)
             {
@@ -335,7 +353,7 @@ namespace Nesh.MasterMemoryDebugger
             var i = 0;
             foreach (var column in frozen) row.Cells[i++].style.width = column.Width;
             foreach (var column in scrolled) row.Cells[i++].style.width = column.Width;
-            row.Frozen.style.width = MasterGridLayout.TotalWidth(frozen);
+            row.Frozen.style.width = FrozenWidth;
             row.Content.style.width = MasterGridLayout.TotalWidth(scrolled);
         }
 
@@ -346,7 +364,7 @@ namespace Nesh.MasterMemoryDebugger
             var contentWidth = MasterGridLayout.TotalWidth(scrolled);
             var verticalScroller = listView.Q<ScrollView>()?.verticalScroller;
             var scrollbarWidth = verticalScroller != null && verticalScroller.resolvedStyle.display == DisplayStyle.Flex ? verticalScroller.layout.width : 0f;
-            var viewportWidth = listView.layout.width - MasterGridLayout.TotalWidth(frozen) - (float.IsNaN(scrollbarWidth) ? 0f : scrollbarWidth);
+            var viewportWidth = listView.layout.width - FrozenWidth - (float.IsNaN(scrollbarWidth) ? 0f : scrollbarWidth);
             if (float.IsNaN(viewportWidth)) return;
 
             var max = MasterGridLayout.MaxScroll(contentWidth, viewportWidth);

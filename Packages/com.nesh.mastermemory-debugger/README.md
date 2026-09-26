@@ -253,10 +253,14 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 - 第一欄 `●` 標示有 Override 的 Record，接著是主鍵欄位（`(PK)`，複合主鍵每個成員一欄），然後每個欄位一欄（SecondaryKey 標 `(SK)`，複雜型別顯示預覽）。
 - 專案用 `SetDisplayName` / `RegisterTable(getDisplayName)` 提供顯示名稱時，會多一欄 `Display`；預設的顯示名稱只是重複某個欄位，所以不另外顯示。
 - 數字靠右對齊、`null` 顯示為灰色的 `NULL`、有格線與交錯底色。有 Override 的格子若和原始值不同，會以橘色顯示。
-- **凍結欄位**：凍結的欄位固定在左側（藍色分隔線左邊），其他欄位可以水平捲動（下方捲軸，或 Shift + 滾輪 / 觸控板左右滑動）。預設凍結 `●` 與主鍵欄位。
-- **Columns ▾**：每個欄位可以勾選 **Show**（顯示 / 隱藏）與 **Freeze**（凍結）；`Show All` 全部顯示、`Reset` 回到預設。
-- 拖曳欄位標題的右邊界可以調整寬度；點欄位標題排序（遞增 → 遞減 → 不排序）。排序會套用在所有符合條件的資料上，再取前 `Max Search Results` 筆（預設 500）。
-- 欄位的顯示、凍結與寬度會依 Table 記住（本次執行期間）。
+- **凍結欄位**：凍結的欄位固定在左側（藍色分隔線左邊），其他欄位可以水平捲動（下方捲軸，或 Shift + 滾輪 / 觸控板左右滑動）。
+  `●` 與主鍵欄位**一律顯示並凍結**，不能取消。
+- **Columns ▾**：其他欄位可以勾選 **Show**（顯示 / 隱藏）與 **Freeze**（凍結）；`Show All` 全部顯示、`Reset` 回到預設。
+- **欄寬自動調整**：依欄位名稱與前 200 筆的內容估算寬度（40～320px，太長的內容以 `…` 截斷，完整內容看右側 Inspector）。
+  拖曳欄位標題的右邊界可以手動調整；**雙擊**右邊界回到自動寬度。
+- 點欄位標題排序（遞增 → 遞減 → 不排序）。排序會套用在所有符合條件的資料上，再取前 `Max Search Results` 筆（預設 500）。
+- 欄位的顯示、凍結與手動寬度會依 Table 記住（本次執行期間）。
+- 範例的 `ExampleManyColumnsMaster`（75 欄、120 筆，Test 群組）與 `ExampleWeaponMaster`（27 欄）可以用來確認超出一個畫面時的水平捲動。
 - **釘選頁籤**：表格上方的 `+ Pin` 把目前的 Table 釘選成頁籤，點頁籤快速切換，`×` 取消釘選。釘選清單記在 PlayerPrefs，下次開啟仍會保留。
 - 表格是自己實作的 virtualized grid（`ListView` + 同步捲動的表頭），沒有使用 `MultiColumnListView`。
 
@@ -294,6 +298,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
     每次修改都會建立新的陣列 / List，原始 Record 與已套用的 Override 不會被改到；Patch 會把整個 List 存成 JSON 陣列。超過 200 項時唯讀。
   - Dictionary / 巢狀物件 / 元素為複雜型別的 List：唯讀的可折疊樹狀檢視（最多 3 層、每層最多 100 項，展開時才建立）
   - 有修改的欄位會顯示 `Original: xxx`
+  - 文字欄位會自動換行並長高，完整顯示很長的值（Enter 仍然是 Apply，不會插入換行）
   - **關聯跳轉**：Record 有實作 MasterMemory 的 `IValidatable<T>` 並用 `GetReferenceSet<T>().Exists(x => x.ItemId, y => y.Id)` 宣告關聯時，
     該欄位旁會出現 `→ ItemMaster` 按鈕，點擊會開啟被參照的 Record（參照的不是主鍵時，改為以 `Id=值` 篩選目標 Table）。
     不需要額外設定：關聯是從 `Validate` 的 `Exists()` 讀出來的（`MasterMemoryReferences.Get(table)`）；沒有寫 Validate 的 Record 就不會顯示按鈕。

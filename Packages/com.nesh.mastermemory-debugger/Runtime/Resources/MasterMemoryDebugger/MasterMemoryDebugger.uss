@@ -36,26 +36,39 @@
 
 /* ------------------------------------------------------------------ header */
 
+/* one row; wraps instead of overlapping when the window is narrow or the UI is scaled up */
 .mm-debugger__header {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     flex-shrink: 0;
-    height: 30px;
-    padding: 0 4px;
+    min-height: 30px;
+    padding: 0 4px 2px 4px;
     margin-bottom: 6px;
     border-bottom-width: 1px;
     border-color: rgb(58, 63, 75);
 }
 
 .mm-debugger__title {
+    flex-shrink: 0;
     font-size: 15px;
     -unity-font-style: bold;
     margin-right: 16px;
 }
 
+.mm-debugger__header .mm-debugger__spacer {
+    min-width: 8px;
+}
+
+/* version / override count give way first (full text in the tooltip) */
 .mm-debugger__header-info {
+    flex-shrink: 1;
+    min-width: 0;
     color: rgb(150, 157, 171);
     margin-right: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mm-debugger__override-count--active {
@@ -107,6 +120,7 @@
 }
 
 .mm-debugger__header-button {
+    flex-shrink: 0;
     min-width: 36px;
 }
 
@@ -121,6 +135,16 @@
 
 .mm-debugger .unity-two-pane-split-view__dragline-anchor {
     background-color: rgb(22, 24, 29);
+}
+
+/* The default theme gives the divider a resize cursor. Built-in cursors only exist in the Editor UI; at runtime they log
+   "Runtime cursors other than the default cursor need to be defined using a texture" every frame. */
+.mm-debugger .unity-two-pane-split-view__dragline-anchor,
+.mm-debugger .unity-two-pane-split-view__dragline,
+.mm-debugger .unity-multi-column-header__column-resize-handle,
+.mm-debugger .unity-base-text-field__input,
+.mm-debugger .unity-text-element--inner-input-field-component {
+    cursor: initial;
 }
 
 .mm-debugger .unity-two-pane-split-view__dragline-anchor:hover {
@@ -242,8 +266,21 @@
 
 /* label language (shown when the project registered labels) */
 .mm-debugger__language {
-    width: 130px;
+    width: auto;
+    min-width: 150px;
+    max-width: 240px;
+    flex-shrink: 0;
     margin: 0 8px 0 4px;
+}
+
+.mm-debugger__language .unity-base-field__input {
+    min-width: 0;
+}
+
+.mm-debugger__language .unity-base-popup-field__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mm-debugger__search-toolbar {
@@ -372,6 +409,12 @@
     height: 100%;
 }
 
+/* rows must start exactly under the header: no padding from the default list item style */
+.mm-debugger .mm-debugger__grid-rows .unity-collection-view__item {
+    padding: 0;
+    margin: 0;
+}
+
 .mm-debugger__grid-hscroll {
     flex-shrink: 0;
 }
@@ -406,6 +449,7 @@
     -unity-text-align: middle-left;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mm-debugger .mm-debugger__cell--number {
@@ -478,6 +522,10 @@
     flex-grow: 1;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.mm-debugger .mm-debugger__columns-row--locked .mm-debugger__columns-name {
+    color: rgb(150, 190, 255);
 }
 
 .mm-debugger__columns-flag {
@@ -604,6 +652,7 @@
 
 .mm-debugger__field-name-container {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     min-height: 18px;
     margin-bottom: 2px;
@@ -674,7 +723,9 @@
 
 /* jump to the record referenced by this field (MasterMemory Validate Exists) */
 .mm-debugger__reference-button {
-    flex-shrink: 0;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
     margin: 0 0 0 6px;
     padding: 0 6px;
     min-height: 18px;
@@ -692,6 +743,17 @@
     font-size: 11px;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* long text values wrap and the field grows, so the whole value is visible */
+.mm-debugger__text-editor .unity-base-text-field__input,
+.mm-debugger__text-editor .unity-text-element {
+    white-space: normal;
+}
+
+.mm-debugger__text-editor .unity-base-text-field__input {
+    min-height: 22px;
+    height: auto;
 }
 
 .mm-debugger__field-editor--invalid .unity-base-text-field__input {
@@ -763,8 +825,9 @@
 
 .mm-debugger__tabs {
     flex-direction: row;
+    flex-shrink: 0;
     align-self: stretch;
-    margin-left: 16px;
+    margin-right: 8px;
 }
 
 .mm-debugger .mm-debugger__tab {
@@ -818,8 +881,9 @@
 }
 
 .mm-debugger__patches-list-panel {
-    min-width: 180px;
+    min-width: 160px;
     margin-right: 3px;
+    overflow: hidden;
 }
 
 .mm-debugger__patches-list {
@@ -828,16 +892,24 @@
 
 .mm-debugger__patch-item {
     justify-content: center;
+    height: 100%;
     padding: 2px 8px;
+    overflow: hidden;
 }
 
 .mm-debugger .mm-debugger__patch-item-name {
     -unity-font-style: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mm-debugger .mm-debugger__patch-item-info {
     font-size: 11px;
     color: rgb(150, 157, 171);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mm-debugger .mm-debugger__patch-item--problem .mm-debugger__patch-item-info {

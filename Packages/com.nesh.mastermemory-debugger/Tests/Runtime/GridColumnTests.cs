@@ -76,6 +76,8 @@ namespace Nesh.MasterMemoryDebugger.Tests
             damage.Visible = false;
             damage.Frozen = true;
             damage.Width = 222f;
+            damage.UserSized = true;
+            columns.Single(x => x.Key == "Cooldown").Width = 333f;
             MasterGridLayout.Save("TestSkill", columns);
 
             var restored = MasterRecordListController.CreateColumns(Table<TestSkill>());
@@ -84,6 +86,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.IsFalse(again.Visible);
             Assert.IsTrue(again.Frozen);
             Assert.AreEqual(222f, again.Width);
+            Assert.AreNotEqual(333f, restored.Single(x => x.Key == "Cooldown").Width, "automatic widths are computed again");
 
             var other = MasterRecordListController.CreateColumns(Table<TestEnemyLevel>());
             MasterGridLayout.Restore("TestEnemyLevel", other);
@@ -92,8 +95,60 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterGridLayout.ResetToDefaults(restored);
             Assert.IsTrue(again.Visible);
             Assert.IsFalse(again.Frozen);
+            Assert.IsFalse(again.UserSized);
             Assert.AreEqual(again.DefaultWidth, again.Width);
             Assert.IsTrue(restored[1].Frozen, "the primary key is frozen again");
+        }
+
+        [Test]
+        public void StateAndPrimaryKeyColumns_ShouldAlwaysBeShownAndFrozen()
+        {
+            var columns = MasterRecordListController.CreateColumns(Table<TestEnemyLevel>());
+            var locked = columns.Take(3).ToList();
+            Assert.IsTrue(locked.All(x => x.Locked));
+            Assert.IsFalse(columns.Skip(3).Any(x => x.Locked));
+
+            foreach (var column in locked)
+            {
+                column.Visible = false;
+                column.Frozen = false;
+                Assert.IsTrue(column.Visible && column.Frozen, column.Key);
+            }
+
+            MasterGridLayout.Save("TestEnemyLevel", columns);
+            var restored = MasterRecordListController.CreateColumns(Table<TestEnemyLevel>());
+            MasterGridLayout.Restore("TestEnemyLevel", restored);
+            Assert.IsTrue(restored.Take(3).All(x => x.Visible && x.Frozen));
+        }
+
+        [Test]
+        public void AutoFit_ShouldFollowTitlesAndValues()
+        {
+            var records = Table<TestSkill>().CreateRecordSnapshot();
+            var columns = MasterRecordListController.CreateColumns(Table<TestSkill>());
+            MasterGridLayout.AutoFit(columns, records);
+
+            var state = columns[0];
+            Assert.AreEqual(state.DefaultWidth, state.Width, "the state column keeps its fixed width");
+            var bigValue = columns.Single(x => x.Key == "BigValue");
+            var isPassive = columns.Single(x => x.Key == "IsPassive");
+            Assert.Greater(bigValue.Width, isPassive.Width, "18446744073709551614 is wider than the title IsPassive");
+            Assert.IsTrue(columns.Where(x => x.AutoWidth).All(x => x.Width >= MasterGridLayout.MinAutoWidth && x.Width <= MasterGridLayout.MaxAutoWidth));
+
+            var resized = columns.Single(x => x.Key == "Name");
+            resized.Width = 500f;
+            resized.UserSized = true;
+            MasterGridLayout.AutoFit(columns, records);
+            Assert.AreEqual(500f, resized.Width, "a dragged width is kept");
+        }
+
+        [Test]
+        public void TextWidth_ShouldCountFullWidthCharactersWider()
+        {
+            Assert.AreEqual(0f, MasterGridLayout.EstimateTextWidth(null, 12f));
+            Assert.Greater(MasterGridLayout.EstimateTextWidth("傷害", 12f), MasterGridLayout.EstimateTextWidth("ab", 12f));
+            Assert.Greater(MasterGridLayout.EstimateTextWidth("MMMM", 12f), MasterGridLayout.EstimateTextWidth("iiii", 12f));
+            Assert.AreEqual(24f, MasterGridLayout.EstimateTextWidth("技能", 12f));
         }
     }
 }

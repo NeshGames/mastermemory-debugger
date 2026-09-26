@@ -186,4 +186,89 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
             if (SkillId != 0) validator.GetReferenceSet<ExampleSkillMaster>().Exists(x => x.SkillId, skill => skill.Id);
         }
     }
+
+    /// <summary>
+    /// Very wide table (75 columns, 120 records) to check horizontal scrolling beyond one screen, frozen columns,
+    /// automatic column widths (long names and values) and text wrapping in the inspector.
+    /// </summary>
+    [MemoryTable("example_many_columns"), MessagePackObject(true)]
+    public sealed record ExampleManyColumnsMaster
+    {
+        [PrimaryKey]
+        public int Id { get; init; }
+        public string Name { get; init; }
+        public string VeryLongFieldNameToCheckAutomaticColumnWidth { get; init; }
+        public string LongDescription { get; init; }
+        public int Param01 { get; init; }
+        public int Param02 { get; init; }
+        public int Param03 { get; init; }
+        public int Param04 { get; init; }
+        public int Param05 { get; init; }
+        public int Param06 { get; init; }
+        public int Param07 { get; init; }
+        public int Param08 { get; init; }
+        public int Param09 { get; init; }
+        public int Param10 { get; init; }
+        public int Param11 { get; init; }
+        public int Param12 { get; init; }
+        public int Param13 { get; init; }
+        public int Param14 { get; init; }
+        public int Param15 { get; init; }
+        public int Param16 { get; init; }
+        public int Param17 { get; init; }
+        public int Param18 { get; init; }
+        public int Param19 { get; init; }
+        public int Param20 { get; init; }
+        public int Param21 { get; init; }
+        public int Param22 { get; init; }
+        public int Param23 { get; init; }
+        public int Param24 { get; init; }
+        public int Param25 { get; init; }
+        public int Param26 { get; init; }
+        public int Param27 { get; init; }
+        public int Param28 { get; init; }
+        public int Param29 { get; init; }
+        public int Param30 { get; init; }
+        public float Rate01 { get; init; }
+        public float Rate02 { get; init; }
+        public float Rate03 { get; init; }
+        public float Rate04 { get; init; }
+        public float Rate05 { get; init; }
+        public float Rate06 { get; init; }
+        public float Rate07 { get; init; }
+        public float Rate08 { get; init; }
+        public float Rate09 { get; init; }
+        public float Rate10 { get; init; }
+        public float Rate11 { get; init; }
+        public float Rate12 { get; init; }
+        public float Rate13 { get; init; }
+        public float Rate14 { get; init; }
+        public float Rate15 { get; init; }
+        public bool Flag01 { get; init; }
+        public bool Flag02 { get; init; }
+        public bool Flag03 { get; init; }
+        public bool Flag04 { get; init; }
+        public bool Flag05 { get; init; }
+        public bool Flag06 { get; init; }
+        public bool Flag07 { get; init; }
+        public bool Flag08 { get; init; }
+        public bool Flag09 { get; init; }
+        public bool Flag10 { get; init; }
+        public string Note01 { get; init; }
+        public string Note02 { get; init; }
+        public string Note03 { get; init; }
+        public string Note04 { get; init; }
+        public string Note05 { get; init; }
+        public string Note06 { get; init; }
+        public string Note07 { get; init; }
+        public string Note08 { get; init; }
+        public string Note09 { get; init; }
+        public string Note10 { get; init; }
+        public long TotalScoreAcrossAllSeasons { get; init; }
+        public double Ratio { get; init; }
+        public ExampleElement Element { get; init; }
+        public ExampleRarity Rarity { get; init; }
+        public int? OptionalLimit { get; init; }
+        public int[] ValueList { get; init; }
+    }
 }

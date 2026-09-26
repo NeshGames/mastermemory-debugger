@@ -456,10 +456,14 @@ namespace Nesh.MasterMemoryDebugger
                         dialog.Confirm();
                         evt.StopPropagation();
                     }
-                    else if (editor.IsDirty && target != null && editor.Container.Contains(target))
+                    else if (target != null && editor.Container.Contains(target))
                     {
-                        editor.TryApply();
-                        evt.StopPropagation();
+                        // string editors are multiline (to wrap long values): Enter applies instead of adding a line break
+                        var textField = target as TextField ?? target.GetFirstAncestorOfType<TextField>();
+                        var inTextEditor = textField != null && textField.ClassListContains("mm-debugger__text-editor");
+                        var wasDirty = editor.IsDirty;
+                        if (wasDirty) editor.TryApply();
+                        if (wasDirty || inTextEditor) evt.StopPropagation();
                     }
                     break;
             }
@@ -478,6 +482,7 @@ namespace Nesh.MasterMemoryDebugger
         void RefreshHeader()
         {
             versionLabel.text = "Master: " + MasterMemoryDebugRegistry.GetMasterVersion();
+            versionLabel.tooltip = versionLabel.text;
             var count = MasterMemoryDebugRuntime.OverrideCount;
             changesTab.text = $"Changes ({count})";
             patchesTab.text = $"Patches ({patches.PatchCount})";

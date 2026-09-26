@@ -71,7 +71,7 @@ namespace Nesh.MasterMemoryDebugger
             searchField.RegisterValueChangedCallback(OnSearchChanged);
             modifiedOnlyToggle.RegisterValueChangedCallback(OnModifiedOnlyChanged);
 
-            grid = new MasterRecordGrid(gridHost);
+            grid = new MasterRecordGrid(gridHost) { AutoFit = column => MasterGridLayout.AutoFit(column, snapshot) };
             grid.ItemSelected += OnItemSelected;
             grid.SortChanged += ApplyFilter;
             grid.ColumnResized += SaveColumns;
@@ -113,6 +113,7 @@ namespace Nesh.MasterMemoryDebugger
             SaveColumns();
             columns = CreateColumns(table);
             MasterGridLayout.Restore(table.TableName, columns);
+            MasterGridLayout.AutoFit(columns, snapshot);
             grid.SetContent(columns, filtered);
             if (columnsPopup != null && columnsPopup.IsOpen) columnsPopup.Open();
         }
@@ -131,6 +132,7 @@ namespace Nesh.MasterMemoryDebugger
                 columnsPopup?.Close();
                 columns = CreateColumns(table);
                 MasterGridLayout.Restore(table?.TableName, columns);
+                MasterGridLayout.AutoFit(columns, snapshot);
                 // columns and rows change together: rows of the previous table are never bound to the new columns
                 filtered.Clear();
                 grid.SetContent(columns, filtered);
@@ -204,22 +206,27 @@ namespace Nesh.MasterMemoryDebugger
             {
                 Tooltip = "Overridden",
                 CellClass = StateCellClass,
-                Frozen = true,
+                Locked = true,
                 DefaultFrozen = true,
+                AutoWidth = false,
             });
 
             // primary key members first, like the columns of a database table; frozen by default
             foreach (var field in table.TypeDescriptor.PrimaryKeyFields)
             {
                 var column = CreateFieldColumn(table, field, " (PK)", KeyCellClass);
-                column.Frozen = column.DefaultFrozen = true;
+                // the key identifies the row: always shown and frozen
+                column.Locked = column.DefaultFrozen = true;
                 result.Add(column);
             }
 
             // the default display name repeats a member; only a project supplied one gets its own column
             if (table.HasCustomDisplayName)
             {
-                result.Add(new MasterGridColumn(NameColumn, "Display", 170, (label, record) => label.text = record.GetDisplayName() ?? string.Empty));
+                result.Add(new MasterGridColumn(NameColumn, "Display", 170, (label, record) => label.text = record.GetDisplayName() ?? string.Empty)
+                {
+                    Text = record => record.GetDisplayName(),
+                });
             }
 
             foreach (var field in table.TypeDescriptor.Fields)
@@ -243,6 +250,11 @@ namespace Nesh.MasterMemoryDebugger
             })
             {
                 Tooltip = MasterMemoryDebugLocalization.GetFieldTooltip(table, field),
+                Text = record =>
+                {
+                    var value = field.GetValue(record.Current);
+                    return value == null ? "NULL" : MasterDataValueUtility.Format(value);
+                },
                 // numbers are right aligned, like in database viewers
                 CellClass = isNumber ? (cellClass == null ? NumberCellClass : cellClass + " " + NumberCellClass) : cellClass,
             };

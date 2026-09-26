@@ -99,6 +99,15 @@ namespace Nesh.MasterMemoryDebugger
                     changed();
                 });
                 row.Add(frozen);
+
+                if (column.Locked)
+                {
+                    // state and primary key columns identify the row: always shown and frozen
+                    visible.SetEnabled(false);
+                    frozen.SetEnabled(false);
+                    row.tooltip = "Always shown and frozen";
+                    row.AddToClassList("mm-debugger__columns-row--locked");
+                }
                 list.Add(row);
             }
             popup.Add(list);
