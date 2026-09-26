@@ -6,7 +6,8 @@ using UnityEngine.UIElements;
 namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
-    /// Completion popup of the search box: field names, and enum / bool values after an operator.
+    /// Completion popup of the search box: field names, and enum / bool values after an operator; recent searches when the
+    /// box is empty (or Down is pressed without a popup).
     /// Up / Down select, Tab / Enter / click accept, Esc closes the popup. Tab never moves the focus out of the search box.
     /// </summary>
     internal sealed class MasterSearchCompletionController : IDisposable
@@ -25,6 +26,8 @@ namespace Nesh.MasterMemoryDebugger
         readonly List<Label> items = new List<Label>();
 
         MasterRecordQueryCompletion.Context context;
+        // the candidates are recent searches that replace the whole text
+        bool showingHistory;
         int selected;
         int firstVisible;
         // closed with Esc: stays closed until the text changes
@@ -93,7 +96,11 @@ namespace Nesh.MasterMemoryDebugger
                     Accept(selected);
                     break;
                 case KeyCode.DownArrow:
-                    if (!canAccept) return;
+                    if (!canAccept)
+                    {
+                        if (!ShowHistory(searchField.value)) return;
+                        break;
+                    }
                     Select(selected + 1);
                     break;
                 case KeyCode.UpArrow:
@@ -160,7 +167,7 @@ namespace Nesh.MasterMemoryDebugger
 
         // ------------------------------------------------------------------ popup
 
-        bool HasChoices => context != null && !IsComplete(context);
+        bool HasChoices => context != null && (showingHistory || !IsComplete(context));
 
         void UpdatePopup()
         {
@@ -171,6 +178,13 @@ namespace Nesh.MasterMemoryDebugger
                 return;
             }
             dismissedText = null;
+
+            if (text.Length == 0)
+            {
+                if (!ShowHistory(text)) Hide();
+                return;
+            }
+            showingHistory = false;
 
             var previous = context != null && selected < context.Candidates.Count ? context.Candidates[selected] : null;
             context = MasterRecordQueryCompletion.GetContext(text, searchField.cursorIndex, typeProvider());
@@ -186,6 +200,26 @@ namespace Nesh.MasterMemoryDebugger
             firstVisible = 0;
             Render();
             popup.style.display = DisplayStyle.Flex;
+        }
+
+        /// <summary>Lists the recent searches that contain <paramref name="text"/>; false when there is none.</summary>
+        bool ShowHistory(string text)
+        {
+            var entries = MasterSearchHistory.Find(text);
+            if (entries.Count == 0)
+            {
+                context = null;
+                showingHistory = false;
+                return false;
+            }
+            text ??= string.Empty;
+            context = new MasterRecordQueryCompletion.Context { Start = 0, End = text.Length, Word = text, Candidates = entries };
+            showingHistory = true;
+            selected = 0;
+            firstVisible = 0;
+            Render();
+            popup.style.display = DisplayStyle.Flex;
+            return true;
         }
 
         void Select(int index)
@@ -204,6 +238,7 @@ namespace Nesh.MasterMemoryDebugger
             // the text field may move the caret while it applies the new value
             searchField.schedule.Execute(() => SetCaret(caret));
             context = null;
+            showingHistory = false;
             Close();
         }
 
@@ -212,7 +247,7 @@ namespace Nesh.MasterMemoryDebugger
             popup.Clear();
             items.Clear();
 
-            if (IsComplete(context))
+            if (!showingHistory && IsComplete(context))
             {
                 // the field name is complete: show what can follow it
                 popup.Add(CreateInfo($"{context.Candidates[0]}  {Operators}"));
@@ -223,14 +258,15 @@ namespace Nesh.MasterMemoryDebugger
             if (selected < firstVisible) firstVisible = selected;
             if (selected >= firstVisible + MaxVisibleItems) firstVisible = selected - MaxVisibleItems + 1;
 
-            if (context.IsValue) popup.Add(CreateInfo(context.ValueField.Name));
+            if (showingHistory) popup.Add(CreateInfo("Recent searches"));
+            else if (context.IsValue) popup.Add(CreateInfo(context.ValueField.Name));
             if (firstVisible > 0) popup.Add(CreateInfo($"▲ {firstVisible} more"));
             var last = Math.Min(count, firstVisible + MaxVisibleItems);
             for (var i = firstVisible; i < last; i++)
             {
                 var candidate = context.Candidates[i];
                 // field names: the label of the selected language next to the code name that is inserted
-                var label = context.IsValue ? null : fieldLabelProvider?.Invoke(candidate);
+                var label = context.IsValue || showingHistory ? null : fieldLabelProvider?.Invoke(candidate);
                 var item = new Label(label != null && label != candidate ? $"{candidate}    {label}" : candidate) { userData = i };
                 item.AddToClassList(ItemClass);
                 item.EnableInClassList(SelectedItemClass, i == selected);

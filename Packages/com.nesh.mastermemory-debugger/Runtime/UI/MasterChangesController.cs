@@ -15,11 +15,14 @@ namespace Nesh.MasterMemoryDebugger
         readonly Label summaryLabel;
         readonly Action<MasterMemoryTableDescriptor, object> open;
         readonly Action<string, bool> setStatus;
+        readonly MasterMemoryDebuggerDialog dialog;
 
         public MasterChangesController(VisualElement panel, ScrollView list, Label summaryLabel, Action<MasterMemoryTableDescriptor, object> open, Action<string, bool> setStatus,
-            Button copyButton = null)
+            Button copyButton = null, Button pasteButton = null, MasterMemoryDebuggerDialog dialog = null)
         {
+            this.dialog = dialog;
             if (copyButton != null) copyButton.clicked += CopyTsv;
+            if (pasteButton != null && dialog != null) pasteButton.clicked += ShowPasteDialog;
             this.panel = panel;
             this.list = list;
             this.summaryLabel = summaryLabel;
@@ -81,6 +84,73 @@ namespace Nesh.MasterMemoryDebugger
             }
             var result = MasterDataPatchExporter.CopyToClipboard(MasterMemoryChangeSummary.ToTsv(entries), "changes.tsv", "text/tab-separated-values");
             setStatus($"Changes: {fields} fields of {entries.Count} records. {result.Message}", !result.Succeeded);
+        }
+
+        /// <summary>Values edited in a spreadsheet (the Copy TSV format) become overrides after a preview.</summary>
+        void ShowPasteDialog()
+        {
+            var textField = new TextField("TSV") { multiline = true };
+            textField.AddToClassList("mm-debugger__import-json");
+            dialog.Show(
+                "Paste TSV",
+                "Paste tab separated lines with the columns table, key, field and current (the format of Copy TSV: copy, edit the current column in a spreadsheet, paste back). Other columns are ignored.",
+                textField,
+                new MasterMemoryDebuggerDialog.DialogButton("Cancel", null),
+                new MasterMemoryDebuggerDialog.DialogButton("Preview", () => Preview(textField.value), isPrimary: true));
+        }
+
+        void Preview(string text)
+        {
+            var plan = MasterMemoryTsvImport.Read(text);
+            if (plan.InvalidFormat != null)
+            {
+                setStatus("Paste TSV: " + plan.InvalidFormat, true);
+                return;
+            }
+
+            var summary = $"{plan.Changes.Count} values of {plan.RecordCount} records will change, {plan.Unchanged} are unchanged";
+            if (plan.Failed > 0) summary += $", {plan.Failed} lines can not be imported";
+            if (plan.Outdated > 0) summary += $", {plan.Outdated} have a different original value now";
+            summary += ".";
+
+            var content = new ScrollView(ScrollViewMode.Vertical);
+            content.AddToClassList("mm-debugger__import-preview");
+            const int MaxPreviewLines = 30;
+            for (var i = 0; i < plan.Changes.Count && i < MaxPreviewLines; i++)
+            {
+                var change = plan.Changes[i];
+                var line = new Label($"{change.Record.Table.TableName} {change.Record.KeyText}  {change.Field.Name}: " +
+                                     $"{MasterDataValueUtility.Format(change.Field.GetValue(change.Record.Current))} → {MasterDataValueUtility.Format(change.Value)}");
+                line.AddToClassList("mm-debugger__import-preview-change");
+                content.Add(line);
+            }
+            if (plan.Changes.Count > MaxPreviewLines) content.Add(new Label($"… {plan.Changes.Count - MaxPreviewLines} more"));
+            foreach (var problem in plan.Problems)
+            {
+                var line = new Label(problem);
+                line.AddToClassList("mm-debugger__change-problem");
+                content.Add(line);
+            }
+
+            if (plan.Changes.Count == 0)
+            {
+                dialog.Show("Paste TSV", summary + " Nothing to apply.", content, new MasterMemoryDebuggerDialog.DialogButton("Close", null));
+                return;
+            }
+            dialog.Show(
+                "Paste TSV",
+                summary + " Undo reverts the import.",
+                content,
+                new MasterMemoryDebuggerDialog.DialogButton("Cancel", null),
+                new MasterMemoryDebuggerDialog.DialogButton("Apply", () =>
+                {
+                    int applied;
+                    using (MasterMemoryDebugHistory.Record($"Paste TSV ({plan.Changes.Count} values)"))
+                    {
+                        applied = MasterMemoryTsvImport.Apply(plan);
+                    }
+                    setStatus($"Paste TSV: {applied} values of {plan.RecordCount} records applied" + (plan.Failed > 0 ? $", {plan.Failed} lines skipped." : "."), plan.Failed > 0);
+                }, isPrimary: true));
         }
 
         VisualElement CreateEntry(MasterMemoryChangeEntry entry)

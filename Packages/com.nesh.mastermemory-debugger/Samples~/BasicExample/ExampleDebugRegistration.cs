@@ -25,7 +25,7 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
                 nameof(ExampleItemMaster),
                 nameof(ExampleWeaponMaster));
             // wide test tables
-            MasterMemoryDebugRegistry.SetTableGroup("Test", nameof(ExampleManyColumnsMaster));
+            MasterMemoryDebugRegistry.SetTableGroup("Test", nameof(ExampleManyColumnsMaster), nameof(ExampleLargeMaster));
             MasterMemoryDebugRegistry.SetTableGroup("Economy", nameof(ExampleShopMaster));
             // or by type: MasterMemoryDebugRegistry.SetTableGroup<ExampleShopMaster>("Economy");
             // ExampleGameConfigMaster has no group -> "Other"

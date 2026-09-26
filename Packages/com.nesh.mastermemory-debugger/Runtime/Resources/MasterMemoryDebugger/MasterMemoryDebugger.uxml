@@ -69,6 +69,7 @@
                     <ui:Label text="Changes" class="mm-debugger__section-title" />
                     <ui:Label name="mm-changes-summary" class="mm-debugger__header-info" />
                     <ui:VisualElement class="mm-debugger__spacer" />
+                    <ui:Button name="mm-changes-paste" text="Paste TSV…" tooltip="Import values edited in a spreadsheet (the Copy TSV format) as overrides, after a preview" class="mm-debugger__button" />
                     <ui:Button name="mm-changes-copy" text="Copy TSV" tooltip="Copy every changed field (table, key, name, field, original, current) as tab separated text, to paste into a spreadsheet (WebGL: download)" class="mm-debugger__button" />
                 </ui:VisualElement>
                 <ui:ScrollView name="mm-changes-list" mode="Vertical" class="mm-debugger__changes-list" />
