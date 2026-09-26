@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Text;
 using UnityEngine;
 
 namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
@@ -47,19 +48,51 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
             RuntimeMasterMemoryDebugger.Toggle();
         }
 
+        /// <summary>Logs every overridden record as gameplay sees it through the service, next to the original value.</summary>
         void LogCurrentValues()
         {
-            var fireball = service.GetSkill(1001);
-            var potion = service.GetItem(1);
-            var enemy = service.GetEnemyLevel(1, 2);
+            var original = ExampleDatabaseBootstrap.OriginalDatabase;
+            var sb = new StringBuilder("[Example] Values read through ExampleMasterDataService");
+            var overrides = MasterMemoryDebugRuntime.GetAllOverrides();
+            if (overrides.Count == 0) sb.Append(": no overrides, every value comes from MasterMemory.");
+
+            foreach (var entry in overrides)
+            {
+                switch (entry.Value)
+                {
+                    case ExampleSkillMaster _:
+                    {
+                        var id = (int)entry.Key.PrimaryKey;
+                        var skill = service.GetSkill(id);
+                        var source = original.ExampleSkillMasterTable.FindById(id);
+                        sb.Append($"\n  Skill {id} {skill.Name}: Damage={skill.Damage} (original {source.Damage}), Cooldown={skill.Cooldown} (original {source.Cooldown}), Element={skill.Element}");
+                        break;
+                    }
+                    case ExampleItemMaster _:
+                    {
+                        var id = (int)entry.Key.PrimaryKey;
+                        var item = service.GetItem(id);
+                        var source = original.ExampleItemMasterTable.FindById(id);
+                        sb.Append($"\n  Item {id} {item.Name}: Price={item.Price} (original {source.Price}), Rarity={item.Rarity}, DropRate={item.DropRate}");
+                        break;
+                    }
+                    case ExampleEnemyLevelMaster _:
+                    {
+                        var (enemyId, level) = ((int, int))entry.Key.PrimaryKey;
+                        var enemy = service.GetEnemyLevel(enemyId, level);
+                        var source = original.ExampleEnemyLevelMasterTable.FindByEnemyIdAndLevel((enemyId, level));
+                        sb.Append($"\n  Enemy ({enemyId}, {level}): Hp={enemy.Hp} (original {source.Hp}), Attack={enemy.Attack}, MoveSpeed={enemy.MoveSpeed}");
+                        break;
+                    }
+                }
+            }
+
             var category1 = service.GetSkillsByCategory(1);
-            Debug.Log(
-                "[Example] via MasterDataService: " +
-                $"Skill 1001 {fireball.Name} Damage={fireball.Damage} Cooldown={fireball.Cooldown}, " +
-                $"Item 1 {potion.Name} Price={potion.Price}, " +
-                $"Enemy (1,2) Hp={enemy.Hp}. " +
-                $"FindByCategory(1) max damage={category1.Max(x => x.Damage)} " +
-                (rebuildDatabaseOnOverride ? "(rebuilt database: sees overrides)" : "(secondary index: does not see overrides)"));
+            sb.Append($"\n  FindByCategory(1) max Damage={category1.Max(x => x.Damage)} ");
+            sb.Append(rebuildDatabaseOnOverride
+                ? "(rebuilt database: secondary index sees overrides)"
+                : "(secondary index: does not see overrides)");
+            Debug.Log(sb.ToString());
         }
     }
 }

@@ -69,7 +69,7 @@ namespace Nesh.MasterMemoryDebugger
             {
                 case MasterDataValueKind.String:
                 {
-                    var f = Prepare(new TextField { value = (string)value ?? string.Empty, isDelayed = true });
+                    var f = Prepare(new TextField { value = (string)value ?? string.Empty });
                     f.RegisterValueChangedCallback(evt => onChanged(evt.newValue));
                     return f;
                 }
@@ -81,7 +81,7 @@ namespace Nesh.MasterMemoryDebugger
                 }
                 case MasterDataValueKind.Int32:
                 {
-                    var f = Prepare(new IntegerField { value = (int)value, isDelayed = true });
+                    var f = Prepare(new IntegerField { value = (int)value });
                     f.RegisterValueChangedCallback(evt => onChanged(evt.newValue));
                     return f;
                 }
@@ -95,31 +95,31 @@ namespace Nesh.MasterMemoryDebugger
                     return CreateClampedIntegerEditor(Convert.ToInt32(value), sbyte.MinValue, sbyte.MaxValue, v => onChanged((sbyte)v));
                 case MasterDataValueKind.UInt32:
                 {
-                    var f = Prepare(new UnsignedIntegerField { value = (uint)value, isDelayed = true });
+                    var f = Prepare(new UnsignedIntegerField { value = (uint)value });
                     f.RegisterValueChangedCallback(evt => onChanged(evt.newValue));
                     return f;
                 }
                 case MasterDataValueKind.Int64:
                 {
-                    var f = Prepare(new LongField { value = (long)value, isDelayed = true });
+                    var f = Prepare(new LongField { value = (long)value });
                     f.RegisterValueChangedCallback(evt => onChanged(evt.newValue));
                     return f;
                 }
                 case MasterDataValueKind.UInt64:
                 {
-                    var f = Prepare(new UnsignedLongField { value = (ulong)value, isDelayed = true });
+                    var f = Prepare(new UnsignedLongField { value = (ulong)value });
                     f.RegisterValueChangedCallback(evt => onChanged(evt.newValue));
                     return f;
                 }
                 case MasterDataValueKind.Single:
                 {
-                    var f = Prepare(new FloatField { value = (float)value, isDelayed = true });
+                    var f = Prepare(new FloatField { value = (float)value });
                     f.RegisterValueChangedCallback(evt => onChanged(evt.newValue));
                     return f;
                 }
                 case MasterDataValueKind.Double:
                 {
-                    var f = Prepare(new DoubleField { value = (double)value, isDelayed = true });
+                    var f = Prepare(new DoubleField { value = (double)value });
                     f.RegisterValueChangedCallback(evt => onChanged(evt.newValue));
                     return f;
                 }
@@ -173,7 +173,7 @@ namespace Nesh.MasterMemoryDebugger
 
         static VisualElement CreateClampedIntegerEditor(int value, int min, int max, Action<int> onChanged)
         {
-            var field = Prepare(new IntegerField { value = value, isDelayed = true });
+            var field = Prepare(new IntegerField { value = value });
             field.RegisterValueChangedCallback(evt =>
             {
                 var clamped = Mathf.Clamp(evt.newValue, min, max);
@@ -186,23 +186,23 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>Flags enums ("A, B") and undefined values are edited as text because the runtime has no EnumFlagsField.</summary>
         static VisualElement CreateTextEnumEditor(Type type, Enum value, Action<object> onChanged)
         {
-            var field = Prepare(new TextField { value = value.ToString(), isDelayed = true });
+            var field = Prepare(new TextField { value = value.ToString() });
             field.tooltip = "Values: " + string.Join(", ", Enum.GetNames(type));
-            var last = value;
             field.RegisterValueChangedCallback(evt =>
             {
+                // edited live: an unparsable text (for example while typing) is only marked, never applied
+                Enum parsed;
                 try
                 {
-                    last = (Enum)MasterDataValueUtility.ParseEnum(type, evt.newValue);
-                    field.RemoveFromClassList(InvalidClass);
-                    field.SetValueWithoutNotify(last.ToString());
-                    onChanged(last);
+                    parsed = (Enum)MasterDataValueUtility.ParseEnum(type, evt.newValue);
                 }
                 catch (Exception)
                 {
                     field.AddToClassList(InvalidClass);
-                    field.SetValueWithoutNotify(last.ToString());
+                    return;
                 }
+                field.RemoveFromClassList(InvalidClass);
+                onChanged(parsed);
             });
             return field;
         }
@@ -223,7 +223,7 @@ namespace Nesh.MasterMemoryDebugger
             for (var i = 0; i < 4; i++)
             {
                 var channel = i;
-                var field = new FloatField(channels[i]) { value = current[channel], isDelayed = true };
+                var field = new FloatField(channels[i]) { value = current[channel] };
                 field.AddToClassList("mm-debugger__color-channel");
                 field.RegisterValueChangedCallback(evt =>
                 {
