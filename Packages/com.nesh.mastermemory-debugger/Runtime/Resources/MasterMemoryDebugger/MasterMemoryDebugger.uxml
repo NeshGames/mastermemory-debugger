@@ -26,10 +26,12 @@
                         <ui:VisualElement name="mm-search-toolbar" class="mm-debugger__search-toolbar">
                             <ui:TextField name="mm-search" class="mm-debugger__search" />
                             <ui:Toggle name="mm-modified-only" label="Modified Only" class="mm-debugger__modified-only" />
+                            <ui:Button name="mm-columns" text="Columns ▾" tooltip="Show, hide and freeze columns" class="mm-debugger__button mm-debugger__columns-button" />
                         </ui:VisualElement>
-                        <ui:MultiColumnListView name="mm-record-list" class="mm-debugger__record-list" />
+                        <ui:VisualElement name="mm-record-grid" class="mm-debugger__record-list" />
                         <ui:Label name="mm-record-count" class="mm-debugger__record-count" />
                         <ui:VisualElement name="mm-search-completion" class="mm-debugger__completion" />
+                        <ui:VisualElement name="mm-columns-popup" class="mm-debugger__columns-popup" />
                     </ui:VisualElement>
 
                     <ui:VisualElement name="mm-inspector-panel" class="mm-debugger__panel mm-debugger__inspector-panel">

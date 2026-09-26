@@ -15,7 +15,7 @@ namespace Nesh.MasterMemoryDebugger
         internal static readonly string[] RequiredElementNames =
         {
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
-            "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-list", "mm-record-count",
+            "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json",
             "mm-close", "mm-patch-list", "mm-patch-name", "mm-save-patch", "mm-load-patch", "mm-delete-patch", "mm-import-patch",
             "mm-export-patch", "mm-open-folder", "mm-reset-all",
@@ -83,8 +83,10 @@ namespace Nesh.MasterMemoryDebugger
             recordList = new MasterRecordListController(
                 Required<TextField>(root, "mm-search"),
                 Required<Toggle>(root, "mm-modified-only"),
-                Required<MultiColumnListView>(root, "mm-record-list"),
-                Required<Label>(root, "mm-record-count"));
+                Required<VisualElement>(root, "mm-record-grid"),
+                Required<Label>(root, "mm-record-count"),
+                Required<Button>(root, "mm-columns"),
+                Required<VisualElement>(root, "mm-columns-popup"));
             searchCompletion = new MasterSearchCompletionController(
                 Required<TextField>(root, "mm-search"),
                 Required<VisualElement>(root, "mm-search-completion"),
@@ -396,6 +398,7 @@ namespace Nesh.MasterMemoryDebugger
                 case KeyCode.Escape:
                     if (dialog.IsVisible) dialog.Cancel();
                     else if (searchCompletion.IsOpen) searchCompletion.Close();
+                    else if (recordList.IsColumnsPopupOpen) recordList.CloseColumnsPopup();
                     else RuntimeMasterMemoryDebugger.Close();
                     evt.StopPropagation();
                     break;

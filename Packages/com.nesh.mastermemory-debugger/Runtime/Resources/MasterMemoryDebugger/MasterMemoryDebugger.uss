@@ -212,43 +212,107 @@
     border-color: rgb(52, 57, 68);
 }
 
-/* ---- grid: header */
+/* ---- grid: header (frozen part | horizontally scrolled part) */
 
-.mm-debugger .unity-multi-column-view__header-container {
+.mm-debugger__grid {
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.mm-debugger__grid-header {
+    flex-direction: row;
+    flex-shrink: 0;
+    height: 24px;
     background-color: rgb(38, 42, 51);
     border-bottom-width: 1px;
     border-color: rgb(70, 76, 90);
 }
 
-.mm-debugger .unity-multi-column-header {
-    background-color: rgb(38, 42, 51);
+.mm-debugger__grid-frozen {
+    flex-direction: row;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-right-width: 2px;
+    border-color: rgb(80, 120, 190);
 }
 
-.mm-debugger .unity-multi-column-header__column {
-    background-color: rgb(38, 42, 51);
+.mm-debugger__grid-frozen--empty {
+    border-right-width: 0;
+}
+
+.mm-debugger__grid-viewport {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.mm-debugger__grid-content {
+    flex-direction: row;
+    flex-shrink: 0;
+    height: 100%;
+}
+
+.mm-debugger__grid-header-cell {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    height: 100%;
+    padding: 0 4px 0 6px;
     border-right-width: 1px;
     border-color: rgb(52, 57, 68);
 }
 
-.mm-debugger .unity-multi-column-header__column:hover {
+.mm-debugger__grid-header-cell:hover {
     background-color: rgb(47, 52, 63);
 }
 
-.mm-debugger .unity-multi-column-header__column__title {
+.mm-debugger .mm-debugger__grid-header-title {
+    flex-grow: 1;
+    flex-shrink: 1;
+    padding: 0;
     color: rgb(205, 211, 222);
     -unity-font-style: bold;
     font-size: 12px;
     -unity-text-align: middle-left;
-    padding-left: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.mm-debugger .unity-multi-column-header__column--sorted-ascending .unity-multi-column-header__column__title,
-.mm-debugger .unity-multi-column-header__column--sorted-descending .unity-multi-column-header__column__title {
+.mm-debugger .mm-debugger__grid-header-cell--sorted .mm-debugger__grid-header-title,
+.mm-debugger .mm-debugger__grid-sort {
     color: rgb(150, 190, 255);
 }
 
-.mm-debugger .unity-multi-column-header__column__sort-indicator__arrow {
-    -unity-background-image-tint-color: rgb(150, 190, 255);
+.mm-debugger .mm-debugger__grid-sort {
+    flex-shrink: 0;
+    font-size: 9px;
+    padding: 0 0 0 2px;
+}
+
+/* drag the right edge of a header cell to resize the column */
+.mm-debugger__grid-resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -3px;
+    width: 7px;
+}
+
+.mm-debugger__grid-resize:hover {
+    background-color: rgba(80, 120, 190, 0.6);
+}
+
+.mm-debugger__grid-rows {
+    flex-grow: 1;
+}
+
+.mm-debugger__grid-row {
+    flex-direction: row;
+    height: 100%;
+}
+
+.mm-debugger__grid-hscroll {
+    flex-shrink: 0;
 }
 
 /* ---- grid: rows and cells */
@@ -270,13 +334,11 @@
     background-color: rgb(44, 82, 140);
 }
 
-.mm-debugger .unity-multi-column-view__cell {
+.mm-debugger .mm-debugger__cell {
+    flex-shrink: 0;
+    height: 100%;
     border-right-width: 1px;
     border-color: rgb(42, 46, 56);
-}
-
-.mm-debugger .mm-debugger__cell {
-    height: 100%;
     padding: 0 6px;
     font-size: 12px;
     color: rgb(215, 219, 227);
@@ -306,6 +368,70 @@
 .mm-debugger .mm-debugger__cell--modified {
     color: rgb(255, 184, 76);
     -unity-font-style: bold;
+}
+
+/* ---- Columns popup: show / freeze per column */
+
+.mm-debugger__columns-button {
+    margin-left: 6px;
+}
+
+.mm-debugger__button--active {
+    background-color: rgb(46, 92, 160);
+}
+
+.mm-debugger__columns-popup {
+    position: absolute;
+    width: 300px;
+    max-height: 70%;
+    padding: 4px;
+    background-color: rgb(40, 44, 53);
+    border-width: 1px;
+    border-color: rgb(84, 92, 110);
+    border-radius: 4px;
+}
+
+.mm-debugger__columns-list {
+    flex-shrink: 1;
+}
+
+.mm-debugger__columns-row {
+    flex-direction: row;
+    align-items: center;
+    min-height: 20px;
+    padding: 0 4px;
+}
+
+.mm-debugger__columns-row--header {
+    border-bottom-width: 1px;
+    border-color: rgb(58, 63, 75);
+    margin-bottom: 2px;
+}
+
+.mm-debugger .mm-debugger__columns-row--header Label {
+    font-size: 11px;
+    color: rgb(150, 157, 171);
+}
+
+.mm-debugger__columns-name {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-debugger__columns-flag {
+    width: 48px;
+    margin: 0;
+    justify-content: center;
+    -unity-text-align: middle-center;
+}
+
+.mm-debugger__columns-actions {
+    flex-direction: row;
+    padding-top: 4px;
+    margin-top: 4px;
+    border-top-width: 1px;
+    border-color: rgb(58, 63, 75);
 }
 
 .mm-debugger__record-count--error {

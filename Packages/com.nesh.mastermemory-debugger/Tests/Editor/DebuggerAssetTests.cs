@@ -19,7 +19,7 @@ namespace Nesh.MasterMemoryDebugger.Editor.Tests
             }
             Assert.IsNotNull(root.Q<TreeView>("mm-table-list"));
             Assert.IsNotNull(root.Q<DropdownField>("mm-patch-list"));
-            Assert.IsNotNull(root.Q<MultiColumnListView>("mm-record-list"));
+            Assert.IsNotNull(root.Q("mm-record-grid"));
             Assert.IsNotNull(root.Q<ScrollView>("mm-inspector"));
         }
 

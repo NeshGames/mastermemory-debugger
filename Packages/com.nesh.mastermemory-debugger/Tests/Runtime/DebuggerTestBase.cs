@@ -55,6 +55,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugRegistry.SetDisplayName<ManualItem>(null);
             MasterDataCloneUtility.ClearProviders();
             MasterMemoryReferences.ClearCache();
+            MasterGridLayout.ClearSettings();
         }
     }
 }
