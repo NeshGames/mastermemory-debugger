@@ -2,6 +2,27 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.4.0] - 2026-09-26
+
+### Added
+
+- Record grid with frozen and hidden columns: frozen columns stay on the left while the others scroll horizontally (scrollbar, Shift + wheel); a Columns popup shows / hides and freezes each column; drag a header edge to resize; settings are kept per table. The state and primary key columns are frozen by default.
+- Pinned table tabs above the grid (`+ Pin`, `×` to unpin), saved in PlayerPrefs.
+- Header tabs Data / Changes / Patches. The Patches tab lists every saved patch (records, fields, master version, save time), previews its changes and can Apply (replace), Merge, Overwrite, Rename, Export or Delete it; the current overrides can be saved, exported or reset, and patch files imported.
+- `MasterMemoryDebugLocalization`: display names and tips per language for tables and fields (API or tab separated text). A header dropdown switches between the code names and each language; used by the table list, tabs, grid headers, inspector and search completion.
+- `Font` setting for the debugger UI (fonts with CJK glyphs for localized names).
+- `MasterDataPatchStorage.Rename` / `GetSavedTime`.
+- Sample: wide `ExampleWeaponMaster` table (27 columns, 300 records) and Chinese labels / tips.
+
+### Changed
+
+- The record grid no longer uses `MultiColumnListView` (it rebuilt the whole list for every column added or removed, which could leave it half built when switching tables).
+- The bottom patch toolbar was replaced by the Patches tab.
+
+### Fixed
+
+- `InvalidCastException` when switching tables in the record grid.
+
 ## [0.3.1] - 2026-09-26
 
 ### Changed
