@@ -37,6 +37,9 @@ namespace Nesh.MasterMemoryDebugger
 
         [SerializeField] MasterMemoryDebugLogLevel logLevel = MasterMemoryDebugLogLevel.Warning;
 
+        [Tooltip("Logs the changed fields with old → new values when overrides are applied, reset or loaded (colored in the Editor Console).")]
+        [SerializeField] bool logOverrideChanges = true;
+
         [Tooltip("Patch selected by default and used by Auto Load Patch. Saved as <name>.patch.json under Application.persistentDataPath/MasterMemoryDebugger/.")]
         [SerializeField, FormerlySerializedAs("patchFileName")] string defaultPatchName = "debug";
 
@@ -54,6 +57,7 @@ namespace Nesh.MasterMemoryDebugger
         public int MaxSearchResults { get => maxSearchResults; set => maxSearchResults = Mathf.Max(1, value); }
         public bool ShowSecondaryKeys { get => showSecondaryKeys; set => showSecondaryKeys = value; }
         public MasterMemoryDebugLogLevel LogLevel { get => logLevel; set => logLevel = value; }
+        public bool LogOverrideChanges { get => logOverrideChanges; set => logOverrideChanges = value; }
         public string DefaultPatchName { get => string.IsNullOrEmpty(defaultPatchName) ? "debug" : defaultPatchName; set => defaultPatchName = value; }
         public PanelSettings PanelSettings { get => panelSettings; set => panelSettings = value; }
         public int SortingOrder { get => sortingOrder; set => sortingOrder = value; }

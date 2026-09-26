@@ -230,6 +230,16 @@ Package 本身永遠不會重建或替換 database。完整範例見 `Samples~/B
   - 有修改的欄位會顯示 `Original: xxx`
 - **Apply Override** 會把編輯中的副本存進 Override Store；如果所有值都和原始值相同，會改為移除 Override。
 - **Reset All** 會先跳出確認視窗：`Reset all MasterMemory runtime overrides?`
+- Apply Override / Reset Record / Reset All / Load Patch 都會在 Console 印出修改內容（可在 Settings 關閉）：
+
+  ```text
+  [MasterMemoryDebugger] Override applied: SkillMaster 1001 (Fireball)
+    Damage: 120 → 185
+    Cooldown: 2.5 → 1.8
+  ```
+
+  Editor Console 中標題為橘色、欄位名稱為黃色、舊值灰色、新值綠色；Development Build 的 log 檔不含顏色標籤。
+  專案也可以用 `MasterDataDiffUtility.GetChanges(before, after)` / `Format(...)` 產生同樣的比對結果。
 - `A-` / `A+` 可調整 UI 縮放（只在使用 Debugger 自己建立的 PanelSettings 時顯示）。
 
 Runtime 的 UI Toolkit 沒有 `ColorField`、`ToolbarSearchField`、`EnumFlagsField`，所以 Color 使用 RGBA 四個 `FloatField`，搜尋框使用 `TextField`，Flags enum 使用文字輸入。
@@ -324,6 +334,7 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 | Max Search Results | 500 | |
 | Show Secondary Keys | true | 在 Inspector 顯示 SecondaryKey 欄位（永遠唯讀） |
 | Log Level | Warning | |
+| Log Override Changes | true | Apply / Reset / Reset All / Load Patch 時在 Console 列出改了哪些欄位與前後值（Editor 中以顏色標示） |
 | Default Patch Name | debug | 預設選取的 Patch 名稱，也是 Auto Load Patch 載入的 Patch |
 | Panel Settings | (none) | 指定專案自己的 PanelSettings；沒指定時 Debugger 會自行建立 |
 | Sorting Order | 10000 | Debugger 自行建立的 Panel 的繪製順序 |

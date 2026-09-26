@@ -232,18 +232,21 @@ namespace Nesh.MasterMemoryDebugger
             }
 
             var store = MasterMemoryDebugRuntime.Store;
+            var before = record.Current;
             isWritingStore = true;
             try
             {
                 if (DiffersFromOriginal(workingCopy))
                 {
                     store.Set(table.RecordType, record.PrimaryKey, workingCopy);
+                    MasterMemoryChangeLog.Applied(table, record.PrimaryKey, before, workingCopy);
                     setStatus($"Override applied: {table.TableName} {record.KeyText}", false);
                 }
                 else
                 {
                     // every value equals the original: an override would be a no-op
                     store.Remove(table.RecordType, record.PrimaryKey);
+                    MasterMemoryChangeLog.Removed(table, record.PrimaryKey, before, record.Original, "removed (values equal the original)");
                     setStatus($"Values equal the original; override removed: {table.TableName} {record.KeyText}", false);
                 }
             }
@@ -273,11 +276,13 @@ namespace Nesh.MasterMemoryDebugger
         void ResetRecord()
         {
             if (record == null) return;
+            var before = record.Current;
             isWritingStore = true;
             try
             {
                 if (MasterMemoryDebugRuntime.Store.Remove(record.Table.RecordType, record.PrimaryKey))
                 {
+                    MasterMemoryChangeLog.Removed(record.Table, record.PrimaryKey, before, record.Original, "reset");
                     setStatus($"Override reset: {record.Table.TableName} {record.KeyText}", false);
                 }
             }

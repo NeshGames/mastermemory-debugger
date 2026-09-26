@@ -8,6 +8,8 @@ All notable changes to this package are documented in this file.
 
 - Table groups: `MasterMemoryDebugRegistry.SetTableGroup` shows tables in foldable groups (TreeView).
 - Named patches: save under a name, pick saved patches from a dropdown to load or delete.
+- Console log of override changes (field: old → new, colored in the Editor) on Apply / Reset / Reset All / Load Patch;
+  setting `Log Override Changes`, public `MasterDataDiffUtility`.
 
 ### Changed
 

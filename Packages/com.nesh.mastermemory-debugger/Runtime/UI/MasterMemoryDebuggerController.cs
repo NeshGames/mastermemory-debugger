@@ -300,6 +300,7 @@ namespace Nesh.MasterMemoryDebugger
                 SetStatus($"Patch \"{name}\" not loaded ({result.Status}).", true);
                 return;
             }
+            MasterMemoryChangeLog.PatchLoaded(name, result);
             SetStatus($"Patch \"{name}\" loaded: {result.AppliedRecords} records, {result.AppliedFields} fields{WarningSuffix(result.Warnings)}", false);
         }
 
@@ -332,6 +333,7 @@ namespace Nesh.MasterMemoryDebugger
                 {
                     var count = MasterMemoryDebugRuntime.OverrideCount;
                     MasterMemoryDebugRuntime.ClearAllOverrides();
+                    MasterMemoryChangeLog.ResetAll(count);
                     SetStatus($"{count} overrides reset.", false);
                 }, isDanger: true));
         }

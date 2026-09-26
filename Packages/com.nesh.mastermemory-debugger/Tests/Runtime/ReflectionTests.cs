@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 
 namespace Nesh.MasterMemoryDebugger.Tests
@@ -122,6 +123,29 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.IsFalse(MasterDataValueUtility.AreEqual(new[] { 1, 2 }, new[] { 1, 3 }));
             Assert.IsFalse(MasterDataValueUtility.AreEqual(new[] { 1 }, new[] { 1, 2 }));
             Assert.IsFalse(MasterDataValueUtility.AreEqual("ab", new[] { 'a', 'b' }));
+        }
+
+        [Test]
+        public void Diff_ShouldListChangedFieldsWithOldAndNewValues()
+        {
+            var original = Database.TestSkillTable.FindById(1001);
+            var changed = original with { Damage = 185, Name = "Meteor" };
+
+            var changes = MasterDataDiffUtility.GetChanges(original, changed);
+            CollectionAssert.AreEquivalent(new[] { "Name", "Damage" }, changes.Select(x => x.Name));
+            var damage = changes.Single(x => x.Name == "Damage");
+            Assert.AreEqual(120, damage.OldValue);
+            Assert.AreEqual(185, damage.NewValue);
+
+            var plain = MasterDataDiffUtility.Format("SkillMaster 1001", changes, false);
+            StringAssert.Contains("Damage: 120 → 185", plain);
+            StringAssert.DoesNotContain("<color", plain);
+
+            var rich = MasterDataDiffUtility.Format("SkillMaster 1001", changes, true);
+            StringAssert.Contains("<color=", rich);
+            StringAssert.Contains("Damage", rich);
+
+            CollectionAssert.IsEmpty(MasterDataDiffUtility.GetChanges(original, original));
         }
 
         [Test]
