@@ -77,6 +77,8 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
                 new ExampleGameConfigMaster { Key = "StartGold", Value = "500" },
             };
 
+            var weapons = CreateWeapons(300);
+
             // generated tables expect data sorted by primary key
             OriginalDatabase = new MemoryDatabase(
                 ExampleCharacterMasterTable: new ExampleCharacterMasterTable(characters.OrderBy(x => x.Id).ToArray()),
@@ -85,8 +87,53 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
                 ExampleGameConfigMasterTable: new ExampleGameConfigMasterTable(configs.OrderBy(x => x.Key, System.StringComparer.Ordinal).ToArray()),
                 ExampleItemMasterTable: new ExampleItemMasterTable(items.OrderBy(x => x.Id).ToArray()),
                 ExampleShopMasterTable: new ExampleShopMasterTable(shops.OrderBy(x => x.Id).ToArray()),
-                ExampleSkillMasterTable: new ExampleSkillMasterTable(skills.OrderBy(x => x.Id).ToArray()));
+                ExampleSkillMasterTable: new ExampleSkillMasterTable(skills.OrderBy(x => x.Id).ToArray()),
+                ExampleWeaponMasterTable: new ExampleWeaponMasterTable(weapons));
             return OriginalDatabase;
+        }
+
+        /// <summary>Deterministic wide records for the scrolling test table.</summary>
+        static ExampleWeaponMaster[] CreateWeapons(int count)
+        {
+            var kinds = new[] { "Sword", "Axe", "Spear", "Bow", "Staff", "Dagger" };
+            var skillIds = new[] { 0, 1001, 1002, 1004 };
+            var weapons = new ExampleWeaponMaster[count];
+            for (var i = 0; i < count; i++)
+            {
+                var kind = kinds[i % kinds.Length];
+                var rarity = (ExampleRarity)(i % 4);
+                weapons[i] = new ExampleWeaponMaster
+                {
+                    Id = 20001 + i,
+                    Name = $"{rarity} {kind} {i + 1}",
+                    Rarity = rarity,
+                    Element = (ExampleElement)(i % 4),
+                    RequiredLevel = 1 + i % 60,
+                    Attack = 10 + i * 3 % 250,
+                    MagicAttack = kind == "Staff" ? 20 + i % 200 : 0,
+                    Defense = i % 40,
+                    CriticalRate = 0.05f + i % 10 * 0.01f,
+                    CriticalDamage = 1.5f + i % 5 * 0.1f,
+                    AttackSpeed = 0.8f + i % 7 * 0.05f,
+                    Range = kind == "Bow" ? 12f : kind == "Spear" ? 2.5f : 1.5f,
+                    Weight = 1f + i % 9 * 0.5f,
+                    Durability = 50 + i % 150,
+                    MaxUpgrade = 5 + (int)rarity * 5,
+                    Price = 100 + i * 37L,
+                    SellPrice = (100 + i * 37L) / 4,
+                    Tradable = i % 3 != 0,
+                    Upgradable = rarity != ExampleRarity.Common,
+                    SkillId = skillIds[i % skillIds.Length],
+                    SetId = i % 5 == 0 ? 900 + i / 5 % 10 : (int?)null,
+                    IconPath = $"Icons/Weapons/{kind.ToLowerInvariant()}_{i % 20:00}",
+                    ModelPath = $"Models/Weapons/{kind}/{kind}_{i % 20:00}.prefab",
+                    Description = $"A {rarity.ToString().ToLowerInvariant()} {kind.ToLowerInvariant()} for testing wide tables.",
+                    SocketTypes = i % 4 == 0 ? new int[0] : new[] { 1, 1 + i % 3 },
+                    DropRate = 0.5 / (1 + (int)rarity * 4),
+                    ReleaseVersion = $"1.{i / 100}.0",
+                };
+            }
+            return weapons;
         }
     }
 }

@@ -22,7 +22,8 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
                 nameof(ExampleEnemyLevelMaster),
                 nameof(ExampleSkillMaster),
                 nameof(ExampleEffectMaster),
-                nameof(ExampleItemMaster));
+                nameof(ExampleItemMaster),
+                nameof(ExampleWeaponMaster));
             MasterMemoryDebugRegistry.SetTableGroup("Economy", nameof(ExampleShopMaster));
             // or by type: MasterMemoryDebugRegistry.SetTableGroup<ExampleShopMaster>("Economy");
             // ExampleGameConfigMaster has no group -> "Other"

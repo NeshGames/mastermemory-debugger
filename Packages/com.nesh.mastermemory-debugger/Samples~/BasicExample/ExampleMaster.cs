@@ -144,4 +144,46 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         public int Attack { get; init; }
         public float MoveSpeed { get; init; }
     }
+
+    /// <summary>
+    /// Wide table (27 columns, 300 records) to check horizontal scrolling, frozen columns and the Columns popup.
+    /// </summary>
+    [MemoryTable("example_weapon"), MessagePackObject(true)]
+    public sealed record ExampleWeaponMaster : IValidatable<ExampleWeaponMaster>
+    {
+        [PrimaryKey]
+        public int Id { get; init; }
+
+        public string Name { get; init; }
+        public ExampleRarity Rarity { get; init; }
+        public ExampleElement Element { get; init; }
+        public int RequiredLevel { get; init; }
+        public int Attack { get; init; }
+        public int MagicAttack { get; init; }
+        public int Defense { get; init; }
+        public float CriticalRate { get; init; }
+        public float CriticalDamage { get; init; }
+        public float AttackSpeed { get; init; }
+        public float Range { get; init; }
+        public float Weight { get; init; }
+        public int Durability { get; init; }
+        public int MaxUpgrade { get; init; }
+        public long Price { get; init; }
+        public long SellPrice { get; init; }
+        public bool Tradable { get; init; }
+        public bool Upgradable { get; init; }
+        public int SkillId { get; init; }
+        public int? SetId { get; init; }
+        public string IconPath { get; init; }
+        public string ModelPath { get; init; }
+        public string Description { get; init; }
+        public int[] SocketTypes { get; init; }
+        public double DropRate { get; init; }
+        public string ReleaseVersion { get; init; }
+
+        void IValidatable<ExampleWeaponMaster>.Validate(IValidator<ExampleWeaponMaster> validator)
+        {
+            if (SkillId != 0) validator.GetReferenceSet<ExampleSkillMaster>().Exists(x => x.SkillId, skill => skill.Id);
+        }
+    }
 }
