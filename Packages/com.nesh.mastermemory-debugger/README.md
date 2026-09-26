@@ -9,7 +9,8 @@
 - 將修改過的欄位存成 / 匯出為 JSON Patch，重開遊戲後可載入，也能交給企劃回填主資料
 
 > 本 Package 的定位是 **Development Runtime Inspector + Value Override Tool**，不是 Runtime Database Editor。
-> 不支援新增 / 刪除 / 複製 Record、修改 PrimaryKey / SecondaryKey、Schema 變更、重建或替換 MemoryDatabase。
+> 不支援新增 / 刪除 / 複製 Record、修改 PrimaryKey / SecondaryKey、Schema 變更。
+> 原始 MemoryDatabase 永遠不會被修改；需要時可以用 `MasterMemoryDebugRebuild` 產生一份套用了 Override 的新 database（選用）。
 
 ---
 
@@ -183,53 +184,102 @@ public EnemyLevelMaster GetEnemyLevel(int enemyId, int level)
 
 沒有任何 Override 的型別不會進行 dictionary 查詢，也不會 boxing。
 
-### （選用）用 ImmutableBuilder 重建 Gameplay Database
+### （選用）重建 Gameplay Database：`MasterMemoryDebugRebuild`
 
-如果希望 SecondaryKey / Range / `All` 查詢也能讀到 Override，可以由**專案端**訂閱 `OverridesChanged`，再用 MasterMemory 官方的 `ImmutableBuilder` 重建：
+如果希望 SecondaryKey / Range / `All` 查詢也能讀到 Override，讓遊戲端讀取的 database 參考換成「套用了 Override 的新 database」。只要一行：
 
 ```csharp
-MasterMemoryDebugRuntime.OverridesChanged += () =>
-{
-    var builder = originalDatabase.ToImmutableBuilder();   // 一定要從原始 database 開始
-    builder.Diff(MasterMemoryDebugRuntime.GetOverrides<SkillMaster>());
-    builder.Diff(MasterMemoryDebugRuntime.GetOverrides<ItemMaster>());
-    service.Database = builder.Build();
-};
+// 遊戲端透過 masterService.Database 讀取主資料
+var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => masterService.Database = db);
+// 不再需要時：rebuild.Dispose();  → 換回原始 database
 ```
 
-代價：每次變更都會重建並重新排序整個 database；其他地方持有的舊 database / record 參考不會更新；每張表都要手寫一行 `Diff`。
-Package 本身永遠不會重建或替換 database。完整範例見 `Samples~/BasicExample/ExampleDatabaseRebuilder.cs`。
+- 內部使用 MasterMemory 官方的 `ToImmutableBuilder().Diff(records).Build()`（透過 reflection 找到每張表的 `Diff`，不需要手寫）。
+- 每次 Override 變更都會從**原始** database 重建，所以 Reset 會回到原始值；沒有 Override 時直接給原始 database。
+- **驗證**：如果 Record 有實作 MasterMemory 的 `IValidatable<T>`，每次重建後會執行 `Validate()`，
+  並把「原始資料沒有、Override 之後才出現」的失敗寫進 Log（例如把 `StartSkillId` 改成不存在的 99）。可用 `validate: false` 關閉。
+- 只想重建一次：`var db = MasterMemoryDebugRebuild.Apply(originalDatabase);`
+- 正式版 Build 中 `AutoRebuild` 只會呼叫一次 `apply(originalDatabase)`，不會訂閱任何事件。
+
+代價：每次變更都會重建並重新排序有 Override 的表；其他地方持有的舊 database / record 參考不會更新。範例見 `Samples~/BasicExample/ExampleDebuggerLauncher.cs`。
 
 ## UI Toolkit Runtime Debugger
 
 ```text
-┌───────────────────────────────────────────────────────────────┐
-│ MasterMemory Runtime Debugger   Master: v1   2 overrides [A-][A+][Close] │
-├──────────────┬────────────────────────────────────────────────┤
-│ Tables       │ [Search.....................] [ ] Modified Only │
-│ ItemMaster   │ Primary Key    Name                        Mod │
-│ SkillMaster*2│ 1001           Fireball                     *  │
-│              │ 1002           Ice Blast                       │
-├──────────────┴────────────────────────────────────────────────┤
-│ SkillMaster 1001  [Overridden]   [Apply Override][Revert Edits][Reset Record] │
-│ Id        PK   1001                                          │
-│ Category  SK   1                                             │
-│ Damage         [185            ]          Original: 120      │
-│ Cooldown       [2.5            ]                             │
-├───────────────────────────────────────────────────────────────┤
-│ status...          [Save Patch][Load Patch][Export][Open Folder][Reset All] │
-└───────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ MasterMemory Runtime Debugger  Master: v1  2 overrides   [Changes (2)][A-][A+][Close] │
+├──────────────┬───────────────────────────────────────────────────────────────┤
+│ Tables       │ [Damage>100 Element=Fire.................] [ ] Modified Only   │
+│ ▼ Battle (5) │ Primary Key │ Name      │ Mod │ Category (SK) │ Damage ▼│ ...   │
+│   SkillM. *2 │ 1004        │ Thunder   │     │ 1             │ 180     │       │
+│   ItemMaster │ 1001        │ Fireball  │  *  │ 1             │ 185     │       │
+│ ▶ Economy (1)│ 2 / 2005 records                                              │
+├──────────────┴───────────────────────────────────────────────────────────────┤
+│ SkillMaster 1001 [Overridden]  [Copy JSON][Apply Override][Revert Edits][Reset Record] │
+│ Id        PK   1001                                                          │
+│ Damage         [185            ]                         Original: 120       │
+│ EffectIds RO   ▶ [2] 10, 11                                                  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Patch [balance-A ▼][balance-A] [Save][Load][Delete][Import][Export][Open Folder] [Reset All] │
+│ status...                                                             [Log (12)] │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Table / Record List 都使用 `ListView` virtualization。
-- 搜尋會比對 PrimaryKey、Display Name、所有 string 欄位；只在查詢字串、Table、Override 變更時重新計算（輸入時有 150ms debounce）。最多顯示 `Max Search Results` 筆（預設 500）。
-- Inspector 會列出所有 public property / field：
+### Record 表格
+
+- Record 列表是可排序的多欄表格（`MultiColumnListView`，virtualization）：Primary Key、Name、Mod，以及每個欄位一欄（SecondaryKey 標 `(SK)`，複雜型別顯示預覽）。
+- 點欄位標題排序（再點一次反向）；排序會套用在所有符合條件的資料上，再取前 `Max Search Results` 筆（預設 500）。
+- 有 Override 的格子若和原始值不同，會以橘色顯示。
+
+### 搜尋 / 篩選
+
+以空白分隔多個條件，**全部符合**才會顯示：
+
+| 寫法 | 意義 |
+| --- | --- |
+| `ice` | PrimaryKey / Display Name / string 欄位包含 `ice`（不分大小寫） |
+| `Damage>100` | 欄位比較，運算子 `=` `!=` `>` `>=` `<` `<=` |
+| `Name~blast` | 欄位文字包含 |
+| `Element=Fire` | enum 用名稱（不分大小寫） |
+| `IsPassive=true` | bool |
+| `Name="Ice Blast"` | 值有空白時加引號 |
+| `UnlockLevel=null` | null |
+| `Category=1 Damage > 100` | 多個條件（運算子前後可以有空格） |
+
+欄位名稱不分大小寫；比較的是目前值（有 Override 時用 Override）。欄位不存在或值格式錯誤時，筆數旁會顯示警告並忽略該條件。
+只在查詢、Table、排序、Override 變更時重新計算（輸入時有 150ms debounce）。
+
+**自動完成**：輸入時搜尋框下方會出現候選清單，**↑ / ↓** 選擇，**Tab / Enter** 或點擊套用，**Esc** 關閉清單（不會關閉 Debugger）。
+
+- 欄位名稱：輸入 `da` → `Damage`。沒有開頭符合的欄位時，改用「包含」比對（`mag` → `Damage`）。
+- 運算子後的值：enum 名稱與 `true` / `false`（`Element=f` → `Fire`；Flags 可用 `|` 連接：`Flags=Boss|Fl` → `Flying`）。
+- 欄位名稱打完整時，清單會列出可用的運算子。
+- 焦點在搜尋框時，Tab 不會跳到下一個控制項。
+
+### Inspector
+
+- 列出所有 public property / field：
   - `PK` / `SK`：永遠唯讀
   - 支援編輯：`int uint short ushort long ulong byte sbyte float double bool string enum`、`[Flags] enum`（以文字輸入）、`Vector2 Vector3 Vector2Int Vector3Int Color`、以及上述型別的 `Nullable<T>`
-  - Array / List / Dictionary / 巢狀物件 / 其他型別：唯讀預覽（`RO`）
+  - **Array / List**（`T[]`、`List<T>`、`IReadOnlyList<T>` 等，元素為上述簡單型別）：逐項編輯、`✕` 刪除、`+ Add` 新增（複製最後一項）。
+    每次修改都會建立新的陣列 / List，原始 Record 與已套用的 Override 不會被改到；Patch 會把整個 List 存成 JSON 陣列。超過 200 項時唯讀。
+  - Dictionary / 巢狀物件 / 元素為複雜型別的 List：唯讀的可折疊樹狀檢視（最多 3 層、每層最多 100 項，展開時才建立）
   - 有修改的欄位會顯示 `Original: xxx`
+  - **關聯跳轉**：Record 有實作 MasterMemory 的 `IValidatable<T>` 並用 `GetReferenceSet<T>().Exists(x => x.ItemId, y => y.Id)` 宣告關聯時，
+    該欄位旁會出現 `→ ItemMaster` 按鈕，點擊會開啟被參照的 Record（參照的不是主鍵時，改為以 `Id=值` 篩選目標 Table）。
+    不需要額外設定：關聯是從 `Validate` 的 `Exists()` 讀出來的（`MasterMemoryReferences.Get(table)`）；沒有寫 Validate 的 Record 就不會顯示按鈕。
 - **Apply Override** 會把編輯中的副本存進 Override Store；如果所有值都和原始值相同，會改為移除 Override。
-- **Reset All** 會先跳出確認視窗：`Reset all MasterMemory runtime overrides?`
+- **Copy JSON**：把整筆 Record（包含陣列與巢狀物件、未套用的編輯）複製為 JSON。Editor / Windows 複製到剪貼簿，WebGL 下載成檔案。
+- 有未套用的編輯時切換 Record / Table，會詢問 **Apply / Discard / Cancel**。
+
+### Changes（修改總覽）
+
+標題列的 **Changes (N)** 會把主畫面切換成所有 Override 的總覽：每筆 Record 的修改欄位（原始值 → 目前值），可以 **Open**（跳到該筆 Record）或 **Reset**。
+原始 Record 已不存在（例如主資料刪掉了）或 Table 沒有註冊的 Override 會以紅色標示。程式中可用 `MasterMemoryChangeSummary.Build()` 取得同樣的資料。
+
+### Log 與 Console
+
+- 狀態列右側的 **Log (N)** 會展開最近 50 則訊息（狀態、Patch 警告、修改內容），在沒有 Console 的實機上也看得到。
 - Apply Override / Reset Record / Reset All / Load Patch 都會在 Console 印出修改內容（可在 Settings 關閉）：
 
   ```text
@@ -240,6 +290,18 @@ Package 本身永遠不會重建或替換 database。完整範例見 `Samples~/B
 
   Editor Console 中標題為橘色、欄位名稱為黃色、舊值灰色、新值綠色；Development Build 的 log 檔不含顏色標籤。
   專案也可以用 `MasterDataDiffUtility.GetChanges(before, after)` / `Format(...)` 產生同樣的比對結果。
+
+### 快捷鍵與其他
+
+| 按鍵 | 行為 |
+| --- | --- |
+| F8 | 開關 Debugger（可在 Settings 修改） |
+| 三指長按 1 秒 | 觸控裝置上開關 Debugger（手指數與秒數可在 Settings 修改，0 指停用） |
+| Enter | Inspector 中：Apply Override；對話框中：執行主要按鈕（刪除 / 覆蓋 / Reset All 等危險操作不會被 Enter 觸發） |
+| ↑ / ↓、Tab / Enter | 搜尋框自動完成：選擇、套用 |
+| Esc | 關閉對話框或自動完成清單，都沒有時關閉 Debugger |
+
+- **Reset All** 會先跳出確認視窗：`Reset all MasterMemory runtime overrides?`
 - `A-` / `A+` 可調整 UI 縮放（只在使用 Debugger 自己建立的 PanelSettings 時顯示）。
 
 Runtime 的 UI Toolkit 沒有 `ColorField`、`ToolbarSearchField`、`EnumFlagsField`，所以 Color 使用 RGBA 四個 `FloatField`，搜尋框使用 `TextField`，Flags enum 使用文字輸入。
@@ -298,7 +360,7 @@ Patch 只記錄 **有修改的可編輯欄位** 與其 **原始值**，不會保
 | 按鈕 | 行為 |
 | --- | --- |
 Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger/<名稱>.patch.json`。
-底部工具列：`Patch [已儲存的 Patch ▼] [名稱] [Save Patch] [Load Patch] [Delete] [Export] [Open Folder] ... [Reset All]`
+底部工具列：`Patch [已儲存的 Patch ▼] [名稱] [Save Patch] [Load Patch] [Delete] [Import] [Export] [Open Folder] ... [Reset All]`
 
 | 控制項 | 行為 |
 | --- | --- |
@@ -307,6 +369,7 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 | Save Patch | 以名稱欄位儲存；名稱已存在且不是目前選取的 Patch 時會先確認是否覆蓋 |
 | Load Patch | 載入下拉選單選取的 Patch，**取代**目前所有 Override |
 | Delete | 刪除下拉選單選取的 Patch（目前的 Override 不受影響） |
+| Import | 把 Patch 檔加入清單（之後用 Load Patch 套用）。Editor：檔案對話框；**WebGL：瀏覽器上傳**；其他平台：貼上 JSON。同名時會確認是否覆蓋 |
 | Export | 匯出目前的 Override（檔名 `<名稱>-<時間>.json`）。Editor：存檔對話框；**WebGL：瀏覽器下載**；其他平台：`.../MasterMemoryDebugger/exports/` |
 | Open Folder | 開啟資料夾（Editor / Windows / macOS / Linux） |
 
@@ -331,6 +394,8 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 | Allow Patch Save | true | 顯示 Save Patch / Export |
 | Auto Load Patch | false | 註冊 Table 時自動載入已儲存的 Patch |
 | Toggle Key | F8 | |
+| Touch Toggle Fingers | 3 | 觸控裝置上幾根手指同時按住會開關 Debugger；0 = 停用 |
+| Touch Toggle Seconds | 1 | 需要按住的秒數 |
 | Max Search Results | 500 | |
 | Show Secondary Keys | true | 在 Inspector 顯示 SecondaryKey 欄位（永遠唯讀） |
 | Log Level | Warning | |
@@ -369,29 +434,35 @@ Override Layer **只保證經過 `TryGetOverride` / `Resolve` 的 PrimaryKey 查
 - `All` / `SortByXxx`
 - 遊戲端已經拿在手上的 Record 參考
 
-需要時請參考上面的「用 ImmutableBuilder 重建 Gameplay Database」。
+需要時請使用上面的 `MasterMemoryDebugRebuild.AutoRebuild`。
 
 ## WebGL Notes
 
 - 沒有使用 `Reflection.Emit`、`DynamicMethod`、Thread、原生檔案對話框、`System.Diagnostics.Process`。
 - Patch 寫在 `Application.persistentDataPath`（IndexedDB），每次寫入後會呼叫 `FS.syncfs` 同步。
-- Export 會透過 `Plugins/WebGL/MasterMemoryDebugger.jslib` 觸發瀏覽器下載。
+- Export / Copy JSON 會透過 `Plugins/WebGL/MasterMemoryDebugger.jslib` 觸發瀏覽器下載，Import 會開啟瀏覽器的檔案選擇器。
+  瀏覽器只允許在使用者點擊後開啟檔案選擇器，若被擋下請再按一次 Import。
 
 ## IL2CPP Notes
 
-- `RegisterTable<SkillMaster, int>()` / `RegisterDatabase()` 會建立實際的型別參考，一般不會被 strip。
-- 反射只使用 `PropertyInfo` / `FieldInfo` 的 `GetValue` / `SetValue`，以及 `Delegate.DynamicInvoke`（複合主鍵）。
-- 只有在實際發生 stripping 時，才需要在專案加入 `link.xml`，例如：
+- Debugger 透過 reflection 讀寫 Record 的 property / backing field，並呼叫產生出來的 `ToImmutableBuilder()` / `Diff()` / `Build()` / `Validate()`。
+  這些成員如果只被 reflection 使用，Managed Code Stripping 可能會把它們移除。
+- **Development Build 會自動處理**：`MasterMemoryDebuggerLinkerProcessor`（`IUnityLinkerProcessor`）在 build 時產生 link.xml，
+  preserve 所有 `[MemoryTable]` Record、`MemoryDatabase` 與 `ImmutableBuilder`。正式版 Build 不受影響。
+  （Unity 不會讀取 Package 裡的 link.xml，所以改用 build callback 產生。）
+- 需要手動設定時（例如想在所有 Build 保留，或自訂 build pipeline 不會執行 `IUnityLinkerProcessor`），
+  可參考範例的 `Samples~/BasicExample/link.xml`，複製到 `Assets/` 底下並改成自己的 assembly / namespace：
 
   ```xml
   <linker>
     <assembly fullname="MyGame.MasterData">
-      <type fullname="MyGame.SkillMaster" preserve="all" />
+      <!-- [MemoryTable] records + MasterMemoryGeneratorOptions namespace of the generated code -->
+      <namespace fullname="MyGame.MasterData" preserve="all" />
     </assembly>
   </linker>
   ```
 
-  不需要 preserve 整個 assembly。
+- 其他 reflection 只使用 `PropertyInfo` / `FieldInfo` 的 `GetValue` / `SetValue`，以及 `Delegate.DynamicInvoke`（複合主鍵），沒有 `Reflection.Emit`。
 
 ## Troubleshooting
 

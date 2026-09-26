@@ -198,55 +198,40 @@
     margin-right: 4px;
 }
 
-.mm-debugger__record-header {
-    flex-direction: row;
-    flex-shrink: 0;
-    padding: 2px 6px;
-    border-bottom-width: 1px;
-    border-color: rgb(52, 57, 68);
-}
-
-.mm-debugger__record-header Label {
-    color: rgb(150, 157, 171);
-    -unity-font-style: bold;
-}
-
 .mm-debugger__record-list {
     flex-grow: 1;
 }
 
-.mm-debugger__record-row {
-    flex-direction: row;
-    align-items: center;
+.mm-debugger__cell {
     height: 100%;
     padding: 0 6px;
-}
-
-.mm-debugger__record-key {
-    width: 160px;
-    flex-shrink: 0;
+    -unity-text-align: middle-left;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.mm-debugger__record-name {
-    flex-grow: 1;
-    flex-basis: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.mm-debugger__record-modified {
-    width: 36px;
-    flex-shrink: 0;
-    -unity-text-align: middle-center;
+.mm-debugger__cell--modified {
     color: rgb(255, 184, 76);
     -unity-font-style: bold;
 }
 
-.mm-debugger__record-row--modified .mm-debugger__record-key,
-.mm-debugger__record-row--modified .mm-debugger__record-name {
-    color: rgb(255, 214, 150);
+.mm-debugger .unity-multi-column-header {
+    background-color: rgb(38, 42, 50);
+    border-bottom-width: 1px;
+    border-color: rgb(58, 63, 75);
+}
+
+.mm-debugger .unity-multi-column-header__column__title {
+    color: rgb(170, 176, 190);
+    -unity-font-style: bold;
+}
+
+.mm-debugger .unity-multi-column-header__column__sort-indicator__arrow {
+    -unity-background-image-tint-color: rgb(200, 205, 215);
+}
+
+.mm-debugger__record-count--error {
+    color: rgb(255, 150, 120);
 }
 
 .mm-debugger__record-count {
@@ -254,6 +239,38 @@
     color: rgb(150, 157, 171);
     font-size: 11px;
     margin: 4px 4px 0 4px;
+}
+
+/* completion popup under the search box (top / left set in code) */
+.mm-debugger__completion {
+    position: absolute;
+    min-width: 180px;
+    max-width: 60%;
+    padding: 2px 0;
+    background-color: rgb(40, 44, 53);
+    border-width: 1px;
+    border-color: rgb(84, 92, 110);
+    border-radius: 3px;
+}
+
+.mm-debugger__completion-item {
+    padding: 2px 10px;
+    font-size: 12px;
+}
+
+.mm-debugger__completion-item:hover {
+    background-color: rgb(52, 58, 70);
+}
+
+.mm-debugger__completion-item--selected,
+.mm-debugger__completion-item--selected:hover {
+    background-color: rgb(46, 92, 160);
+}
+
+.mm-debugger .mm-debugger__completion-info {
+    padding: 1px 10px;
+    font-size: 11px;
+    color: rgb(150, 157, 171);
 }
 
 /* ------------------------------------------------------------------ inspector */
@@ -343,6 +360,55 @@
 .mm-debugger__field-readonly--key {
     color: rgb(150, 190, 255);
     -unity-font-style: bold;
+}
+
+/* array / List editor: one row per element, copied on every change */
+.mm-debugger__list-editor {
+    flex-grow: 1;
+}
+
+.mm-debugger__list-item {
+    flex-direction: row;
+    align-items: center;
+    margin: 1px 0;
+}
+
+.mm-debugger .mm-debugger__list-index {
+    width: 28px;
+    flex-shrink: 0;
+    color: rgb(150, 157, 171);
+    font-size: 11px;
+    -unity-text-align: middle-right;
+    margin-right: 6px;
+}
+
+.mm-debugger__list-value {
+    flex-grow: 1;
+}
+
+.mm-debugger__list-remove {
+    flex-shrink: 0;
+    min-width: 22px;
+    padding: 0 4px;
+    margin-left: 4px;
+}
+
+.mm-debugger__list-add {
+    align-self: flex-start;
+    margin: 2px 0 2px 34px;
+}
+
+/* jump to the record referenced by this field (MasterMemory Validate Exists) */
+.mm-debugger__reference-button {
+    flex-shrink: 0;
+    margin: 0 6px 0 4px;
+    padding: 0 6px;
+    min-height: 18px;
+    font-size: 11px;
+}
+
+.mm-debugger .mm-debugger__reference-button {
+    color: rgb(120, 180, 255);
 }
 
 .mm-debugger__field-original {
@@ -445,13 +511,172 @@
     margin: 0 2px 0 0;
 }
 
-.mm-debugger__status {
+.mm-debugger__status-row {
+    flex-direction: row;
+    align-items: center;
     flex-shrink: 0;
-    height: 18px;
+    height: 24px;
     margin-top: 2px;
+}
+
+.mm-debugger__status {
+    flex-grow: 1;
+    flex-basis: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     color: rgb(170, 176, 190);
+}
+
+.mm-debugger__log-toggle {
+    height: 20px;
+}
+
+.mm-debugger__log {
+    flex-shrink: 0;
+    max-height: 170px;
+    min-height: 60px;
+    margin-top: 4px;
+    padding: 4px;
+    background-color: rgb(16, 18, 22);
+    border-width: 1px;
+    border-color: rgb(52, 57, 68);
+    border-radius: 4px;
+}
+
+.mm-debugger__log-entry {
+    white-space: normal;
+    font-size: 11px;
+    margin-bottom: 2px;
+    color: rgb(190, 196, 208);
+}
+
+.mm-debugger__log-entry--warning {
+    color: rgb(255, 214, 110);
+}
+
+.mm-debugger__log-entry--error {
+    color: rgb(255, 120, 110);
+}
+
+.mm-debugger__log-entry--change {
+    color: rgb(124, 227, 139);
+}
+
+/* ------------------------------------------------------------------ changes view */
+
+.mm-debugger__changes-panel {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-height: 200px;
+}
+
+.mm-debugger__changes-header {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    margin-bottom: 4px;
+}
+
+.mm-debugger__changes-list {
+    flex-grow: 1;
+}
+
+.mm-debugger__change {
+    padding: 4px 6px;
+    margin-bottom: 4px;
+    border-left-width: 3px;
+    border-color: rgb(255, 184, 76);
+    background-color: rgb(34, 37, 44);
+}
+
+.mm-debugger__change--problem {
+    border-color: rgb(229, 83, 75);
+}
+
+.mm-debugger__change-header {
+    flex-direction: row;
+    align-items: center;
+}
+
+.mm-debugger__change-table {
+    -unity-font-style: bold;
+    color: rgb(150, 190, 255);
+    margin-right: 8px;
+}
+
+.mm-debugger__change-key {
+    -unity-font-style: bold;
+    margin-right: 8px;
+}
+
+.mm-debugger__change-name {
+    flex-grow: 1;
+    color: rgb(170, 176, 190);
+}
+
+.mm-debugger__change-field {
+    flex-direction: row;
+    align-items: center;
+    padding-left: 16px;
+}
+
+.mm-debugger__change-field-name {
+    width: 200px;
+    color: rgb(255, 210, 127);
+    -unity-font-style: bold;
+}
+
+.mm-debugger__change-old {
+    color: rgb(154, 160, 172);
+}
+
+.mm-debugger__change-arrow {
+    margin: 0 6px;
+    color: rgb(154, 160, 172);
+}
+
+.mm-debugger__change-new {
+    color: rgb(124, 227, 139);
+    -unity-font-style: bold;
+}
+
+.mm-debugger__change-problem {
+    padding-left: 16px;
+    color: rgb(255, 120, 110);
+    white-space: normal;
+}
+
+/* ------------------------------------------------------------------ complex value tree */
+
+.mm-debugger__tree .unity-foldout__text {
+    color: rgb(170, 176, 190);
+}
+
+.mm-debugger__tree .unity-foldout__checkmark {
+    -unity-background-image-tint-color: rgb(200, 205, 215);
+}
+
+.mm-debugger__tree-more {
+    color: rgb(130, 136, 150);
+    font-size: 11px;
+    padding-left: 4px;
+}
+
+/* ------------------------------------------------------------------ import dialog */
+
+.mm-debugger__dialog-content {
+    margin-bottom: 12px;
+}
+
+.mm-debugger__import-json {
+    margin-top: 6px;
+}
+
+.mm-debugger__import-json .unity-base-text-field__input {
+    min-height: 160px;
+    max-height: 320px;
+    -unity-text-align: upper-left;
+    white-space: normal;
 }
 
 .mm-debugger__status--error {
@@ -472,7 +697,7 @@
 }
 
 .mm-debugger__dialog {
-    width: 460px;
+    width: 560px;
     max-width: 90%;
     padding: 16px;
     background-color: rgb(34, 37, 44);

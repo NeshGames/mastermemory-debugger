@@ -29,6 +29,12 @@ namespace Nesh.MasterMemoryDebugger
         [Tooltip("Keyboard key that toggles the debugger.")]
         [SerializeField] KeyCode toggleKey = KeyCode.F8;
 
+        [Tooltip("Touch devices: number of fingers held on the screen to toggle the debugger. 0 disables the gesture.")]
+        [SerializeField, Range(0, 5)] int touchToggleFingers = 3;
+
+        [Tooltip("Touch devices: seconds the fingers must stay on the screen.")]
+        [SerializeField, Min(0.1f)] float touchToggleSeconds = 1f;
+
         [Tooltip("Maximum number of records shown in the record list.")]
         [SerializeField, Min(1)] int maxSearchResults = 500;
 
@@ -54,6 +60,8 @@ namespace Nesh.MasterMemoryDebugger
         public bool AllowPatchSave { get => allowPatchSave; set => allowPatchSave = value; }
         public bool AutoLoadPatch { get => autoLoadPatch; set => autoLoadPatch = value; }
         public KeyCode ToggleKey { get => toggleKey; set => toggleKey = value; }
+        public int TouchToggleFingers { get => touchToggleFingers; set => touchToggleFingers = Mathf.Clamp(value, 0, 5); }
+        public float TouchToggleSeconds { get => touchToggleSeconds; set => touchToggleSeconds = Mathf.Max(0.1f, value); }
         public int MaxSearchResults { get => maxSearchResults; set => maxSearchResults = Mathf.Max(1, value); }
         public bool ShowSecondaryKeys { get => showSecondaryKeys; set => showSecondaryKeys = value; }
         public MasterMemoryDebugLogLevel LogLevel { get => logLevel; set => logLevel = value; }

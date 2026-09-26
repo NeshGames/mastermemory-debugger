@@ -59,7 +59,12 @@ namespace Nesh.MasterMemoryDebugger
             IsNullable = underlying != null;
             ValueType = underlying ?? fieldType;
             Kind = MasterDataValueUtility.GetKind(ValueType);
-            CanEdit = !IsPrimaryKey && !IsSecondaryKey && setter != null && Kind != MasterDataValueKind.Complex;
+            if (MasterDataValueUtility.TryGetEditableListElement(fieldType, out var elementType))
+            {
+                ElementType = elementType;
+                ElementKind = MasterDataValueUtility.GetKind(elementType);
+            }
+            CanEdit = !IsPrimaryKey && !IsSecondaryKey && setter != null && (Kind != MasterDataValueKind.Complex || IsList);
         }
 
         public string Name { get; }
@@ -85,8 +90,17 @@ namespace Nesh.MasterMemoryDebugger
 
         public bool IsKey => IsPrimaryKey || IsSecondaryKey;
 
-        /// <summary>True when the member is a non-key member of a supported simple type with a usable setter.</summary>
+        /// <summary>True when the member is a non-key member of a supported simple type, or a list of them, with a usable setter.</summary>
         public bool CanEdit { get; }
+
+        /// <summary>
+        /// Element type of an array / List / list interface of simple values (editable, copied on every edit); otherwise null.
+        /// </summary>
+        public Type ElementType { get; }
+
+        public MasterDataValueKind ElementKind { get; }
+
+        public bool IsList => ElementType != null;
 
         /// <summary>True when the value can be exported to / imported from a patch.</summary>
         public bool IsSimpleValue => Kind != MasterDataValueKind.Complex;

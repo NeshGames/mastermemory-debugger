@@ -48,7 +48,7 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         public bool IsPassive { get; init; }
         public int? UnlockLevel { get; init; }
 
-        // complex members are shown read-only
+        // arrays / Lists of simple values are edited element by element (a new array is created on every change)
         public int[] EffectIds { get; init; }
     }
 
@@ -65,8 +65,12 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         public double DropRate { get; init; }
     }
 
+    /// <summary>
+    /// MasterMemory validation (IValidatable). The debugger reads the Exists() calls to offer a jump from
+    /// StartSkillId to the skill, and AutoRebuild reports overrides that break them (e.g. StartSkillId = 99).
+    /// </summary>
     [MemoryTable("example_character"), MessagePackObject(true)]
-    public sealed record ExampleCharacterMaster
+    public sealed record ExampleCharacterMaster : IValidatable<ExampleCharacterMaster>
     {
         [PrimaryKey]
         public int Id { get; init; }
@@ -77,6 +81,13 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         public int Defense { get; init; }
         public float MoveSpeed { get; init; }
         public ExampleElement Element { get; init; }
+        public int StartSkillId { get; init; }
+
+        void IValidatable<ExampleCharacterMaster>.Validate(IValidator<ExampleCharacterMaster> validator)
+        {
+            validator.GetReferenceSet<ExampleSkillMaster>().Exists(x => x.StartSkillId, skill => skill.Id);
+            validator.Validate(x => x.Hp > 0);
+        }
     }
 
     [MemoryTable("example_effect"), MessagePackObject(true)]
@@ -92,7 +103,7 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
     }
 
     [MemoryTable("example_shop"), MessagePackObject(true)]
-    public sealed record ExampleShopMaster
+    public sealed record ExampleShopMaster : IValidatable<ExampleShopMaster>
     {
         [PrimaryKey]
         public int Id { get; init; }
@@ -102,6 +113,11 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
 
         public long Price { get; init; }
         public int Stock { get; init; }
+
+        void IValidatable<ExampleShopMaster>.Validate(IValidator<ExampleShopMaster> validator)
+        {
+            validator.GetReferenceSet<ExampleItemMaster>().Exists(x => x.ItemId, item => item.Id);
+        }
     }
 
     /// <summary>String primary key example. Left without a group, so it is listed under "Other".</summary>

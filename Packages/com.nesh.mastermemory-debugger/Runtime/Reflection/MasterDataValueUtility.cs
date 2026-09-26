@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -36,6 +37,60 @@ namespace Nesh.MasterMemoryDebugger
                 return type.IsDefined(typeof(FlagsAttribute), false) ? MasterDataValueKind.FlagsEnum : MasterDataValueKind.Enum;
             }
             return MasterDataValueKind.Complex;
+        }
+
+        // ------------------------------------------------------------------ lists
+
+        /// <summary>
+        /// True for one-dimensional arrays, <see cref="List{T}"/> and the list interfaces an array implements
+        /// (<c>IReadOnlyList&lt;T&gt;</c>, <c>IList&lt;T&gt;</c>, <c>IEnumerable&lt;T&gt;</c>, ...) whose element type is a simple, non-nullable value.
+        /// </summary>
+        public static bool TryGetEditableListElement(Type type, out Type elementType)
+        {
+            elementType = null;
+            if (type == null || type == typeof(string)) return false;
+            Type candidate = null;
+            if (type.IsArray)
+            {
+                if (type.GetArrayRank() == 1) candidate = type.GetElementType();
+            }
+            else if (type.IsGenericType && type.GetGenericArguments().Length == 1)
+            {
+                var argument = type.GetGenericArguments()[0];
+                if (type.GetGenericTypeDefinition() == typeof(List<>) || (type.IsInterface && type.IsAssignableFrom(argument.MakeArrayType())))
+                {
+                    candidate = argument;
+                }
+            }
+            if (candidate == null || Nullable.GetUnderlyingType(candidate) != null || GetKind(candidate) == MasterDataValueKind.Complex) return false;
+            elementType = candidate;
+            return true;
+        }
+
+        /// <summary>A new collection of <paramref name="listType"/> (List&lt;T&gt; for List, an array otherwise).</summary>
+        public static object CreateList(Type listType, Type elementType, IList items)
+        {
+            if (listType.IsGenericType && listType.GetGenericTypeDefinition() == typeof(List<>))
+            {
+                var list = (IList)Activator.CreateInstance(listType, items.Count);
+                foreach (var item in items) list.Add(item);
+                return list;
+            }
+            var array = Array.CreateInstance(elementType, items.Count);
+            for (var i = 0; i < items.Count; i++) array.SetValue(items[i], i);
+            return array;
+        }
+
+        /// <summary>Default value of a new list element ("" for strings).</summary>
+        public static object CreateDefaultElement(Type elementType)
+        {
+            if (elementType == typeof(string)) return string.Empty;
+            if (elementType.IsEnum)
+            {
+                var values = Enum.GetValues(elementType);
+                return values.Length > 0 ? values.GetValue(0) : Activator.CreateInstance(elementType);
+            }
+            return Activator.CreateInstance(elementType);
         }
 
         // ------------------------------------------------------------------ display
@@ -140,7 +195,7 @@ namespace Nesh.MasterMemoryDebugger
 
         // ------------------------------------------------------------------ json
 
-        /// <summary>Converts a simple value to a JSON value. Complex values are not supported.</summary>
+        /// <summary>Converts a simple value, or a list of simple values, to a JSON value. Other complex values are not supported.</summary>
         public static object ToJson(object value)
         {
             switch (value)
@@ -149,6 +204,12 @@ namespace Nesh.MasterMemoryDebugger
                 case string _:
                 case bool _:
                     return value;
+                case IList list when TryGetEditableListElement(value.GetType(), out _):
+                {
+                    var json = new List<object>(list.Count);
+                    foreach (var item in list) json.Add(ToJson(item));
+                    return json;
+                }
                 case Enum e: return e.ToString();
                 case Vector2 v:
                     return new MasterDataJsonObject { { "x", v.x }, { "y", v.y } };
@@ -186,6 +247,14 @@ namespace Nesh.MasterMemoryDebugger
                 throw new FormatException($"null is not a valid {type.Name} value.");
             }
             type = underlying ?? type;
+
+            if (TryGetEditableListElement(type, out var elementType))
+            {
+                if (!(json is List<object> array)) throw new FormatException($"{type.Name} expects a JSON array.");
+                var items = new List<object>(array.Count);
+                foreach (var item in array) items.Add(FromJson(item, elementType));
+                return CreateList(type, elementType, items);
+            }
 
             switch (GetKind(type))
             {

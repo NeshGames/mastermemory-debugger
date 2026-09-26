@@ -1,0 +1,27 @@
+<!--
+  MasterMemory Debugger: keeping master data members from managed code stripping (IL2CPP / Mono).
+
+  You usually do NOT need this file: in Development Builds the package generates the same rules automatically
+  (MasterMemoryDebuggerLinkerProcessor) for every [MemoryTable] record, MemoryDatabase and ImmutableBuilder.
+  Unity ignores link.xml files inside packages, which is why that is done by a build callback.
+
+  Copy and adapt this file (anywhere under Assets/) only if
+    - you want the rules in every build, or
+    - you build with a custom pipeline that does not run IUnityLinkerProcessor.
+
+  What is kept and why:
+    - records:          the debugger reads and sets their properties / backing fields through reflection
+                        (setters used only by `init` or by MessagePack constructors may otherwise be stripped)
+    - MemoryDatabase:   ToImmutableBuilder() / Validate(), called by MasterMemoryDebugRebuild through reflection
+    - ImmutableBuilder: Diff(T[]) / Build(), same reason
+
+  Replace the assembly and namespaces with those of your master data:
+    assembly  = the asmdef name (or Assembly-CSharp) that contains the [MemoryTable] records
+    namespace = the records namespace, and the MasterMemoryGeneratorOptions namespace of the generated code
+-->
+<linker>
+  <assembly fullname="Nesh.MasterMemoryDebugger.Samples.BasicExample">
+    <!-- the [MemoryTable] records and the generated MemoryDatabase / ImmutableBuilder live in this namespace -->
+    <namespace fullname="Nesh.MasterMemoryDebugger.Samples.BasicExample" preserve="all" />
+  </assembly>
+</linker>

@@ -54,6 +54,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugRegistry.ClearTableGroups();
             MasterMemoryDebugRegistry.SetDisplayName<ManualItem>(null);
             MasterDataCloneUtility.ClearProviders();
+            MasterMemoryReferences.ClearCache();
         }
     }
 }

@@ -14,8 +14,8 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         }
 
         /// <summary>
-        /// The database used by gameplay. Usually the original database; <see cref="ExampleDatabaseRebuilder"/>
-        /// can replace it with a database rebuilt from the overrides.
+        /// The database used by gameplay. Usually the original database; <see cref="MasterMemoryDebugRebuild.AutoRebuild{TDatabase}"/>
+        /// replaces it with a database rebuilt from the overrides (see ExampleDebuggerLauncher).
         /// </summary>
         public MemoryDatabase Database { get; set; }
 
@@ -44,7 +44,7 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
 
         /// <summary>
         /// Secondary key / range queries read the MasterMemory indexes directly and do NOT see overrides,
-        /// unless the database was rebuilt with <see cref="ExampleDatabaseRebuilder"/>.
+        /// unless the database was rebuilt with <see cref="MasterMemoryDebugRebuild"/>.
         /// </summary>
         public RangeView<ExampleSkillMaster> GetSkillsByCategory(int category)
         {

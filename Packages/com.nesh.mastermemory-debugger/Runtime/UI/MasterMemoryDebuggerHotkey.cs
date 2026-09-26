@@ -3,13 +3,16 @@ using UnityEngine;
 namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
-    /// The only object that exists while the debugger is closed: listens for the toggle key (F8 by default).
+    /// The only object that exists while the debugger is closed: listens for the toggle key (F8 by default)
+    /// and, on touch screens, for several fingers held down (3 fingers for 1 second by default).
     /// Supports the Input System package and the legacy Input Manager.
     /// </summary>
     [AddComponentMenu("")]
     internal sealed class MasterMemoryDebuggerHotkey : MonoBehaviour
     {
         static MasterMemoryDebuggerHotkey s_instance;
+
+        readonly MasterMemoryTouchGesture touchGesture = new MasterMemoryTouchGesture();
 
 #if MMDEBUGGER_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM
         KeyCode cachedKeyCode = KeyCode.None;
@@ -21,7 +24,7 @@ namespace Nesh.MasterMemoryDebugger
         {
             if (!MasterMemoryDebugBuild.IsEnabled || s_instance != null) return;
             var settings = MasterMemoryDebuggerSettings.Current;
-            if (!settings.Enabled || settings.ToggleKey == KeyCode.None) return;
+            if (!settings.Enabled || (settings.ToggleKey == KeyCode.None && settings.TouchToggleFingers == 0)) return;
 
             var gameObject = new GameObject("MasterMemoryDebuggerHotkey");
             gameObject.hideFlags = HideFlags.HideInHierarchy | HideFlags.DontSave;
@@ -37,7 +40,27 @@ namespace Nesh.MasterMemoryDebugger
 
         void Update()
         {
-            if (WasTogglePressed()) RuntimeMasterMemoryDebugger.Toggle();
+            var settings = MasterMemoryDebuggerSettings.Current;
+            var touchToggle = touchGesture.Update(GetTouchCount(), settings.TouchToggleFingers, settings.TouchToggleSeconds, Time.unscaledTime);
+            if (WasTogglePressed() || touchToggle) RuntimeMasterMemoryDebugger.Toggle();
+        }
+
+        static int GetTouchCount()
+        {
+#if MMDEBUGGER_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM
+            var touchscreen = UnityEngine.InputSystem.Touchscreen.current;
+            if (touchscreen == null) return 0;
+            var count = 0;
+            foreach (var touch in touchscreen.touches)
+            {
+                if (touch.press.isPressed) count++;
+            }
+            return count;
+#elif ENABLE_LEGACY_INPUT_MANAGER
+            return Input.touchCount;
+#else
+            return 0;
+#endif
         }
 
         bool WasTogglePressed()

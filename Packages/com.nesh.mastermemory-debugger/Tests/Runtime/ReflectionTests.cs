@@ -7,6 +7,8 @@ namespace Nesh.MasterMemoryDebugger.Tests
 {
     public class ReflectionTests : DebuggerTestBase
     {
+        static MasterRecordQuery Q(string text) => MasterRecordQuery.Parse(text, MasterDataReflectionCache.Get<TestSkill>());
+
         static MasterMemoryFieldDescriptor Field<T>(string name)
         {
             Assert.IsTrue(MasterDataReflectionCache.Get<T>().TryGetField(name, out var field), name);
@@ -79,13 +81,31 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.IsTrue(unlock.CanEdit);
         }
 
+        sealed class ComplexItem
+        {
+            public System.Collections.Generic.Dictionary<string, int> Map { get; set; }
+            public ComplexItem Child { get; set; }
+        }
+
         [Test]
-        public void ComplexField_ShouldBeReadonly()
+        public void ListOfSimpleValues_ShouldBeEditable()
         {
             var tags = Field<TestSkill>("Tags");
             Assert.AreEqual(MasterDataValueKind.Complex, tags.Kind);
-            Assert.IsFalse(tags.CanEdit);
+            Assert.IsTrue(tags.IsList);
+            Assert.IsTrue(tags.CanEdit);
             Assert.AreEqual("[2] 1, 2", MasterDataValueUtility.Format(tags.GetValue(Database.TestSkillTable.FindById(1001))));
+        }
+
+        [Test]
+        public void OtherComplexFields_ShouldBeReadonly()
+        {
+            foreach (var field in MasterDataReflectionCache.Get<ComplexItem>().Fields)
+            {
+                Assert.AreEqual(MasterDataValueKind.Complex, field.Kind, field.Name);
+                Assert.IsFalse(field.IsList, field.Name);
+                Assert.IsFalse(field.CanEdit, field.Name);
+            }
         }
 
         [Test]
@@ -174,8 +194,8 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var snapshot = table.CreateRecordSnapshot();
             var result = new List<MasterMemoryRecordDescriptor>();
 
-            Assert.AreEqual(3, MasterRecordListController.Filter(snapshot, "", false, 500, result));
-            Assert.AreEqual(1, MasterRecordListController.Filter(snapshot, "", true, 500, result));
+            Assert.AreEqual(3, MasterRecordListController.Filter(snapshot, Q(""), false, 500, result));
+            Assert.AreEqual(1, MasterRecordListController.Filter(snapshot, Q(""), true, 500, result));
             Assert.AreEqual(1002, result[0].PrimaryKey);
             Assert.IsTrue(result[0].IsModified);
             Assert.AreEqual(7, ((TestSkill)result[0].Current).Damage);
@@ -188,18 +208,18 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var snapshot = Table<TestSkill>().CreateRecordSnapshot();
             var result = new List<MasterMemoryRecordDescriptor>();
 
-            Assert.AreEqual(1, MasterRecordListController.Filter(snapshot, "1003", false, 500, result));
-            Assert.AreEqual(1, MasterRecordListController.Filter(snapshot, "ice", false, 500, result));
+            Assert.AreEqual(1, MasterRecordListController.Filter(snapshot, Q("1003"), false, 500, result));
+            Assert.AreEqual(1, MasterRecordListController.Filter(snapshot, Q("ice"), false, 500, result));
             Assert.AreEqual(1002, result[0].PrimaryKey);
-            Assert.AreEqual(0, MasterRecordListController.Filter(snapshot, "nothing", false, 500, result));
+            Assert.AreEqual(0, MasterRecordListController.Filter(snapshot, Q("nothing"), false, 500, result));
 
             // max results: matches are counted, the list is capped
-            Assert.AreEqual(3, MasterRecordListController.Filter(snapshot, "", false, 2, result));
+            Assert.AreEqual(3, MasterRecordListController.Filter(snapshot, Q(""), false, 2, result));
             Assert.AreEqual(2, result.Count);
 
             // overridden names are searchable
             MasterMemoryDebugRuntime.SetOverride(1003, Database.TestSkillTable.FindById(1003) with { Name = "Mega Heal" });
-            Assert.AreEqual(1, MasterRecordListController.Filter(snapshot, "mega", false, 500, result));
+            Assert.AreEqual(1, MasterRecordListController.Filter(snapshot, Q("mega"), false, 500, result));
         }
     }
 }
