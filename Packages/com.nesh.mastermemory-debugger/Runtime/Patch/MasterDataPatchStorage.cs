@@ -94,6 +94,34 @@ namespace Nesh.MasterMemoryDebugger
             return true;
         }
 
+        /// <summary>
+        /// Renames a saved patch. Returns false when <paramref name="oldName"/> does not exist or <paramref name="newName"/> is taken
+        /// (unless <paramref name="overwrite"/>).
+        /// </summary>
+        public static bool Rename(string oldName, string newName, bool overwrite = false)
+        {
+            var from = NormalizeName(oldName);
+            var to = NormalizeName(newName);
+            if (from == null || to == null || !Exists(from)) return false;
+            if (from == to) return true;
+            var target = GetPatchPath(to);
+            if (File.Exists(target))
+            {
+                if (!overwrite) return false;
+                File.Delete(target);
+            }
+            File.Move(GetPatchPath(from), target);
+            MasterDataWebGLBridge.SyncFileSystem();
+            return true;
+        }
+
+        /// <summary>Last time the patch file was written (local time), or null when it does not exist.</summary>
+        public static DateTime? GetSavedTime(string name)
+        {
+            var path = GetPatchPath(name);
+            return MasterMemoryDebugBuild.IsEnabled && File.Exists(path) ? File.GetLastWriteTime(path) : (DateTime?)null;
+        }
+
         /// <summary>Writes a copy under the exports directory and returns its path.</summary>
         public static string WriteExport(string json, string fileName = null)
         {

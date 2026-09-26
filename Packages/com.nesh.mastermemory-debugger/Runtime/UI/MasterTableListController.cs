@@ -159,6 +159,7 @@ namespace Nesh.MasterMemoryDebugger
             {
                 var modified = node.Group.Tables.Sum(x => MasterMemoryDebugRuntime.Store.CountOf(x.RecordType));
                 nameLabel.text = $"{node.Group.Name} ({node.Group.Tables.Count})";
+                element.tooltip = null;
                 countLabel.text = modified > 0 ? "*" + modified : string.Empty;
                 element.AddToClassList("mm-debugger__table-row--group");
                 element.EnableInClassList("mm-debugger__table-row--modified", modified > 0);
@@ -167,7 +168,8 @@ namespace Nesh.MasterMemoryDebugger
 
             var table = node.Table;
             var count = MasterMemoryDebugRuntime.Store.CountOf(table.RecordType);
-            nameLabel.text = table.TableName;
+            nameLabel.text = MasterMemoryDebugLocalization.GetTableLabel(table);
+            element.tooltip = MasterMemoryDebugLocalization.GetTableTooltip(table);
             countLabel.text = count > 0 ? "*" + count : string.Empty;
             element.RemoveFromClassList("mm-debugger__table-row--group");
             element.EnableInClassList("mm-debugger__table-row--modified", count > 0);

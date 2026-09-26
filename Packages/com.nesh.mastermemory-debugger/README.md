@@ -160,6 +160,31 @@ MasterMemoryDebugRegistry.RegisterCloneProvider<SkillMaster>(x => x with { });
 
 所有註冊 API 在非 Editor / 非 Development Build 中都不會做任何事。
 
+### 顯示名稱與 Tips（多語言）
+
+Table 與欄位可以設定各語言的顯示名稱和提示（Tips）。標題列的語言下拉選單可以在「Code names」（程式名稱）與各語言之間切換（記在 PlayerPrefs）。
+顯示名稱會用在 Table 清單、釘選頁籤、表格標題、Inspector 與搜尋自動完成；程式名稱仍會出現在 Tooltip 裡，搜尋條件與 Patch 也一律使用程式名稱。
+
+```csharp
+MasterMemoryDebugLocalization.SetTableLabel<SkillMaster>("zh-TW", "技能", "所有技能的基本數值");
+MasterMemoryDebugLocalization.SetFieldLabel<SkillMaster>("Damage", "zh-TW", "傷害", "基礎傷害，未含角色加成");
+// 語言給 null：這個 Tip 在所有語言（包含 Code names）都會顯示
+MasterMemoryDebugLocalization.SetFieldLabel<SkillMaster>("Cooldown", null, null, "單位：秒");
+
+// 或從試算表匯出的 Tab 分隔文字一次載入：table, field（Table 本身留空）, language, label, tip
+MasterMemoryDebugLocalization.LoadTsv(labelsTextAsset.text);
+```
+
+```text
+table	field	language	label	tip
+SkillMaster		zh-TW	技能	所有技能的基本數值
+SkillMaster	Damage	zh-TW	傷害	基礎傷害\n未含角色加成
+```
+
+- Table 名稱可以用註冊名稱（`RegisterDatabase` 時是 Record 類別名稱）或 `[MemoryTable]` 名稱。
+- Tip 中的 `\n` 會換行；`#` 開頭的行會被略過。
+- 中文、日文等名稱需要字型支援：在 Settings 的 **Font** 指定含有這些字的字型（例如 Noto Sans TC），否則會顯示成方框。
+
 ## Integrate Override
 
 ```csharp
@@ -206,30 +231,38 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 ## UI Toolkit Runtime Debugger
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ MasterMemory Runtime Debugger  Master: v1  2 overrides   [Changes (2)][A-][A+][Close] │
-├──────────────┬───────────────────────────────────────────────────────────────┤
-│ Tables       │ [Damage>100 Element=Fire.................] [ ] Modified Only   │
-│ ▼ Battle (5) │ Primary Key │ Name      │ Mod │ Category (SK) │ Damage ▼│ ...   │
-│   SkillM. *2 │ 1004        │ Thunder   │     │ 1             │ 180     │       │
-│   ItemMaster │ 1001        │ Fireball  │  *  │ 1             │ 185     │       │
-│ ▶ Economy (1)│ 2 / 2005 records                                              │
-├──────────────┴───────────────────────────────────────────────────────────────┤
-│ SkillMaster 1001 [Overridden]  [Copy JSON][Apply Override][Revert Edits][Reset Record] │
-│ Id        PK   1001                                                          │
-│ Damage         [185            ]                         Original: 120       │
-│ EffectIds RO   ▶ [2] 10, 11                                                  │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ Patch [balance-A ▼][balance-A] [Save][Load][Delete][Import][Export][Open Folder] [Reset All] │
-│ status...                                                             [Log (12)] │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ MasterMemory Runtime Debugger  [Data][Changes (2)][Patches (3)]   Master: v1  [zh-TW ▼] [A-][A+][Close] │
+├────────────┬┬─────────────────────────────────────────────┬┬──────────────────────────┤
+│ Tables     ││ [技能 ×][武器 ×] [+ Pin]                      ││ 技能 1001  Overridden     │
+│ ▼ Battle(6)││ [Damage>100 Element=Fire....] [ ] Mod [Columns▾]││ Id  PK                   │
+│   技能     ││ ● │ Id (PK)┃ 分類 (SK)│ 名稱    │ 傷害 ▼│ ...   ││ 1001                     │
+│   武器     ││   │   1004 ┃        1 │ Thunder │   180 │       ││ 傷害       Original: 120 │
+│ ▶ Economy  ││ ● │   1001 ┃        1 │ Fireball│   185 │       ││ [185                   ] │
+│            ││ 2 / 2005 records                ◀━━━━━━━━▶   ││ [Apply][Revert][Reset]   │
+├────────────┴┴─────────────────────────────────────────────┴┴──────────────────────────┤
+│ status...                                                                     [Log (12)] │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+- 標題列的頁籤：**Data**（瀏覽與編輯）、**Changes**（所有修改的總覽）、**Patches**（Patch 管理，見下方）。
+- Data 頁的版面和一般資料庫檢視工具相同：左側 Table 清單、中間資料表格、右側 Record 詳細資料；兩條分隔線都可以拖曳調整寬度。
 
 ### Record 表格
 
-- Record 列表是可排序的多欄表格（`MultiColumnListView`，virtualization）：Primary Key、Name、Mod，以及每個欄位一欄（SecondaryKey 標 `(SK)`，複雜型別顯示預覽）。
-- 點欄位標題排序（再點一次反向）；排序會套用在所有符合條件的資料上，再取前 `Max Search Results` 筆（預設 500）。
-- 有 Override 的格子若和原始值不同，會以橘色顯示。
+- 第一欄 `●` 標示有 Override 的 Record，接著是主鍵欄位（`(PK)`，複合主鍵每個成員一欄），然後每個欄位一欄（SecondaryKey 標 `(SK)`，複雜型別顯示預覽）。
+- 專案用 `SetDisplayName` / `RegisterTable(getDisplayName)` 提供顯示名稱時，會多一欄 `Display`；預設的顯示名稱只是重複某個欄位，所以不另外顯示。
+- 數字靠右對齊、`null` 顯示為灰色的 `NULL`、有格線與交錯底色。有 Override 的格子若和原始值不同，會以橘色顯示。
+- **凍結欄位**：凍結的欄位固定在左側（藍色分隔線左邊），其他欄位可以水平捲動（下方捲軸，或 Shift + 滾輪 / 觸控板左右滑動）。
+  `●` 與主鍵欄位**一律顯示並凍結**，不能取消。
+- **Columns ▾**：其他欄位可以勾選 **Show**（顯示 / 隱藏）與 **Freeze**（凍結）；`Show All` 全部顯示、`Reset` 回到預設。
+- **欄寬自動調整**：依欄位名稱與前 200 筆的內容估算寬度（40～320px，太長的內容以 `…` 截斷，完整內容看右側 Inspector）。
+  拖曳欄位標題的右邊界可以手動調整；**雙擊**右邊界回到自動寬度。
+- 點欄位標題排序（遞增 → 遞減 → 不排序）。排序會套用在所有符合條件的資料上，再取前 `Max Search Results` 筆（預設 500）。
+- 欄位的顯示、凍結與手動寬度會依 Table 記住（本次執行期間）。
+- 範例的 `ExampleManyColumnsMaster`（75 欄、120 筆，Test 群組）與 `ExampleWeaponMaster`（27 欄）可以用來確認超出一個畫面時的水平捲動。
+- **釘選頁籤**：表格上方的 `+ Pin` 把目前的 Table 釘選成頁籤，點頁籤快速切換，`×` 取消釘選。釘選清單記在 PlayerPrefs，下次開啟仍會保留。
+- 表格是自己實作的 virtualized grid（`ListView` + 同步捲動的表頭），沒有使用 `MultiColumnListView`。
 
 ### 搜尋 / 篩選
 
@@ -261,14 +294,15 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 - 列出所有 public property / field：
   - `PK` / `SK`：永遠唯讀
   - 支援編輯：`int uint short ushort long ulong byte sbyte float double bool string enum`、`[Flags] enum`（以文字輸入）、`Vector2 Vector3 Vector2Int Vector3Int Color`、以及上述型別的 `Nullable<T>`
-  - **Array / List**（`T[]`、`List<T>`、`IReadOnlyList<T>` 等，元素為上述簡單型別）：逐項編輯、`✕` 刪除、`+ Add` 新增（複製最後一項）。
+  - **Array / List**（`T[]`、`List<T>`、`IReadOnlyList<T>` 等，元素為上述簡單型別）：逐項編輯、`×` 刪除、`+ Add` 新增（複製最後一項）。
     每次修改都會建立新的陣列 / List，原始 Record 與已套用的 Override 不會被改到；Patch 會把整個 List 存成 JSON 陣列。超過 200 項時唯讀。
   - Dictionary / 巢狀物件 / 元素為複雜型別的 List：唯讀的可折疊樹狀檢視（最多 3 層、每層最多 100 項，展開時才建立）
   - 有修改的欄位會顯示 `Original: xxx`
+  - 文字欄位會自動換行並長高，完整顯示很長的值（Enter 仍然是 Apply，不會插入換行）
   - **關聯跳轉**：Record 有實作 MasterMemory 的 `IValidatable<T>` 並用 `GetReferenceSet<T>().Exists(x => x.ItemId, y => y.Id)` 宣告關聯時，
     該欄位旁會出現 `→ ItemMaster` 按鈕，點擊會開啟被參照的 Record（參照的不是主鍵時，改為以 `Id=值` 篩選目標 Table）。
     不需要額外設定：關聯是從 `Validate` 的 `Exists()` 讀出來的（`MasterMemoryReferences.Get(table)`）；沒有寫 Validate 的 Record 就不會顯示按鈕。
-- **Apply Override** 會把編輯中的副本存進 Override Store；如果所有值都和原始值相同，會改為移除 Override。
+- **Apply** 會把編輯中的副本存進 Override Store；如果所有值都和原始值相同，會改為移除 Override。
 - **Copy JSON**：把整筆 Record（包含陣列與巢狀物件、未套用的編輯）複製為 JSON。Editor / Windows 複製到剪貼簿，WebGL 下載成檔案。
 - 有未套用的編輯時切換 Record / Table，會詢問 **Apply / Discard / Cancel**。
 
@@ -280,7 +314,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 ### Log 與 Console
 
 - 狀態列右側的 **Log (N)** 會展開最近 50 則訊息（狀態、Patch 警告、修改內容），在沒有 Console 的實機上也看得到。
-- Apply Override / Reset Record / Reset All / Load Patch 都會在 Console 印出修改內容（可在 Settings 關閉）：
+- Apply / Reset / Reset All / 套用 Patch 都會在 Console 印出修改內容（可在 Settings 關閉）：
 
   ```text
   [MasterMemoryDebugger] Override applied: SkillMaster 1001 (Fireball)
@@ -297,9 +331,10 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 | --- | --- |
 | F8 | 開關 Debugger（可在 Settings 修改） |
 | 三指長按 1 秒 | 觸控裝置上開關 Debugger（手指數與秒數可在 Settings 修改，0 指停用） |
-| Enter | Inspector 中：Apply Override；對話框中：執行主要按鈕（刪除 / 覆蓋 / Reset All 等危險操作不會被 Enter 觸發） |
+| Enter | Inspector 中：Apply；對話框中：執行主要按鈕（刪除 / 覆蓋 / Reset All 等危險操作不會被 Enter 觸發） |
 | ↑ / ↓、Tab / Enter | 搜尋框自動完成：選擇、套用 |
-| Esc | 關閉對話框或自動完成清單，都沒有時關閉 Debugger |
+| Esc | 依序關閉：對話框、自動完成清單、Columns 清單；都沒有時關閉 Debugger |
+| Shift + 滾輪 | 表格水平捲動 |
 
 - **Reset All** 會先跳出確認視窗：`Reset all MasterMemory runtime overrides?`
 - `A-` / `A+` 可調整 UI 縮放（只在使用 Debugger 自己建立的 PanelSettings 時顯示）。
@@ -357,27 +392,36 @@ Patch 只記錄 **有修改的可編輯欄位** 與其 **原始值**，不會保
   string json = MasterDataPatchSerializer.ToJson(patch);
   ```
 
-| 按鈕 | 行為 |
-| --- | --- |
-Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger/<名稱>.patch.json`。
-底部工具列：`Patch [已儲存的 Patch ▼] [名稱] [Save Patch] [Load Patch] [Delete] [Import] [Export] [Open Folder] ... [Reset All]`
+Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger/<名稱>.patch.json`。所有 Patch 操作都在 **Patches** 頁籤：
 
-| 控制項 | 行為 |
+```text
+┌ Current: 3 overridden records  [Save As…][Export][Reset All]              [Import][Open Folder] ┐
+├ Saved patches (3)          ┃ balance-A                                                          │
+│ balance-A                  ┃ 12 records, 30 fields · master version v1 · saved 2026-09-26 14:00 │
+│  12 records · 30 fields    ┃ [Apply][Merge][Overwrite][Rename…][Export][Delete]                 │
+│ debug  (default)           ┃ SkillMaster (2)                                                    │
+│  3 records · 5 fields      ┃  {"Id":1001}   Damage  120 → 185                                   │
+└────────────────────────────┴────────────────────────────────────────────────────────────────────┘
+```
+
+| 操作 | 行為 |
 | --- | --- |
-| 下拉選單 | 列出已儲存的 Patch；選擇後名稱欄位會帶入同樣的名稱 |
-| 名稱欄位 | Save Patch 使用的名稱（例如 `balance-A`）。不能用在檔名的字元會換成 `_` |
-| Save Patch | 以名稱欄位儲存；名稱已存在且不是目前選取的 Patch 時會先確認是否覆蓋 |
-| Load Patch | 載入下拉選單選取的 Patch，**取代**目前所有 Override |
-| Delete | 刪除下拉選單選取的 Patch（目前的 Override 不受影響） |
-| Import | 把 Patch 檔加入清單（之後用 Load Patch 套用）。Editor：檔案對話框；**WebGL：瀏覽器上傳**；其他平台：貼上 JSON。同名時會確認是否覆蓋 |
-| Export | 匯出目前的 Override（檔名 `<名稱>-<時間>.json`）。Editor：存檔對話框；**WebGL：瀏覽器下載**；其他平台：`.../MasterMemoryDebugger/exports/` |
+| Save As… | 把目前的 Override 存成新的 Patch（輸入名稱；同名時確認是否覆蓋）。不能用在檔名的字元會換成 `_` |
+| Export（上方） | 匯出目前的 Override（檔名 `current-<時間>.json`）。Editor：存檔對話框；**WebGL：瀏覽器下載**；其他平台：`.../MasterMemoryDebugger/exports/` |
+| Reset All | 移除所有 Override（會先確認） |
+| Import | 把 Patch 檔加入清單。Editor：檔案對話框；**WebGL：瀏覽器上傳**；其他平台：貼上 JSON。同名時確認是否覆蓋 |
 | Open Folder | 開啟資料夾（Editor / Windows / macOS / Linux） |
+| 清單 | 每個 Patch 的筆數、欄位數、儲存時間；版本和目前主資料不同的會以橘色標示。右側預覽每個欄位的原始值 → 修改值 |
+| Apply | **取代**目前所有 Override（目前有 Override 時會先確認） |
+| Merge | 疊加在目前的 Override 上（同一筆 Record 會被 Patch 的內容取代） |
+| Overwrite | 用目前的 Override 覆蓋這個 Patch |
+| Rename… / Export / Delete | 改名、匯出這個 Patch、刪除（目前的 Override 不受影響） |
 
 程式碼中也可以直接使用：`MasterDataPatchStorage.Save(patch, "balance-A")`、`Load("balance-A")`、`ListPatchNames()`、`Delete("balance-A")`。
 
 載入時：
 
-- Master Version 不同 → 顯示警告，可選 **Cancel** 或 **Force Load**。
+- Master Version 不同 → 顯示警告，可選 **Cancel** 或 **Force Apply**。
 - Record 不存在 → 略過（不能新增 Record）。
 - Key 欄位或不存在的欄位 → 略過。
 - `original` 和目前主資料不同 → 仍然套用，但會列出警告（代表主資料已經改過）。
@@ -391,7 +435,7 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 | --- | --- | --- |
 | Enabled | true | 關閉時 UI、熱鍵、Auto Load 全部停用（Override API 仍可使用） |
 | Allow Editing | true | 關閉時變成唯讀瀏覽器 |
-| Allow Patch Save | true | 顯示 Save Patch / Export |
+| Allow Patch Save | true | Patches 頁籤顯示 Save As / Overwrite / Rename / Export / Delete |
 | Auto Load Patch | false | 註冊 Table 時自動載入已儲存的 Patch |
 | Toggle Key | F8 | |
 | Touch Toggle Fingers | 3 | 觸控裝置上幾根手指同時按住會開關 Debugger；0 = 停用 |
@@ -399,8 +443,9 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 | Max Search Results | 500 | |
 | Show Secondary Keys | true | 在 Inspector 顯示 SecondaryKey 欄位（永遠唯讀） |
 | Log Level | Warning | |
-| Log Override Changes | true | Apply / Reset / Reset All / Load Patch 時在 Console 列出改了哪些欄位與前後值（Editor 中以顏色標示） |
-| Default Patch Name | debug | 預設選取的 Patch 名稱，也是 Auto Load Patch 載入的 Patch |
+| Log Override Changes | true | Apply / Reset / Reset All / 套用 Patch 時在 Console 列出改了哪些欄位與前後值（Editor 中以顏色標示） |
+| Default Patch Name | debug | Patches 頁籤中標示為 (default) 的 Patch，也是 Auto Load Patch 載入的 Patch |
+| Font | (none) | Debugger UI 使用的字型（TTF / OTF）。顯示名稱使用中文、日文等文字時，請指定含有這些字的字型 |
 | Panel Settings | (none) | 指定專案自己的 PanelSettings；沒指定時 Debugger 會自行建立 |
 | Sorting Order | 10000 | Debugger 自行建立的 Panel 的繪製順序 |
 
@@ -472,8 +517,10 @@ Override Layer **只保證經過 `TryGetOverride` / `Resolve` 的 PrimaryKey 查
 | `MasterMemory.dll will not be loaded ... Unable to resolve reference 'MessagePack'` | NuGet 相依套件沒有裝齊。用 Manage NuGet Packages 重新安裝 MasterMemory，或補齊 `packages.config` 後執行 **NuGet > Restore Packages**。 |
 | 顯示「No table registered」 | 還沒呼叫 `RegisterDatabase` / `RegisterTable`，或呼叫時 database 尚未載入。 |
 | Apply 之後遊戲數值沒變 | 該讀取路徑沒有經過 `TryGetOverride` / `Resolve`，或者是 SecondaryKey / Range 查詢（參考 Query Limitation）。 |
-| 欄位顯示 `RO` | 不支援的型別（Array / List / 巢狀物件…）或沒有 setter。 |
-| Load Patch 顯示版本不同 | 用 `SetMasterVersionProvider` 提供正確版本，或在確認後選 Force Load。 |
+| 欄位顯示 `RO` | 不支援的型別（Dictionary / 巢狀物件 / 元素為複雜型別的 List…）或沒有 setter。 |
+| Apply Patch 顯示版本不同 | 用 `SetMasterVersionProvider` 提供正確版本，或在確認後選 Force Apply。 |
+| 顯示名稱變成方框 | 預設字型沒有這些字：在 Settings 的 Font 指定含有 CJK 的字型。 |
+| 表格欄位太多、看不到 | 用 Columns ▾ 隱藏不需要的欄位、凍結常用欄位，或 Shift + 滾輪水平捲動。 |
 | Auto Load 沒有套用 | `SetMasterVersionProvider` 必須在註冊 Table **之前** 呼叫；版本不同時不會自動載入。 |
 | UI 被遊戲 UI 蓋住 | 調高 Settings 的 Sorting Order，或指定自己的 PanelSettings。 |
 | 下拉選單是白底 | 只有在 Settings 指定了專案自己的 PanelSettings 時才會發生（Debugger 不會去改共用 panel 的樣式）。不指定 PanelSettings 時會使用深色選單。 |

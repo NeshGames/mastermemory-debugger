@@ -49,6 +49,9 @@ namespace Nesh.MasterMemoryDebugger
         [Tooltip("Patch selected by default and used by Auto Load Patch. Saved as <name>.patch.json under Application.persistentDataPath/MasterMemoryDebugger/.")]
         [SerializeField, FormerlySerializedAs("patchFileName")] string defaultPatchName = "debug";
 
+        [Tooltip("Optional font of the debugger UI (TTF / OTF). Use a font with the glyphs of your labels, e.g. CJK for Chinese / Japanese table and field names.")]
+        [SerializeField] Font font;
+
         [Tooltip("Optional PanelSettings. When empty the debugger creates its own panel.")]
         [SerializeField] PanelSettings panelSettings;
 
@@ -68,6 +71,7 @@ namespace Nesh.MasterMemoryDebugger
         public bool LogOverrideChanges { get => logOverrideChanges; set => logOverrideChanges = value; }
         public string DefaultPatchName { get => string.IsNullOrEmpty(defaultPatchName) ? "debug" : defaultPatchName; set => defaultPatchName = value; }
         public PanelSettings PanelSettings { get => panelSettings; set => panelSettings = value; }
+        public Font Font { get => font; set => font = value; }
         public int SortingOrder { get => sortingOrder; set => sortingOrder = value; }
 
         static MasterMemoryDebuggerSettings s_current;

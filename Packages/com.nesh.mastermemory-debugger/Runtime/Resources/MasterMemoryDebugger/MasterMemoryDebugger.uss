@@ -36,26 +36,39 @@
 
 /* ------------------------------------------------------------------ header */
 
+/* one row; wraps instead of overlapping when the window is narrow or the UI is scaled up */
 .mm-debugger__header {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     flex-shrink: 0;
-    height: 30px;
-    padding: 0 4px;
+    min-height: 30px;
+    padding: 0 4px 2px 4px;
     margin-bottom: 6px;
     border-bottom-width: 1px;
     border-color: rgb(58, 63, 75);
 }
 
 .mm-debugger__title {
+    flex-shrink: 0;
     font-size: 15px;
     -unity-font-style: bold;
     margin-right: 16px;
 }
 
+.mm-debugger__header .mm-debugger__spacer {
+    min-width: 8px;
+}
+
+/* version / override count give way first (full text in the tooltip) */
 .mm-debugger__header-info {
+    flex-shrink: 1;
+    min-width: 0;
     color: rgb(150, 157, 171);
     margin-right: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mm-debugger__override-count--active {
@@ -107,16 +120,35 @@
 }
 
 .mm-debugger__header-button {
+    flex-shrink: 0;
     min-width: 36px;
 }
 
 /* ------------------------------------------------------------------ panels */
 
+/* tables | records | record detail (TwoPaneSplitView, dividers can be dragged) */
 .mm-debugger__main {
-    flex-direction: row;
     flex-grow: 1;
     flex-basis: 0;
     min-height: 200px;
+}
+
+.mm-debugger .unity-two-pane-split-view__dragline-anchor {
+    background-color: rgb(22, 24, 29);
+}
+
+/* The default theme gives the divider a resize cursor. Built-in cursors only exist in the Editor UI; at runtime they log
+   "Runtime cursors other than the default cursor need to be defined using a texture" every frame. */
+.mm-debugger .unity-two-pane-split-view__dragline-anchor,
+.mm-debugger .unity-two-pane-split-view__dragline,
+.mm-debugger .unity-multi-column-header__column-resize-handle,
+.mm-debugger .unity-base-text-field__input,
+.mm-debugger .unity-text-element--inner-input-field-component {
+    cursor: initial;
+}
+
+.mm-debugger .unity-two-pane-split-view__dragline-anchor:hover {
+    background-color: rgb(80, 120, 190);
 }
 
 .mm-debugger__panel {
@@ -134,10 +166,8 @@
 }
 
 .mm-debugger__table-panel {
-    width: 220px;
-    min-width: 160px;
-    flex-shrink: 0;
-    margin-right: 6px;
+    min-width: 140px;
+    margin-right: 3px;
 }
 
 .mm-debugger__table-list {
@@ -175,6 +205,82 @@
 .mm-debugger__content-panel {
     flex-grow: 1;
     flex-direction: column;
+    min-width: 240px;
+    margin: 0 3px;
+}
+
+/* pinned table tabs above the grid */
+.mm-debugger__table-tabs {
+    flex-direction: row;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    margin-bottom: 4px;
+    border-bottom-width: 1px;
+    border-color: rgb(52, 57, 68);
+}
+
+.mm-debugger__table-tab {
+    flex-direction: row;
+    align-items: center;
+    height: 24px;
+    padding: 0 4px 0 10px;
+    margin-right: 2px;
+    border-width: 1px 1px 0 1px;
+    border-color: rgb(52, 57, 68);
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    background-color: rgb(34, 37, 45);
+}
+
+.mm-debugger__table-tab:hover {
+    background-color: rgb(42, 47, 58);
+}
+
+.mm-debugger__table-tab--selected,
+.mm-debugger__table-tab--selected:hover {
+    background-color: rgb(44, 82, 140);
+    border-color: rgb(80, 140, 230);
+}
+
+.mm-debugger .mm-debugger__table-tab-label {
+    font-size: 12px;
+}
+
+.mm-debugger .mm-debugger__table-tab-close {
+    margin-left: 6px;
+    padding: 0 4px;
+    color: rgb(150, 157, 171);
+    border-radius: 3px;
+}
+
+.mm-debugger .mm-debugger__table-tab-close:hover {
+    color: rgb(255, 255, 255);
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.mm-debugger__table-tab-pin {
+    height: 22px;
+    margin: 1px 0 1px 4px;
+    font-size: 11px;
+}
+
+/* label language (shown when the project registered labels) */
+.mm-debugger__language {
+    width: auto;
+    min-width: 150px;
+    max-width: 240px;
+    flex-shrink: 0;
+    margin: 0 8px 0 4px;
+}
+
+.mm-debugger__language .unity-base-field__input {
+    min-width: 0;
+}
+
+.mm-debugger__language .unity-base-popup-field__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mm-debugger__search-toolbar {
@@ -200,34 +306,247 @@
 
 .mm-debugger__record-list {
     flex-grow: 1;
+    border-width: 1px;
+    border-color: rgb(52, 57, 68);
 }
 
-.mm-debugger__cell {
+/* ---- grid: header (frozen part | horizontally scrolled part) */
+
+.mm-debugger__grid {
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.mm-debugger__grid-header {
+    flex-direction: row;
+    flex-shrink: 0;
+    height: 24px;
+    background-color: rgb(38, 42, 51);
+    border-bottom-width: 1px;
+    border-color: rgb(70, 76, 90);
+}
+
+.mm-debugger__grid-frozen {
+    flex-direction: row;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-right-width: 2px;
+    border-color: rgb(80, 120, 190);
+}
+
+.mm-debugger__grid-frozen--empty {
+    border-right-width: 0;
+}
+
+.mm-debugger__grid-viewport {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.mm-debugger__grid-content {
+    flex-direction: row;
+    flex-shrink: 0;
     height: 100%;
-    padding: 0 6px;
+}
+
+.mm-debugger__grid-header-cell {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    height: 100%;
+    padding: 0 4px 0 6px;
+    border-right-width: 1px;
+    border-color: rgb(52, 57, 68);
+}
+
+.mm-debugger__grid-header-cell:hover {
+    background-color: rgb(47, 52, 63);
+}
+
+.mm-debugger .mm-debugger__grid-header-title {
+    flex-grow: 1;
+    flex-shrink: 1;
+    margin: 0;
+    padding: 0;
+    color: rgb(205, 211, 222);
+    -unity-font-style: bold;
+    font-size: 12px;
     -unity-text-align: middle-left;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.mm-debugger__cell--modified {
+.mm-debugger .mm-debugger__grid-header-cell--sorted .mm-debugger__grid-header-title,
+.mm-debugger .mm-debugger__grid-sort {
+    color: rgb(150, 190, 255);
+}
+
+.mm-debugger .mm-debugger__grid-sort {
+    flex-shrink: 0;
+    margin: 0;
+    font-size: 9px;
+    padding: 0 0 0 2px;
+}
+
+/* drag the right edge of a header cell to resize the column */
+.mm-debugger__grid-resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -3px;
+    width: 7px;
+}
+
+.mm-debugger__grid-resize:hover {
+    background-color: rgba(80, 120, 190, 0.6);
+}
+
+.mm-debugger__grid-rows {
+    flex-grow: 1;
+}
+
+.mm-debugger__grid-row {
+    flex-direction: row;
+    height: 100%;
+}
+
+/* rows must start exactly under the header: no padding from the default list item style */
+.mm-debugger .mm-debugger__grid-rows .unity-collection-view__item {
+    padding: 0;
+    margin: 0;
+}
+
+.mm-debugger__grid-hscroll {
+    flex-shrink: 0;
+}
+
+/* ---- grid: rows and cells */
+
+.mm-debugger .mm-debugger__record-list .unity-collection-view__item {
+    background-color: rgb(30, 33, 40);
+}
+
+.mm-debugger .mm-debugger__record-list .unity-collection-view__item--alternative-background {
+    background-color: rgb(34, 37, 45);
+}
+
+.mm-debugger .mm-debugger__record-list .unity-collection-view__item:hover {
+    background-color: rgb(42, 47, 58);
+}
+
+.mm-debugger .mm-debugger__record-list .unity-collection-view__item--selected,
+.mm-debugger .mm-debugger__record-list .unity-collection-view__item--selected:hover {
+    background-color: rgb(44, 82, 140);
+}
+
+/* Cells are Labels: the default theme gives labels a 3px left / right margin, which would make every cell 6px wider
+   than its header and shift the columns more and more to the right. The width set in code must be the whole cell. */
+.mm-debugger .mm-debugger__cell {
+    flex-shrink: 0;
+    margin: 0;
+    min-width: 0;
+    height: 100%;
+    border-right-width: 1px;
+    border-color: rgb(42, 46, 56);
+    padding: 0 6px;
+    font-size: 12px;
+    color: rgb(215, 219, 227);
+    -unity-text-align: middle-left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mm-debugger .mm-debugger__cell--number {
+    -unity-text-align: middle-right;
+}
+
+.mm-debugger .mm-debugger__cell--key {
+    color: rgb(150, 190, 255);
+}
+
+.mm-debugger .mm-debugger__cell--null {
+    color: rgb(112, 118, 130);
+    -unity-font-style: italic;
+}
+
+.mm-debugger .mm-debugger__cell--state {
+    padding: 0;
+    -unity-text-align: middle-center;
+}
+
+.mm-debugger .mm-debugger__cell--modified {
     color: rgb(255, 184, 76);
     -unity-font-style: bold;
 }
 
-.mm-debugger .unity-multi-column-header {
-    background-color: rgb(38, 42, 50);
+/* ---- Columns popup: show / freeze per column */
+
+.mm-debugger__columns-button {
+    margin-left: 6px;
+}
+
+.mm-debugger__button--active {
+    background-color: rgb(46, 92, 160);
+}
+
+.mm-debugger__columns-popup {
+    position: absolute;
+    width: 300px;
+    max-height: 70%;
+    padding: 4px;
+    background-color: rgb(40, 44, 53);
+    border-width: 1px;
+    border-color: rgb(84, 92, 110);
+    border-radius: 4px;
+}
+
+.mm-debugger__columns-list {
+    flex-shrink: 1;
+}
+
+.mm-debugger__columns-row {
+    flex-direction: row;
+    align-items: center;
+    min-height: 20px;
+    padding: 0 4px;
+}
+
+.mm-debugger__columns-row--header {
     border-bottom-width: 1px;
     border-color: rgb(58, 63, 75);
+    margin-bottom: 2px;
 }
 
-.mm-debugger .unity-multi-column-header__column__title {
-    color: rgb(170, 176, 190);
-    -unity-font-style: bold;
+.mm-debugger .mm-debugger__columns-row--header Label {
+    font-size: 11px;
+    color: rgb(150, 157, 171);
 }
 
-.mm-debugger .unity-multi-column-header__column__sort-indicator__arrow {
-    -unity-background-image-tint-color: rgb(200, 205, 215);
+.mm-debugger__columns-name {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-debugger .mm-debugger__columns-row--locked .mm-debugger__columns-name {
+    color: rgb(150, 190, 255);
+}
+
+.mm-debugger__columns-flag {
+    width: 48px;
+    margin: 0;
+    justify-content: center;
+    -unity-text-align: middle-center;
+}
+
+.mm-debugger__columns-actions {
+    flex-direction: row;
+    padding-top: 4px;
+    margin-top: 4px;
+    border-top-width: 1px;
+    border-color: rgb(58, 63, 75);
 }
 
 .mm-debugger__record-count--error {
@@ -276,17 +595,27 @@
 /* ------------------------------------------------------------------ inspector */
 
 .mm-debugger__inspector-panel {
-    flex-grow: 1;
-    flex-basis: 0;
-    min-height: 160px;
-    margin-top: 6px;
+    flex-direction: column;
+    min-width: 260px;
+    margin-left: 3px;
 }
 
 .mm-debugger__inspector-header {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     flex-shrink: 0;
     margin-bottom: 4px;
+}
+
+.mm-debugger__inspector-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding-top: 4px;
+    margin-top: 4px;
+    border-top-width: 1px;
+    border-color: rgb(52, 57, 68);
 }
 
 .mm-debugger__record-state {
@@ -315,11 +644,10 @@
     margin: 8px;
 }
 
+/* detail rows: name line (badges, original value, reference) above a full width editor */
 .mm-debugger__field {
-    flex-direction: row;
-    align-items: center;
-    min-height: 24px;
-    padding: 1px 4px;
+    flex-direction: column;
+    padding: 4px 6px 5px 6px;
     border-bottom-width: 1px;
     border-color: rgb(40, 44, 53);
 }
@@ -330,25 +658,26 @@
 
 .mm-debugger__field-name-container {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
-    width: 240px;
-    flex-shrink: 0;
+    min-height: 18px;
+    margin-bottom: 2px;
 }
 
-.mm-debugger__field-name {
+.mm-debugger .mm-debugger__field-name {
+    font-size: 11px;
+    color: rgb(160, 168, 184);
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.mm-debugger__field--modified .mm-debugger__field-name {
+.mm-debugger .mm-debugger__field--modified .mm-debugger__field-name {
     color: rgb(255, 184, 76);
     -unity-font-style: bold;
 }
 
 .mm-debugger__field-value {
-    flex-grow: 1;
-    flex-basis: 0;
-    margin: 0 8px 0 0;
+    margin: 0;
 }
 
 .mm-debugger__field-readonly {
@@ -400,8 +729,10 @@
 
 /* jump to the record referenced by this field (MasterMemory Validate Exists) */
 .mm-debugger__reference-button {
-    flex-shrink: 0;
-    margin: 0 6px 0 4px;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0 0 0 6px;
     padding: 0 6px;
     min-height: 18px;
     font-size: 11px;
@@ -412,12 +743,23 @@
 }
 
 .mm-debugger__field-original {
-    width: 220px;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    margin-left: 6px;
     color: rgb(255, 184, 76);
     font-size: 11px;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* long text values wrap and the field grows, so the whole value is visible */
+.mm-debugger__text-editor .unity-base-text-field__input,
+.mm-debugger__text-editor .unity-text-element {
+    white-space: normal;
+}
+
+.mm-debugger__text-editor .unity-base-text-field__input {
+    min-height: 22px;
+    height: auto;
 }
 
 .mm-debugger__field-editor--invalid .unity-base-text-field__input {
@@ -485,30 +827,149 @@
 
 /* ------------------------------------------------------------------ bottom toolbar */
 
-.mm-debugger__bottom-toolbar {
+/* ------------------------------------------------------------------ tabs (Data | Changes | Patches) */
+
+.mm-debugger__tabs {
     flex-direction: row;
+    flex-shrink: 0;
+    align-self: stretch;
+    margin-right: 8px;
+}
+
+.mm-debugger .mm-debugger__tab {
+    margin: 0 2px;
+    padding: 2px 12px;
+    border-width: 0 0 2px 0;
+    border-radius: 0;
+    border-color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0);
+    color: rgb(170, 176, 190);
+}
+
+.mm-debugger .mm-debugger__tab:hover {
+    color: rgb(226, 229, 235);
+    background-color: rgb(40, 44, 53);
+}
+
+.mm-debugger .mm-debugger__tab--selected {
+    color: rgb(150, 190, 255);
+    border-color: rgb(80, 140, 230);
+    -unity-font-style: bold;
+}
+
+/* ------------------------------------------------------------------ patches tab */
+
+.mm-debugger__patches-panel {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-height: 200px;
+    flex-direction: column;
+}
+
+.mm-debugger__patches-current {
+    flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     flex-shrink: 0;
-    height: 32px;
-    margin-top: 6px;
-    padding-top: 4px;
-    border-top-width: 1px;
-    border-color: rgb(58, 63, 75);
+    padding: 2px 4px 6px 4px;
+    margin-bottom: 4px;
+    border-bottom-width: 1px;
+    border-color: rgb(52, 57, 68);
 }
 
-.mm-debugger__toolbar-label {
+.mm-debugger .mm-debugger__patches-current-label {
+    -unity-font-style: bold;
+    margin-right: 10px;
+}
+
+.mm-debugger__patches-split {
+    flex-grow: 1;
+}
+
+.mm-debugger__patches-list-panel {
+    min-width: 160px;
+    margin-right: 3px;
+    overflow: hidden;
+}
+
+.mm-debugger__patches-list {
+    flex-grow: 1;
+}
+
+.mm-debugger__patch-item {
+    justify-content: center;
+    height: 100%;
+    padding: 2px 8px;
+    overflow: hidden;
+}
+
+.mm-debugger .mm-debugger__patch-item-name {
+    -unity-font-style: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mm-debugger .mm-debugger__patch-item-info {
+    font-size: 11px;
     color: rgb(150, 157, 171);
-    margin-right: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.mm-debugger__patch-list {
-    width: 200px;
-    margin: 0 4px 0 0;
+.mm-debugger .mm-debugger__patch-item--problem .mm-debugger__patch-item-info {
+    color: rgb(255, 184, 76);
 }
 
-.mm-debugger__patch-name {
-    width: 180px;
-    margin: 0 2px 0 0;
+.mm-debugger__patches-detail {
+    flex-direction: column;
+    min-width: 260px;
+    margin-left: 6px;
+}
+
+.mm-debugger .mm-debugger__patches-info {
+    font-size: 11px;
+    color: rgb(150, 157, 171);
+    margin: 0 4px 2px 4px;
+    white-space: normal;
+}
+
+.mm-debugger .mm-debugger__patches-warning {
+    font-size: 11px;
+    color: rgb(255, 184, 76);
+    margin: 0 4px 4px 4px;
+    white-space: normal;
+}
+
+.mm-debugger__patches-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding-bottom: 6px;
+    margin-bottom: 4px;
+    border-bottom-width: 1px;
+    border-color: rgb(52, 57, 68);
+}
+
+.mm-debugger__patches-preview {
+    flex-grow: 1;
+}
+
+.mm-debugger .mm-debugger__patches-table {
+    -unity-font-style: bold;
+    color: rgb(150, 190, 255);
+    margin: 6px 4px 2px 4px;
+}
+
+.mm-debugger .mm-debugger__patches-table--missing {
+    color: rgb(255, 150, 120);
+}
+
+.mm-debugger .mm-debugger__patches-record {
+    font-size: 11px;
+    color: rgb(170, 176, 190);
+    margin: 2px 4px 0 10px;
 }
 
 .mm-debugger__status-row {

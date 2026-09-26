@@ -2,6 +2,41 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.4.0] - 2026-09-26
+
+### Added
+
+- Record grid with frozen and hidden columns: frozen columns stay on the left while the others scroll horizontally (scrollbar, Shift + wheel); a Columns popup shows / hides and freezes each column; drag a header edge to resize; settings are kept per table. The state and primary key columns are frozen by default.
+- Pinned table tabs above the grid (`+ Pin`, `×` to unpin), saved in PlayerPrefs.
+- Header tabs Data / Changes / Patches. The Patches tab lists every saved patch (records, fields, master version, save time), previews its changes and can Apply (replace), Merge, Overwrite, Rename, Export or Delete it; the current overrides can be saved, exported or reset, and patch files imported.
+- `MasterMemoryDebugLocalization`: display names and tips per language for tables and fields (API or tab separated text). A header dropdown switches between the code names and each language; used by the table list, tabs, grid headers, inspector and search completion.
+- `Font` setting for the debugger UI (fonts with CJK glyphs for localized names).
+- `MasterDataPatchStorage.Rename` / `GetSavedTime`.
+- Automatic column widths from the titles and the values of the first 200 rows; double click a header edge to go back to the automatic width.
+- The state and primary key columns are always shown and frozen.
+- Inspector text fields wrap and grow to show long values.
+- Sample: `ExampleManyColumnsMaster` (75 columns, 120 records).
+- Sample: wide `ExampleWeaponMaster` table (27 columns, 300 records) and Chinese labels / tips.
+
+### Changed
+
+- The record grid no longer uses `MultiColumnListView` (it rebuilt the whole list for every column added or removed, which could leave it half built when switching tables).
+- The bottom patch toolbar was replaced by the Patches tab.
+
+### Fixed
+
+- `InvalidCastException` when switching tables in the record grid.
+- Grid cells were 6px wider than their headers (default label margins), so the columns drifted to the right and frozen values were cut; frozen columns also lost 2px to the divider and rows could be offset by the default list item padding.
+- "Runtime cursors other than the default cursor need to be defined using a texture" warnings: the default theme's resize / text cursors are reset for the debugger UI.
+- Header items overlapped when the UI was scaled up: the header wraps and the version text is truncated; the language dropdown is wide enough for its choices; the saved patch list sizes to the panel and truncates long lines.
+
+## [0.3.1] - 2026-09-26
+
+### Changed
+
+- Database viewer layout: tables | record grid | record detail side by side, with draggable dividers (`TwoPaneSplitView`). The inspector field rows put the name, badges, original value and reference button above a full width editor; Apply / Revert / Reset / Copy JSON moved to the bottom of the detail panel.
+- Record grid: dark, readable column headers; a `●` state column; primary key members as their own `(PK)` columns; the `Display` column only when the project supplies display names; numbers right aligned; `NULL` for null values; grid lines, alternating rows and a clearer selection.
+
 ## [0.3.0] - 2026-09-26
 
 ### Added

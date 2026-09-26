@@ -7,6 +7,7 @@ namespace Nesh.MasterMemoryDebugger
     public sealed class MasterMemoryTableDescriptor
     {
         readonly Func<object, string> getDisplayName;
+        readonly bool customDisplayName;
 
         internal MasterMemoryTableDescriptor(
             string tableName,
@@ -15,7 +16,8 @@ namespace Nesh.MasterMemoryDebugger
             Type keyType,
             Func<IEnumerable<object>> getAllRecords,
             Func<object, object> getPrimaryKey,
-            Func<object, string> getDisplayName)
+            Func<object, string> getDisplayName,
+            bool customDisplayName = false)
         {
             if (string.IsNullOrEmpty(tableName)) throw new ArgumentException("Table name is required.", nameof(tableName));
             TableName = tableName;
@@ -25,6 +27,7 @@ namespace Nesh.MasterMemoryDebugger
             GetAllRecords = getAllRecords ?? throw new ArgumentNullException(nameof(getAllRecords));
             GetPrimaryKey = getPrimaryKey ?? throw new ArgumentNullException(nameof(getPrimaryKey));
             this.getDisplayName = getDisplayName;
+            this.customDisplayName = customDisplayName;
             TypeDescriptor = MasterDataReflectionCache.Get(recordType);
         }
 
@@ -47,6 +50,11 @@ namespace Nesh.MasterMemoryDebugger
         public MasterDataTypeDescriptor TypeDescriptor { get; }
 
         public bool HasDisplayName => getDisplayName != null || MasterMemoryDebugRegistry.HasDisplayNameOverride(RecordType);
+
+        /// <summary>
+        /// True when the project supplied the display name (RegisterTable / SetDisplayName); the default one only repeats a member.
+        /// </summary>
+        public bool HasCustomDisplayName => customDisplayName || MasterMemoryDebugRegistry.HasDisplayNameOverride(RecordType);
 
         public string GetDisplayName(object record)
         {

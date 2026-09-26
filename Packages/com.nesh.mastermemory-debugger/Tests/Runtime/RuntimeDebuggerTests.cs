@@ -35,7 +35,42 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var root = host.GetComponent<UIDocument>().rootVisualElement;
             Assert.IsNotNull(root.Q("mm-window"));
             Assert.IsNotNull(root.Q<TreeView>("mm-table-list"));
-            Assert.IsNotNull(root.Q<MultiColumnListView>("mm-record-list"));
+            Assert.IsNotNull(root.Q("mm-record-grid"));
+        }
+
+        /// <summary>Regression: rows of the previous table were bound to the columns of the new one (InvalidCastException).</summary>
+        [UnityTest]
+        public IEnumerator RecordList_SwitchingTables_ShouldNotBindRecordsOfThePreviousTable()
+        {
+            RuntimeMasterMemoryDebugger.Open();
+            yield return null;
+            var root = GameObject.Find(MasterMemoryDebuggerDocument.GameObjectName).GetComponent<UIDocument>().rootVisualElement;
+
+            var list = new VisualElement();
+            list.style.width = 600;
+            list.style.height = 300;
+            root.Add(list);
+            var controller = new MasterRecordListController(new TextField(), new Toggle(), list, new Label());
+            try
+            {
+                // any exception logged while the rows are bound fails the test
+                controller.SetTable(Table<TestSkill>());
+                yield return null;
+                yield return null;
+                controller.SetTable(Table<TestEnemyLevel>());
+                yield return null;
+                yield return null;
+                controller.SetTable(Table<TestSkill>());
+                yield return null;
+                yield return null;
+                Assert.AreEqual(3, controller.Rows.Count);
+                Assert.AreEqual("Id", controller.Columns[1].Key);
+            }
+            finally
+            {
+                controller.Dispose();
+                list.RemoveFromHierarchy();
+            }
         }
 
         [UnityTest]

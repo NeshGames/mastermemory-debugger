@@ -6,29 +6,34 @@ using UnityEngine.UIElements;
 namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
-    /// Search box, Modified Only filter and the virtualized record table
-    /// (Primary Key, Name, Mod, then one column per member; click a header to sort).
+    /// Search box, Modified Only filter and the record grid
+    /// (state ●, primary key members, a Display column when the project supplies display names, then one column per member).
+    /// Columns can be hidden, frozen, resized and sorted; the settings are kept per table for the play session.
     /// Results are rebuilt only when the query, the filter, the sorting, the table or the overrides change.
     /// </summary>
     internal sealed class MasterRecordListController : IDisposable
     {
-        const float RowHeight = 22f;
         const long SearchDelayMs = 150;
-        const string KeyColumn = "mm-key";
-        const string NameColumn = "mm-name";
-        const string ModifiedColumn = "mm-modified";
-        const string CellClass = "mm-debugger__cell";
+        internal const string KeyColumn = "mm-key";
+        internal const string NameColumn = "mm-name";
+        internal const string ModifiedColumn = "mm-modified";
         const string ModifiedCellClass = "mm-debugger__cell--modified";
+        const string NumberCellClass = "mm-debugger__cell--number";
+        const string NullCellClass = "mm-debugger__cell--null";
+        const string KeyCellClass = "mm-debugger__cell--key";
+        const string StateCellClass = "mm-debugger__cell--state";
 
         readonly TextField searchField;
         readonly Toggle modifiedOnlyToggle;
-        readonly MultiColumnListView listView;
+        readonly MasterRecordGrid grid;
+        readonly MasterGridColumnsPopup columnsPopup;
         readonly Label countLabel;
         readonly IVisualElementScheduledItem filterJob;
         readonly List<MasterMemoryRecordDescriptor> filtered = new List<MasterMemoryRecordDescriptor>();
 
         MasterMemoryTableDescriptor table;
         List<MasterMemoryRecordDescriptor> snapshot = new List<MasterMemoryRecordDescriptor>();
+        List<MasterGridColumn> columns = new List<MasterGridColumn>();
 
         public event Action<MasterMemoryRecordDescriptor> RecordSelected;
 
@@ -41,11 +46,20 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>Members of the shown table, used by the search conditions and their completion.</summary>
         public MasterDataTypeDescriptor TypeDescriptor => table?.TypeDescriptor;
 
-        public MasterRecordListController(TextField searchField, Toggle modifiedOnlyToggle, MultiColumnListView listView, Label countLabel)
+        /// <summary>Label of a field of the shown table in the selected language, or null.</summary>
+        public string FindFieldLabel(string fieldName) => table == null ? null : MasterMemoryDebugLocalization.FindFieldLabel(table, fieldName);
+
+        public bool IsColumnsPopupOpen => columnsPopup != null && columnsPopup.IsOpen;
+
+        internal IReadOnlyList<MasterGridColumn> Columns => columns;
+
+        internal IReadOnlyList<MasterMemoryRecordDescriptor> Rows => filtered;
+
+        public MasterRecordListController(TextField searchField, Toggle modifiedOnlyToggle, VisualElement gridHost, Label countLabel,
+            Button columnsButton = null, VisualElement columnsPopupElement = null)
         {
             this.searchField = searchField;
             this.modifiedOnlyToggle = modifiedOnlyToggle;
-            this.listView = listView;
             this.countLabel = countLabel;
 
             searchField.textEdition.placeholder = "Search text, or conditions like  Damage>100 Element=Fire Name~ice";
@@ -57,25 +71,31 @@ namespace Nesh.MasterMemoryDebugger
             searchField.RegisterValueChangedCallback(OnSearchChanged);
             modifiedOnlyToggle.RegisterValueChangedCallback(OnModifiedOnlyChanged);
 
-            listView.fixedItemHeight = RowHeight;
-            listView.selectionType = SelectionType.Single;
-            listView.showAlternatingRowBackgrounds = AlternatingRowBackground.ContentOnly;
-            listView.sortingMode = ColumnSortingMode.Custom;
-            listView.itemsSource = filtered;
-            listView.columnSortingChanged += OnSortingChanged;
-            listView.selectionChanged += OnSelectionChanged;
+            grid = new MasterRecordGrid(gridHost) { AutoFit = column => MasterGridLayout.AutoFit(column, snapshot) };
+            grid.ItemSelected += OnItemSelected;
+            grid.SortChanged += ApplyFilter;
+            grid.ColumnResized += SaveColumns;
 
-            filterJob = listView.schedule.Execute(ApplyFilter);
+            if (columnsButton != null && columnsPopupElement != null)
+            {
+                columnsPopup = new MasterGridColumnsPopup(columnsButton, columnsPopupElement, () => columns, OnColumnsChanged);
+            }
+
+            filterJob = gridHost.schedule.Execute(ApplyFilter);
             filterJob.Pause();
         }
 
         public void Dispose()
         {
             filterJob.Pause();
+            SaveColumns();
             searchField.UnregisterValueChangedCallback(OnSearchChanged);
             modifiedOnlyToggle.UnregisterValueChangedCallback(OnModifiedOnlyChanged);
-            listView.columnSortingChanged -= OnSortingChanged;
-            listView.selectionChanged -= OnSelectionChanged;
+            grid.ItemSelected -= OnItemSelected;
+            grid.SortChanged -= ApplyFilter;
+            grid.ColumnResized -= SaveColumns;
+            grid.Dispose();
+            columnsPopup?.Dispose();
         }
 
         public void SetState(string query, bool modifiedOnly)
@@ -84,15 +104,39 @@ namespace Nesh.MasterMemoryDebugger
             modifiedOnlyToggle.SetValueWithoutNotify(modifiedOnly);
         }
 
+        public void CloseColumnsPopup() => columnsPopup?.Close();
+
+        /// <summary>Recreates the column titles after the label language changed; visibility, freezing and widths are kept.</summary>
+        public void RefreshLabels()
+        {
+            if (table == null) return;
+            SaveColumns();
+            columns = CreateColumns(table);
+            MasterGridLayout.Restore(table.TableName, columns);
+            MasterGridLayout.AutoFit(columns, snapshot);
+            grid.SetContent(columns, filtered);
+            if (columnsPopup != null && columnsPopup.IsOpen) columnsPopup.Open();
+        }
+
         /// <summary>Takes a new snapshot of the table records, rebuilds the columns and the results.</summary>
         public void SetTable(MasterMemoryTableDescriptor newTable, object preferredKey = null)
         {
             var sameTable = newTable != null && table != null && newTable.RecordType == table.RecordType;
+            if (!sameTable) SaveColumns();
             table = newTable;
             snapshot = table != null ? table.CreateRecordSnapshot() : new List<MasterMemoryRecordDescriptor>();
             var keepKey = preferredKey ?? (sameTable && SelectedRecord != null ? SelectedRecord.PrimaryKey : null);
             SelectedRecord = null;
-            if (!sameTable) RebuildColumns();
+            if (!sameTable)
+            {
+                columnsPopup?.Close();
+                columns = CreateColumns(table);
+                MasterGridLayout.Restore(table?.TableName, columns);
+                MasterGridLayout.AutoFit(columns, snapshot);
+                // columns and rows change together: rows of the previous table are never bound to the new columns
+                filtered.Clear();
+                grid.SetContent(columns, filtered);
+            }
             ApplyFilter();
             if (keepKey != null) SelectByKey(keepKey);
         }
@@ -100,16 +144,16 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>Called when overrides changed: updates values and markers, re-filters when a filter depends on values.</summary>
         public void OnOverridesChanged()
         {
-            if (ModifiedOnly || !string.IsNullOrWhiteSpace(Query) || listView.sortedColumns.Any()) ApplyFilter();
-            else listView.RefreshItems();
+            if (ModifiedOnly || !string.IsNullOrWhiteSpace(Query) || grid.SortKey != null) ApplyFilter();
+            else grid.RefreshItems();
         }
 
         public bool SelectByKey(object key)
         {
             var index = filtered.FindIndex(x => Equals(x.PrimaryKey, key));
             if (index < 0) return false;
-            listView.SetSelectionWithoutNotify(new[] { index });
-            listView.ScrollToItem(index);
+            grid.SetSelectionWithoutNotify(index);
+            grid.ScrollToItem(index);
             if (filtered[index] != SelectedRecord)
             {
                 SelectedRecord = filtered[index];
@@ -122,63 +166,118 @@ namespace Nesh.MasterMemoryDebugger
         public void RestoreSelection(MasterMemoryRecordDescriptor record)
         {
             SelectedRecord = record;
-            var index = record == null ? -1 : filtered.IndexOf(record);
-            if (index >= 0) listView.SetSelectionWithoutNotify(new[] { index });
-            else listView.ClearSelection();
+            grid.SetSelectionWithoutNotify(record == null ? -1 : filtered.IndexOf(record));
+        }
+
+        void OnItemSelected(int index)
+        {
+            if (index < 0 || index >= filtered.Count) return;
+            var record = filtered[index];
+            if (record == SelectedRecord) return;
+            SelectedRecord = record;
+            RecordSelected?.Invoke(record);
         }
 
         // ------------------------------------------------------------------ columns
 
-        void RebuildColumns()
+        void OnColumnsChanged()
         {
-            listView.sortColumnDescriptions.Clear();
-            listView.columns.Clear();
-            if (table != null)
-            {
-                listView.columns.Add(CreateColumn(KeyColumn, "Primary Key", 130, (label, record) => label.text = record.KeyText));
-                listView.columns.Add(CreateColumn(NameColumn, "Name", 170, (label, record) => label.text = record.GetDisplayName() ?? string.Empty));
-                listView.columns.Add(CreateColumn(ModifiedColumn, "Mod", 42, (label, record) =>
-                {
-                    var modified = record.IsModified;
-                    label.text = modified ? "*" : string.Empty;
-                    label.EnableInClassList(ModifiedCellClass, modified);
-                }));
-
-                foreach (var field in table.TypeDescriptor.Fields)
-                {
-                    if (field.IsPrimaryKey) continue;
-                    var f = field;
-                    var column = CreateColumn(field.Name, field.Name, field.IsSimpleValue ? 110 : 160, (label, record) =>
-                    {
-                        var value = f.GetValue(record.Current);
-                        label.text = MasterDataValueUtility.Format(value);
-                        label.EnableInClassList(ModifiedCellClass, record.IsModified && !MasterDataValueUtility.AreEqual(value, f.GetValue(record.Original)));
-                    });
-                    column.title = field.IsSecondaryKey ? field.Name + " (SK)" : field.Name;
-                    listView.columns.Add(column);
-                }
-            }
-            listView.Rebuild();
+            grid.Relayout();
+            SaveColumns();
         }
 
-        Column CreateColumn(string name, string title, float width, Action<Label, MasterMemoryRecordDescriptor> bind)
+        void SaveColumns()
         {
-            return new Column
+            if (table != null) MasterGridLayout.Save(table.TableName, columns);
+        }
+
+        internal static List<MasterGridColumn> CreateColumns(MasterMemoryTableDescriptor table)
+        {
+            var result = new List<MasterGridColumn>();
+            if (table == null) return result;
+
+            // state gutter: ● for overridden records
+            result.Add(new MasterGridColumn(ModifiedColumn, "●", 26, (label, record) =>
             {
-                name = name,
-                title = title,
-                width = width,
-                minWidth = 30,
-                sortable = true,
-                stretchable = false,
-                makeCell = () =>
+                var modified = record.IsModified;
+                label.text = modified ? "●" : string.Empty;
+                label.EnableInClassList(ModifiedCellClass, modified);
+            })
+            {
+                Tooltip = "Overridden",
+                CellClass = StateCellClass,
+                Locked = true,
+                DefaultFrozen = true,
+                AutoWidth = false,
+            });
+
+            // primary key members first, like the columns of a database table; frozen by default
+            foreach (var field in table.TypeDescriptor.PrimaryKeyFields)
+            {
+                var column = CreateFieldColumn(table, field, " (PK)", KeyCellClass);
+                // the key identifies the row: always shown and frozen
+                column.Locked = column.DefaultFrozen = true;
+                result.Add(column);
+            }
+
+            // the default display name repeats a member; only a project supplied one gets its own column
+            if (table.HasCustomDisplayName)
+            {
+                result.Add(new MasterGridColumn(NameColumn, "Display", 170, (label, record) => label.text = record.GetDisplayName() ?? string.Empty)
                 {
-                    var label = new Label();
-                    label.AddToClassList(CellClass);
-                    return label;
+                    Text = record => record.GetDisplayName(),
+                });
+            }
+
+            foreach (var field in table.TypeDescriptor.Fields)
+            {
+                if (field.IsPrimaryKey) continue;
+                result.Add(CreateFieldColumn(table, field, field.IsSecondaryKey ? " (SK)" : string.Empty, null));
+            }
+            return result;
+        }
+
+        static MasterGridColumn CreateFieldColumn(MasterMemoryTableDescriptor table, MasterMemoryFieldDescriptor field, string suffix, string cellClass)
+        {
+            var isNumber = IsNumber(field.Kind);
+            var title = MasterMemoryDebugLocalization.GetFieldLabel(table, field) + suffix;
+            return new MasterGridColumn(field.Name, title, field.IsSimpleValue ? (isNumber ? 90 : 130) : 160, (label, record) =>
+            {
+                var value = field.GetValue(record.Current);
+                label.text = value == null ? "NULL" : MasterDataValueUtility.Format(value);
+                label.EnableInClassList(NullCellClass, value == null);
+                label.EnableInClassList(ModifiedCellClass, record.IsModified && !MasterDataValueUtility.AreEqual(value, field.GetValue(record.Original)));
+            })
+            {
+                Tooltip = MasterMemoryDebugLocalization.GetFieldTooltip(table, field),
+                Text = record =>
+                {
+                    var value = field.GetValue(record.Current);
+                    return value == null ? "NULL" : MasterDataValueUtility.Format(value);
                 },
-                bindCell = (element, index) => bind((Label)element, filtered[index]),
+                // numbers are right aligned, like in database viewers
+                CellClass = isNumber ? (cellClass == null ? NumberCellClass : cellClass + " " + NumberCellClass) : cellClass,
             };
+        }
+
+        static bool IsNumber(MasterDataValueKind kind)
+        {
+            switch (kind)
+            {
+                case MasterDataValueKind.Int32:
+                case MasterDataValueKind.UInt32:
+                case MasterDataValueKind.Int16:
+                case MasterDataValueKind.UInt16:
+                case MasterDataValueKind.Int64:
+                case MasterDataValueKind.UInt64:
+                case MasterDataValueKind.Byte:
+                case MasterDataValueKind.SByte:
+                case MasterDataValueKind.Single:
+                case MasterDataValueKind.Double:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         // ------------------------------------------------------------------ filter / sort
@@ -193,11 +292,6 @@ namespace Nesh.MasterMemoryDebugger
             ApplyFilter();
         }
 
-        void OnSortingChanged()
-        {
-            ApplyFilter();
-        }
-
         void ApplyFilter()
         {
             filterJob.Pause();
@@ -205,13 +299,10 @@ namespace Nesh.MasterMemoryDebugger
             var max = MasterMemoryDebuggerSettings.Current.MaxSearchResults;
 
             var matches = Filter(snapshot, query, ModifiedOnly, int.MaxValue, filtered);
-            Sort(filtered, table, listView.sortedColumns.FirstOrDefault());
+            if (grid.SortKey != null && table != null) SortBy(filtered, grid.SortKey, table, grid.SortDescending);
             if (filtered.Count > max) filtered.RemoveRange(max, filtered.Count - max);
-            listView.RefreshItems();
-
-            var selectedIndex = SelectedRecord == null ? -1 : filtered.IndexOf(SelectedRecord);
-            if (selectedIndex >= 0) listView.SetSelectionWithoutNotify(new[] { selectedIndex });
-            else listView.ClearSelection();
+            grid.RefreshItems();
+            grid.SetSelectionWithoutNotify(SelectedRecord == null ? -1 : filtered.IndexOf(SelectedRecord));
 
             UpdateCountLabel(query, matches, max);
         }
@@ -246,14 +337,7 @@ namespace Nesh.MasterMemoryDebugger
             return matches;
         }
 
-        /// <summary>Sorts by a column of the record table (stable; nulls first).</summary>
-        internal static void Sort(List<MasterMemoryRecordDescriptor> records, MasterMemoryTableDescriptor table, SortColumnDescription sort)
-        {
-            if (sort == null || table == null || records.Count < 2) return;
-            var descending = sort.direction == SortDirection.Descending;
-            SortBy(records, sort.columnName, table, descending);
-        }
-
+        /// <summary>Sorts by a column key (member name, or the state / display column); stable, nulls first.</summary>
         internal static void SortBy(List<MasterMemoryRecordDescriptor> records, string columnName, MasterMemoryTableDescriptor table, bool descending)
         {
             Func<MasterMemoryRecordDescriptor, object> selector;
@@ -300,14 +384,6 @@ namespace Nesh.MasterMemoryDebugger
                 }
             }
             return string.Compare(MasterDataValueUtility.Format(a), MasterDataValueUtility.Format(b), StringComparison.OrdinalIgnoreCase);
-        }
-
-        void OnSelectionChanged(IEnumerable<object> selection)
-        {
-            var record = selection.FirstOrDefault() as MasterMemoryRecordDescriptor;
-            if (record == null || record == SelectedRecord) return;
-            SelectedRecord = record;
-            RecordSelected?.Invoke(record);
         }
     }
 }
