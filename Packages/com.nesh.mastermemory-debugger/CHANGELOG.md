@@ -12,6 +12,16 @@ All notable changes to this package are documented in this file.
   - TCP with length prefixed frames; records as MessagePack (`MasterMemoryDebugRemote.SerializerOptions` for IL2CPP resolvers). Not on WebGL.
 - Header: Remote button (status colored) and dialog: addresses, port and pairing code in the game; address, port, code, Connect / Disconnect in the tool.
 - Sample: Start Remote Server option of `ExampleDebuggerLauncher`.
+- Tools > MasterMemory Debugger > Remote Editing: Create Example Game Scene, Create Remote Editor Tool Scene, and Build Remote Editor Tool… (a windowed Mono Development Build of the tool scene for this desktop, with its own product name; the project settings are restored after the build).
+
+### Changed
+
+- `MasterMemoryDebugRebuild.AutoRebuild`: when one validation takes more than a second, the database is no longer validated after every change (it froze the game on each edit); the Validation tab still validates on demand.
+- Sample: `ExampleLargeMaster` has no `IValidatable` any more. MasterMemory's `Validate()` compiles the `Exists()` expressions for every record, so its 50,000 records made every edit of the sample freeze for seconds.
+
+### Fixed
+
+- Remote editing: the sockets are closed when Play Mode ends or scripts reload in the Editor.
 
 ## [0.7.0] - 2026-09-26
 

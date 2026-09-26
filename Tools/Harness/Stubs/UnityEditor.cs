@@ -29,7 +29,7 @@ namespace UnityEditor
         public IEnumerable<string> keywords { get; set; }
     }
     public static class SettingsService { public static object OpenProjectSettings(string settingsPath = null) => null; }
-    public class SerializedObject { public SerializedObject(UnityEngine.Object obj) { } }
+    public class SerializedObject { public SerializedObject(UnityEngine.Object obj) { } public SerializedProperty FindProperty(string name) => null; public bool ApplyModifiedPropertiesWithoutUndo() => true; }
     public static class AssetDatabase
     {
         public static string[] FindAssets(string filter) => new string[0];
@@ -40,6 +40,7 @@ namespace UnityEditor
         public static bool IsValidFolder(string path) => false;
         public static string CreateFolder(string parent, string newFolderName) => "";
         public static string GetAssetPath(UnityEngine.Object o) => "";
+        public static void Refresh() { }
     }
     public static class EditorGUIUtility { public static void PingObject(UnityEngine.Object o) { } }
     public static class EditorUtility
@@ -48,8 +49,11 @@ namespace UnityEditor
         public static string SaveFilePanel(string title, string directory, string defaultName, string extension) => "";
         public static string OpenFilePanel(string title, string directory, string extension) => "";
         public static void RevealInFinder(string path) { }
+        public static string SaveFolderPanel(string title, string folder, string defaultName) => "";
     }
-    public static class EditorApplication { public static bool isPlaying => false; }
+    public enum PlayModeStateChange { EnteredEditMode, ExitingEditMode, EnteredPlayMode, ExitingPlayMode }
+    public static class EditorApplication { public static bool isPlaying => false; public static event Action<PlayModeStateChange> playModeStateChanged; }
+    public static class AssemblyReloadEvents { public delegate void AssemblyReloadCallback(); public static event AssemblyReloadCallback beforeAssemblyReload; }
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)] public sealed class MenuItem : Attribute
     {
         public MenuItem(string itemName) { }
@@ -77,10 +81,58 @@ namespace UnityEditor.Build
 }
 namespace UnityEditor.Build.Reporting
 {
-    public class BuildSummary { public UnityEditor.BuildOptions options => default; }
+    public enum BuildResult { Unknown, Succeeded, Failed, Cancelled }
+    public class BuildSummary { public UnityEditor.BuildOptions options => default; public BuildResult result => default; }
     public class BuildReport { public BuildSummary summary => null; }
 }
 namespace UnityEditor.UnityLinker
 {
     public class UnityLinkerBuildPipelineData { }
+}
+namespace UnityEngine
+{
+    public enum FullScreenMode { ExclusiveFullScreen, FullScreenWindow, MaximizedWindow, Windowed }
+}
+namespace UnityEngine.SceneManagement
+{
+    public struct Scene { }
+}
+namespace UnityEditor
+{
+    public enum BuildTarget { StandaloneOSX = 2, StandaloneWindows64 = 19, StandaloneLinux64 = 24 }
+    public enum ScriptingImplementation { Mono2x = 0, IL2CPP = 1 }
+    public struct BuildPlayerOptions
+    {
+        public string[] scenes { get; set; }
+        public string locationPathName { get; set; }
+        public BuildTarget target { get; set; }
+        public BuildOptions options { get; set; }
+    }
+    public static class BuildPipeline { public static UnityEditor.Build.Reporting.BuildReport BuildPlayer(BuildPlayerOptions options) => null; }
+    public static class PlayerSettings
+    {
+        public static string productName { get; set; }
+        public static UnityEngine.FullScreenMode fullScreenMode { get; set; }
+        public static int defaultScreenWidth { get; set; }
+        public static int defaultScreenHeight { get; set; }
+        public static bool resizableWindow { get; set; }
+        public static ScriptingImplementation GetScriptingBackend(UnityEditor.Build.NamedBuildTarget target) => default;
+        public static void SetScriptingBackend(UnityEditor.Build.NamedBuildTarget target, ScriptingImplementation backend) { }
+    }
+    public class SerializedProperty { public bool boolValue { get; set; } }
+}
+namespace UnityEditor.Build
+{
+    public struct NamedBuildTarget { public static readonly NamedBuildTarget Standalone = default; }
+}
+namespace UnityEditor.SceneManagement
+{
+    public enum NewSceneSetup { EmptyScene, DefaultGameObjects }
+    public enum NewSceneMode { Single, Additive }
+    public static class EditorSceneManager
+    {
+        public static UnityEngine.SceneManagement.Scene NewScene(NewSceneSetup setup, NewSceneMode mode) => default;
+        public static bool SaveScene(UnityEngine.SceneManagement.Scene scene, string path) => true;
+        public static bool SaveCurrentModifiedScenesIfUserWantsTo() => true;
+    }
 }

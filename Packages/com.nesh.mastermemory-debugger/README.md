@@ -226,6 +226,8 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 - **驗證**：如果 Record 有實作 MasterMemory 的 `IValidatable<T>`，每次重建後會執行 `Validate()`，
   並把「原始資料沒有、Override 之後才出現」的失敗寫進 Log（例如把 `StartSkillId` 改成不存在的 99），
   所有失敗也會列在 Debugger 的 **Validation** 頁籤（見下方）。可用 `validate: false` 關閉。
+- MasterMemory 的 `Validate()` 會為每一筆 Record 重新編譯 `Exists()` 的運算式並掃描整張被參照的表，大表（數萬筆）可能要好幾秒。
+  一次驗證超過 1 秒時，AutoRebuild 會停止「每次修改後驗證」並在 Log 說明，之後請用 Validation 頁籤的 **Validate** 按鈕手動驗證。
 - 只想重建一次：`var db = MasterMemoryDebugRebuild.Apply(originalDatabase);`
 - 正式版 Build 中 `AutoRebuild` 只會呼叫一次 `apply(originalDatabase)`，不會訂閱任何事件。
 
@@ -441,9 +443,18 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
 
 ### 2. 工具端：用專案 build 一個 exe
 
-1. 建立一個空的 Scene，加一個 GameObject，掛上 **MasterMemoryRemoteEditor** 元件（Add Component → MasterMemory Debugger → Remote Editor）。
-2. Build Settings 只勾這個 Scene，平台選 Windows（或 macOS），勾選 **Development Build**，Build。
-3. 執行 exe → 出現連線對話框 → 輸入遊戲的 IP、Port、配對碼 → **Connect**。
+選單 **Tools > MasterMemory Debugger > Remote Editing**：
+
+| 選單 | 內容 |
+| --- | --- |
+| Create Example Game Scene | 建立 `Assets/MasterMemoryDebugger/MasterMemoryExampleGame.unity`（需先匯入 Basic Example）：掛好 `ExampleDebuggerLauncher` 並勾選 Start Remote Server，按 Play 即可 |
+| Create Remote Editor Tool Scene | 建立 `Assets/MasterMemoryDebugger/MasterMemoryRemoteEditor.unity`：只有 `MasterMemoryRemoteEditor` 元件。在 Editor 按 Play 就是工具 |
+| Build Remote Editor Tool… | 選擇輸出資料夾，把工具 Scene build 成這台電腦的桌面版（Windows / macOS）Development Build。Build 時暫時使用視窗模式、Mono、獨立的 Product Name（工具的 PlayerPrefs / Patch 和遊戲分開），完成後還原專案設定 |
+
+執行 exe → 出現連線對話框 → 輸入遊戲的 IP、Port、配對碼 → **Connect**。
+手動設定也可以：空 Scene 掛上 **MasterMemoryRemoteEditor**（Add Component → MasterMemory Debugger → Remote Editor），只 build 這個 Scene，勾選 **Development Build**。
+
+同一台電腦試用：Create Example Game Scene → Play（Console 有配對碼）→ 執行 Build 出來的工具 → 連 `127.0.0.1`。
 
 - 工具只執行這個 Scene，遊戲本身的邏輯不會跑；它只需要專案的 Record 型別（所以要從**同一個版本**的專案 build）。
   主資料的類別改了之後請重新 build 工具（可以放進 CI 和遊戲一起 build）。
@@ -459,6 +470,8 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
 - 資料以 MessagePack 傳送（MasterMemory 本來就依賴 MessagePack，不增加套件）。IL2CPP 的遊戲請把載入 MemoryDatabase 時用的 options 設給
   `MasterMemoryDebugRemote.SerializerOptions`（含 MasterMemory / 專案的 resolver），工具端也設定相同的 options。
 - 通訊內容沒有加密，請在開發用的網路使用。
+- 在 Editor 結束 Play Mode 或重新編譯時，連線會自動關閉。
+- 工具送來的修改會觸發遊戲端的 `AutoRebuild` 驗證；驗證很慢時請看下方「重建 Gameplay Database」的說明。
 
 ## Patch Save / Load / Export
 

@@ -165,8 +165,24 @@ namespace Nesh.MasterMemoryDebugger
             s_peer = peer;
             peer.Changed += RaiseChanged;
             if (Application.isPlaying && s_runner == null) s_runner = MasterMemoryRemoteRunner.Create();
+#if UNITY_EDITOR
+            // sockets and their threads must be closed before Play Mode ends or scripts reload, or the Editor waits for them
+            if (!s_editorHooks)
+            {
+                s_editorHooks = true;
+                UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += Stop;
+                UnityEditor.EditorApplication.playModeStateChanged += state =>
+                {
+                    if (state == UnityEditor.PlayModeStateChange.ExitingPlayMode) Stop();
+                };
+            }
+#endif
             RaiseChanged();
         }
+
+#if UNITY_EDITOR
+        static bool s_editorHooks;
+#endif
 
         static void RaiseChanged() => Changed?.Invoke();
 

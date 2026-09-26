@@ -25,8 +25,9 @@ and Play Mode) as well.
 
 ## Remote editing
 
-- [ ] Sample with Start Remote Server: Remote dialog shows the addresses, port and pairing code.
-- [ ] Tool (a scene with MasterMemoryRemoteEditor, Play Mode or a Windows Development Build): connect with the code →
+- [ ] Tools > MasterMemory Debugger > Remote Editing > Create Example Game Scene → Play: the Remote dialog shows the
+      addresses, port and pairing code.
+- [ ] Build Remote Editor Tool… → run it, connect with the code →
       the tables appear; an edit in the tool changes the game (Console log of the sample) and an edit in the game shows
       in the tool; a wrong code is refused.
 
