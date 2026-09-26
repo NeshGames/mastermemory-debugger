@@ -48,7 +48,7 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         public bool IsPassive { get; init; }
         public int? UnlockLevel { get; init; }
 
-        // complex members are shown read-only
+        // arrays / Lists of simple values are edited element by element (a new array is created on every change)
         public int[] EffectIds { get; init; }
     }
 

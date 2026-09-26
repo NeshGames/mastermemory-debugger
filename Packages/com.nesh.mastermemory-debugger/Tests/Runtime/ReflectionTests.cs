@@ -81,13 +81,31 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.IsTrue(unlock.CanEdit);
         }
 
+        sealed class ComplexItem
+        {
+            public System.Collections.Generic.Dictionary<string, int> Map { get; set; }
+            public ComplexItem Child { get; set; }
+        }
+
         [Test]
-        public void ComplexField_ShouldBeReadonly()
+        public void ListOfSimpleValues_ShouldBeEditable()
         {
             var tags = Field<TestSkill>("Tags");
             Assert.AreEqual(MasterDataValueKind.Complex, tags.Kind);
-            Assert.IsFalse(tags.CanEdit);
+            Assert.IsTrue(tags.IsList);
+            Assert.IsTrue(tags.CanEdit);
             Assert.AreEqual("[2] 1, 2", MasterDataValueUtility.Format(tags.GetValue(Database.TestSkillTable.FindById(1001))));
+        }
+
+        [Test]
+        public void OtherComplexFields_ShouldBeReadonly()
+        {
+            foreach (var field in MasterDataReflectionCache.Get<ComplexItem>().Fields)
+            {
+                Assert.AreEqual(MasterDataValueKind.Complex, field.Kind, field.Name);
+                Assert.IsFalse(field.IsList, field.Name);
+                Assert.IsFalse(field.CanEdit, field.Name);
+            }
         }
 
         [Test]

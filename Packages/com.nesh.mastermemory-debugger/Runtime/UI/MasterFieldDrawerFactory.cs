@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -13,6 +15,9 @@ namespace Nesh.MasterMemoryDebugger
         public const string EditorClass = "mm-debugger__field-editor";
         public const string ReadOnlyClass = "mm-debugger__field-readonly";
         public const string InvalidClass = "mm-debugger__field-editor--invalid";
+
+        /// <summary>Longer lists are shown read-only.</summary>
+        public const int MaxEditableListItems = 200;
 
         /// <summary>Read-only view of any value: text, or a foldout tree for arrays / lists / nested objects.</summary>
         public static VisualElement CreateReadOnly(object value)
@@ -30,10 +35,93 @@ namespace Nesh.MasterMemoryDebugger
         public static VisualElement CreateEditor(MasterMemoryFieldDescriptor field, object value, Action<object> onChanged)
         {
             if (!field.CanEdit) return CreateReadOnly(value);
+            if (field.IsList) return CreateListEditor(field, (IList)value, onChanged);
             if (field.IsNullable) return CreateNullableEditor(field, value, onChanged);
 
             var editor = CreateValueEditor(field.Kind, field.ValueType, value, onChanged);
             return editor ?? CreateReadOnly(value);
+        }
+
+        /// <summary>
+        /// Foldout with one editor per element, remove buttons and Add. The list shown by the record is never modified:
+        /// every change passes a new array / List to <paramref name="onChanged"/>.
+        /// </summary>
+        static VisualElement CreateListEditor(MasterMemoryFieldDescriptor field, IList value, Action<object> onChanged)
+        {
+            if (value != null && value.Count > MaxEditableListItems)
+            {
+                var readOnly = CreateReadOnly(value);
+                readOnly.tooltip = $"Lists with more than {MaxEditableListItems} items are read-only.";
+                return readOnly;
+            }
+
+            var items = new List<object>();
+            if (value != null)
+            {
+                foreach (var item in value) items.Add(item);
+            }
+
+            var foldout = new Foldout { value = items.Count <= 10 };
+            foldout.AddToClassList("mm-debugger__list-editor");
+            var body = new VisualElement();
+            body.AddToClassList("mm-debugger__list-items");
+            var addButton = new Button { text = "+ Add", tooltip = "Append an element" };
+            addButton.AddToClassList("mm-debugger__button");
+            addButton.AddToClassList("mm-debugger__list-add");
+
+            void Publish()
+            {
+                foldout.text = $"[{items.Count}]";
+                onChanged(MasterDataValueUtility.CreateList(field.FieldType, field.ElementType, items));
+            }
+
+            void Rebuild()
+            {
+                body.Clear();
+                foldout.text = $"[{items.Count}]";
+                for (var i = 0; i < items.Count; i++)
+                {
+                    var index = i;
+                    var row = new VisualElement();
+                    row.AddToClassList("mm-debugger__list-item");
+                    var indexLabel = new Label(index.ToString());
+                    indexLabel.AddToClassList("mm-debugger__list-index");
+                    row.Add(indexLabel);
+
+                    var editor = CreateValueEditor(field.ElementKind, field.ElementType, items[index], newValue =>
+                    {
+                        items[index] = newValue;
+                        Publish();
+                    }) ?? CreateReadOnly(items[index]);
+                    editor.AddToClassList("mm-debugger__list-value");
+                    row.Add(editor);
+
+                    var remove = new Button(() =>
+                    {
+                        items.RemoveAt(index);
+                        Rebuild();
+                        Publish();
+                    })
+                    { text = "✕", tooltip = "Remove this element" };
+                    remove.AddToClassList("mm-debugger__button");
+                    remove.AddToClassList("mm-debugger__list-remove");
+                    row.Add(remove);
+                    body.Add(row);
+                }
+                body.Add(addButton);
+            }
+
+            addButton.clicked += () =>
+            {
+                // repeat the last element: lists usually hold similar values
+                items.Add(items.Count > 0 ? items[items.Count - 1] : MasterDataValueUtility.CreateDefaultElement(field.ElementType));
+                Rebuild();
+                Publish();
+            };
+
+            Rebuild();
+            foldout.Add(body);
+            return foldout;
         }
 
         static VisualElement CreateNullableEditor(MasterMemoryFieldDescriptor field, object value, Action<object> onChanged)

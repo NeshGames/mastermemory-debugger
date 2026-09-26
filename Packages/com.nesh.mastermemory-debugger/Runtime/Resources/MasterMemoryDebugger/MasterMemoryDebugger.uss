@@ -362,6 +362,42 @@
     -unity-font-style: bold;
 }
 
+/* array / List editor: one row per element, copied on every change */
+.mm-debugger__list-editor {
+    flex-grow: 1;
+}
+
+.mm-debugger__list-item {
+    flex-direction: row;
+    align-items: center;
+    margin: 1px 0;
+}
+
+.mm-debugger .mm-debugger__list-index {
+    width: 28px;
+    flex-shrink: 0;
+    color: rgb(150, 157, 171);
+    font-size: 11px;
+    -unity-text-align: middle-right;
+    margin-right: 6px;
+}
+
+.mm-debugger__list-value {
+    flex-grow: 1;
+}
+
+.mm-debugger__list-remove {
+    flex-shrink: 0;
+    min-width: 22px;
+    padding: 0 4px;
+    margin-left: 4px;
+}
+
+.mm-debugger__list-add {
+    align-self: flex-start;
+    margin: 2px 0 2px 34px;
+}
+
 /* jump to the record referenced by this field (MasterMemory Validate Exists) */
 .mm-debugger__reference-button {
     flex-shrink: 0;
