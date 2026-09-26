@@ -38,6 +38,9 @@ namespace Nesh.MasterMemoryDebugger
 
         public bool ModifiedOnly => modifiedOnlyToggle.value;
 
+        /// <summary>Members of the shown table, used by the search conditions and their completion.</summary>
+        public MasterDataTypeDescriptor TypeDescriptor => table?.TypeDescriptor;
+
         public MasterRecordListController(TextField searchField, Toggle modifiedOnlyToggle, MultiColumnListView listView, Label countLabel)
         {
             this.searchField = searchField;
@@ -45,11 +48,12 @@ namespace Nesh.MasterMemoryDebugger
             this.listView = listView;
             this.countLabel = countLabel;
 
-            searchField.textEdition.placeholder = "Search text, or conditions like  Damage>100 Element=Fire Name~ice";
+            searchField.textEdition.placeholder = "Search text, or conditions like  Damage>100 Element=Fire Name~ice  (Tab completes)";
             searchField.tooltip =
                 "Space separated terms, all must match.\n" +
                 "Text: primary key / name / string members (contains).\n" +
-                "Field op Value with = != > >= < <= ~ (contains). Quote values with spaces: Name=\"Ice Blast\". Field=null matches null.";
+                "Field op Value with = != > >= < <= ~ (contains). Quote values with spaces: Name=\"Ice Blast\". Field=null matches null.\n" +
+                "Tab completes field names, and enum / bool values after an operator. Tab again cycles, Shift+Tab goes back.";
             searchField.RegisterValueChangedCallback(OnSearchChanged);
             modifiedOnlyToggle.RegisterValueChangedCallback(OnModifiedOnlyChanged);
 

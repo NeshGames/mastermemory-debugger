@@ -246,6 +246,13 @@ Package 本身永遠不會重建或替換 database。完整範例見 `Samples~/B
 欄位名稱不分大小寫；比較的是目前值（有 Override 時用 Override）。欄位不存在或值格式錯誤時，筆數旁會顯示警告並忽略該條件。
 只在查詢、Table、排序、Override 變更時重新計算（輸入時有 150ms debounce）。
 
+**Tab 自動完成**：輸入時搜尋框下方會浮出候選清單。
+
+- 欄位名稱：`da` + Tab → `Damage`；多個候選時先補到共同字首，再按 Tab 依序切換，Shift+Tab 反向。沒有開頭符合的欄位時，改用「包含」比對（`mag` → `Damage`）。
+- 運算子後的值：enum 名稱與 `true` / `false`（`Element=f` + Tab → `Element=Fire`；Flags 可用 `|` 連接：`Flags=Boss|Fl` → `Flags=Boss|Flying`）。
+- 欄位名稱打完整時，提示會列出可用的運算子。
+- 焦點在搜尋框時，Tab 不會跳到下一個控制項。
+
 ### Inspector
 
 - 列出所有 public property / field：

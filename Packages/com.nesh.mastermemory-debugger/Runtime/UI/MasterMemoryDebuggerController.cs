@@ -15,7 +15,7 @@ namespace Nesh.MasterMemoryDebugger
         internal static readonly string[] RequiredElementNames =
         {
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
-            "mm-table-list", "mm-search", "mm-modified-only", "mm-record-list", "mm-record-count",
+            "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-hint", "mm-modified-only", "mm-record-list", "mm-record-count",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json",
             "mm-close", "mm-patch-list", "mm-patch-name", "mm-save-patch", "mm-load-patch", "mm-delete-patch", "mm-import-patch",
             "mm-export-patch", "mm-open-folder", "mm-reset-all",
@@ -48,6 +48,7 @@ namespace Nesh.MasterMemoryDebugger
         MasterMemoryTableDescriptor shownTable;
         readonly MasterTableListController tableList;
         readonly MasterRecordListController recordList;
+        readonly MasterSearchCompletionController searchCompletion;
         readonly MasterRecordEditorController editor;
         readonly MasterMemoryDebuggerDialog dialog;
         readonly Label statusLabel;
@@ -84,6 +85,11 @@ namespace Nesh.MasterMemoryDebugger
                 Required<Toggle>(root, "mm-modified-only"),
                 Required<MultiColumnListView>(root, "mm-record-list"),
                 Required<Label>(root, "mm-record-count"));
+            searchCompletion = new MasterSearchCompletionController(
+                Required<TextField>(root, "mm-search"),
+                Required<Label>(root, "mm-search-hint"),
+                Required<VisualElement>(root, "mm-search-toolbar"),
+                () => recordList.TypeDescriptor);
             editor = new MasterRecordEditorController(
                 Required<Label>(root, "mm-inspector-title"),
                 Required<Label>(root, "mm-record-state"),
@@ -176,6 +182,7 @@ namespace Nesh.MasterMemoryDebugger
 
             tableList.Dispose();
             recordList.Dispose();
+            searchCompletion.Dispose();
             editor.Dispose();
         }
 
@@ -198,6 +205,7 @@ namespace Nesh.MasterMemoryDebugger
             shownTable = table;
             editor.Show(null);
             recordList.SetTable(table);
+            searchCompletion.Refresh();
         }
 
         void OnRecordSelected(MasterMemoryRecordDescriptor record)

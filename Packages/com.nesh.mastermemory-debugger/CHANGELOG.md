@@ -8,6 +8,7 @@ All notable changes to this package are documented in this file.
 
 - Record table: `MultiColumnListView` with a column per member, sortable headers (sorting covers every match before the result limit) and highlighted overridden cells.
 - Search conditions: space separated terms combined with AND, `Field op Value` with `= != > >= < <= ~`, quoted values, `null`; invalid terms are reported and ignored (`MasterRecordQuery`).
+- Tab completion in the search box: field names, and enum / bool values after an operator; common prefix first, then Tab / Shift+Tab cycles; candidates shown under the search box.
 - Changes view (header button): every overridden record with its changed fields, Open / Reset, overrides without an original record or table flagged (`MasterMemoryChangeSummary`).
 - Read-only foldout tree for arrays, lists, dictionaries and nested objects in the inspector.
 - Copy JSON of a record (clipboard; WebGL download) (`MasterDataRecordJson`).

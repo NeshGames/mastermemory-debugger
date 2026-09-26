@@ -241,6 +241,23 @@
     margin: 4px 4px 0 4px;
 }
 
+/* Tab completion candidates, floating under the search box (top / left set in code) */
+.mm-debugger__search-hint {
+    position: absolute;
+    max-width: 90%;
+    padding: 3px 8px;
+    background-color: rgb(40, 44, 53);
+    border-width: 1px;
+    border-color: rgb(84, 92, 110);
+    border-radius: 3px;
+    font-size: 11px;
+    white-space: normal;
+}
+
+.mm-debugger .mm-debugger__search-hint {
+    color: rgb(190, 200, 215);
+}
+
 /* ------------------------------------------------------------------ inspector */
 
 .mm-debugger__inspector-panel {
