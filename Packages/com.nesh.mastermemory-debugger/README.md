@@ -460,6 +460,8 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
 
 ## Remote Editing（遠端編輯實機）
 
+第一次使用可先看 [Remote Editor Build 完整操作教學](REMOTE_EDITOR_GUIDE.md)：從範例試用、遊戲與工具建置、連線，到各功能操作與常見問題。
+
 用一個 **桌面版的工具 exe**（從同一個專案 build）連到正在執行的遊戲（Development Build：Windows / macOS / Android / iOS），
 用完整的 Debugger UI 瀏覽和修改遊戲裡的主資料。修改會立刻套用到遊戲，遊戲端的修改也會同步回工具（雙向）。
 

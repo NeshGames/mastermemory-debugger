@@ -33,7 +33,7 @@ Everything runs only in the Editor and in Development Builds; release builds con
 
    `#v0.11.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
 
-See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for usage.
+See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for usage, or follow the [Remote Editor Build guide](Packages/com.nesh.mastermemory-debugger/REMOTE_EDITOR_GUIDE.md) to build and use the desktop tool.
 
 ## Develop the package in this repository
 
