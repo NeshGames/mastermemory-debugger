@@ -13,8 +13,8 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     internal static class MasterMemoryRemoteProtocol
     {
-        /// <summary>2: validation messages. 3: deleted records.</summary>
-        public const int Version = 3;
+        /// <summary>2: validation messages. 3: deleted records. 4: remote operations.</summary>
+        public const int Version = 4;
         public const int MaxFrameBytes = 512 * 1024 * 1024;
 
         public enum MessageType : byte
@@ -33,6 +33,37 @@ namespace Nesh.MasterMemoryDebugger
             ValidateRequest = 6,
             /// <summary>Server → client: every failure of the game's Validate().</summary>
             ValidateResult = 7,
+            /// <summary>Server → client: available game operations and their current context.</summary>
+            Operations = 8,
+            /// <summary>Client → server: invoke one operation against the context shown by the game.</summary>
+            OperationRequest = 9,
+            /// <summary>Server → client: one request's outcome.</summary>
+            OperationResult = 10,
+        }
+
+        public sealed class Operation
+        {
+            public string Id;
+            public string Label;
+            public string Context;
+            public int Revision;
+        }
+
+        public sealed class OperationRequest
+        {
+            public string RequestId;
+            public string OperationId;
+            public string Context;
+            public int Revision;
+        }
+
+        public sealed class OperationResult
+        {
+            public string RequestId;
+            public byte Status;
+            public string Message;
+            public string OldSha;
+            public string NewSha;
         }
 
         public sealed class ValidationState
@@ -72,10 +103,12 @@ namespace Nesh.MasterMemoryDebugger
         public sealed class Welcome
         {
             public int Version;
+            public string ServerEpoch;
             public string MasterVersion;
             public string LabelsTsv;
             public List<Table> Tables = new List<Table>();
             public List<Change> Overrides = new List<Change>();
+            public List<Operation> Operations = new List<Operation>();
         }
 
         public enum ChangeKind : byte
@@ -116,6 +149,7 @@ namespace Nesh.MasterMemoryDebugger
         public static byte[] Encode(Welcome message) => Write(MessageType.Welcome, w =>
         {
             w.Write(message.Version);
+            w.Write(message.ServerEpoch ?? string.Empty);
             w.Write(message.MasterVersion ?? string.Empty);
             w.Write(message.LabelsTsv ?? string.Empty);
             w.Write(message.Tables.Count);
@@ -136,6 +170,7 @@ namespace Nesh.MasterMemoryDebugger
                 }
             }
             WriteChanges(w, message.Overrides);
+            WriteOperations(w, message.Operations);
         });
 
         public static byte[] EncodeReject(string reason) => Write(MessageType.Reject, w => w.Write(reason ?? string.Empty));
@@ -160,6 +195,26 @@ namespace Nesh.MasterMemoryDebugger
                 w.Write(failure.Message ?? string.Empty);
                 w.Write(failure.IsNew);
             }
+        });
+
+        public static byte[] EncodeOperations(List<Operation> operations) => Write(MessageType.Operations, w =>
+            WriteOperations(w, operations));
+
+        public static byte[] Encode(OperationRequest request) => Write(MessageType.OperationRequest, w =>
+        {
+            w.Write(request.RequestId ?? string.Empty);
+            w.Write(request.OperationId ?? string.Empty);
+            w.Write(request.Context ?? string.Empty);
+            w.Write(request.Revision);
+        });
+
+        public static byte[] Encode(OperationResult result) => Write(MessageType.OperationResult, w =>
+        {
+            w.Write(result.RequestId ?? string.Empty);
+            w.Write(result.Status);
+            w.Write(result.Message ?? string.Empty);
+            w.Write(result.OldSha ?? string.Empty);
+            w.Write(result.NewSha ?? string.Empty);
         });
 
         // ------------------------------------------------------------------ decode
@@ -187,9 +242,15 @@ namespace Nesh.MasterMemoryDebugger
             return failures;
         });
 
+        public static List<Operation> DecodeOperations(byte[] payload) => Read(payload, MessageType.Operations, ReadOperations);
+        public static OperationRequest DecodeOperationRequest(byte[] payload) => Read(payload, MessageType.OperationRequest, r =>
+            new OperationRequest { RequestId = r.ReadString(), OperationId = r.ReadString(), Context = r.ReadString(), Revision = r.ReadInt32() });
+        public static OperationResult DecodeOperationResult(byte[] payload) => Read(payload, MessageType.OperationResult, r =>
+            new OperationResult { RequestId = r.ReadString(), Status = r.ReadByte(), Message = r.ReadString(), OldSha = r.ReadString(), NewSha = r.ReadString() });
+
         public static Welcome DecodeWelcome(byte[] payload) => Read(payload, MessageType.Welcome, r =>
         {
-            var message = new Welcome { Version = r.ReadInt32(), MasterVersion = r.ReadString(), LabelsTsv = r.ReadString() };
+            var message = new Welcome { Version = r.ReadInt32(), ServerEpoch = r.ReadString(), MasterVersion = r.ReadString(), LabelsTsv = r.ReadString() };
             var tableCount = ReadCount(r);
             for (var i = 0; i < tableCount; i++)
             {
@@ -212,6 +273,7 @@ namespace Nesh.MasterMemoryDebugger
                 message.Tables.Add(table);
             }
             message.Overrides = ReadChanges(r);
+            message.Operations = ReadOperations(r);
             return message;
         });
 
@@ -301,6 +363,29 @@ namespace Nesh.MasterMemoryDebugger
                 changes.Add(new Change { Kind = kind, TableName = r.ReadString(), Record = ReadBytes(r) });
             }
             return changes;
+        }
+
+        static void WriteOperations(BinaryWriter w, List<Operation> operations)
+        {
+            w.Write(operations.Count);
+            foreach (var operation in operations)
+            {
+                w.Write(operation.Id ?? string.Empty);
+                w.Write(operation.Label ?? string.Empty);
+                w.Write(operation.Context ?? string.Empty);
+                w.Write(operation.Revision);
+            }
+        }
+
+        static List<Operation> ReadOperations(BinaryReader r)
+        {
+            var count = ReadCount(r);
+            var operations = new List<Operation>(count);
+            for (var i = 0; i < count; i++) operations.Add(new Operation
+            {
+                Id = r.ReadString(), Label = r.ReadString(), Context = r.ReadString(), Revision = r.ReadInt32(),
+            });
+            return operations;
         }
 
         static void WriteBytes(BinaryWriter w, byte[] bytes)

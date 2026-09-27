@@ -44,6 +44,9 @@ and Play Mode) as well.
 - [ ] Tool: fills the window, no Close; the Validation tab shows the game's failures and Open jumps to the record.
 - [ ] Tool: "Games on the network" lists the running game; stop and restart the game's Play Mode → the tool reconnects
       by itself (fixed Remote Pairing Code); a wrong code is not retried.
+- [ ] With a game operation registered, the tool's Remote dialog lists it; click once and see its result and old/new
+      fingerprints. Change its target or candidate revision before clicking an older list item: the game rejects the stale
+      request. Leaving the owner removes the operation from the tool.
 
 ## Builds
 

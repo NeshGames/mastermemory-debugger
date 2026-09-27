@@ -147,6 +147,12 @@ namespace Nesh.MasterMemoryDebugger
                     case MasterMemoryRemoteProtocol.MessageType.ValidateResult:
                         validation.OnResult(MasterMemoryRemoteProtocol.DecodeValidateResult(payload));
                         break;
+                    case MasterMemoryRemoteProtocol.MessageType.Operations:
+                        MasterMemoryDebugRemote.ReceiveOperations(MasterMemoryRemoteProtocol.DecodeOperations(payload));
+                        break;
+                    case MasterMemoryRemoteProtocol.MessageType.OperationResult:
+                        MasterMemoryDebugRemote.ReceiveOperationResult(MasterMemoryRemoteProtocol.DecodeOperationResult(payload));
+                        break;
                 }
             }
             catch (Exception e)
@@ -197,6 +203,8 @@ namespace Nesh.MasterMemoryDebugger
 
             StartSyncing();
             ApplyRemote(welcome.Overrides, replaceAll: true);
+            MasterMemoryDebugRemote.ReceiveOperations(welcome.Operations, welcome.ServerEpoch);
+            MasterMemoryDebugRemote.ResendPending(this);
             MasterMemoryDebugHistory.Clear();
             MasterMemoryDebugValidation.Add(validation);
 
@@ -211,6 +219,9 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         void RequestValidation() => Connection?.Send(MasterMemoryRemoteProtocol.EncodeValidateRequest());
+
+        internal void SendOperation(MasterMemoryRemoteProtocol.OperationRequest request) =>
+            Connection?.Send(MasterMemoryRemoteProtocol.Encode(request));
 
         /// <summary>
         /// The Validation tab of the tool shows the game's Validate() results: the game pushes whether it validates and the

@@ -61,10 +61,10 @@ IL2CPP 還需要把產生的 `MasterMemoryResolver` 註冊到 MessagePack（參�
 Package Manager → `+` → **Add package from git URL...**
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.10.1
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.11.0
    ```
 
-   URL 最後的 `#v0.10.1` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
+   URL 最後的 `#v0.11.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
 
 Runtime assembly (`Nesh.MasterMemoryDebugger.Runtime`) 會自動參考 NuGetForUnity 安裝的 `MasterMemory.dll`。
 
@@ -507,6 +507,22 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
   **Validation** 分頁會請遊戲端執行 `Validate()` 並顯示結果（Open 跳到工具中的該筆 Record）；頁籤標題的 `(N new)` 由遊戲端即時更新。
   遊戲端需要使用 `AutoRebuild`（validate: true）。
 - 工具的 Debugger 佔滿整個視窗，沒有 Close（Esc / F8 不會關閉）。
+- 遊戲可在進入特定情境時登記自訂操作；工具的 Remote 對話框會顯示按鈕，按下後由遊戲主執行緒執行並回傳結果。離開情境時釋放登記 token：
+
+  ```csharp
+  IDisposable registration = MasterMemoryDebugRemote.RegisterOperation(
+      "battle.refresh", "Refresh battle",
+      () => currentBattleIdentity, () => candidateRevision,
+      () => new MasterMemoryRemoteOperationResult
+      {
+          Status = MasterMemoryRemoteOperationStatus.Success,
+          Message = "Applied", OldSha = previousSha, NewSha = currentSha,
+      });
+  // 候選版號或目標身分變動後通知工具；離開情境時 registration.Dispose()。
+  MasterMemoryDebugRemote.NotifyOperationsChanged();
+  ```
+
+  Context 用來辨識目前的操作目標，Revision 用來辨識候選資料。舊目標或舊版號的要求會回 `Stale`；相同要求重送只執行一次。工具只在連回同一個伺服器實例時重送尚未收到結果的要求；遊戲重啟後會回報結果未知。每次伺服器啟動最多保存 4096 個要求結果，達到上限後新要求回 `Busy`，避免重送快取無限增長。
 - 斷線後工具保留最後收到的資料，並**每 3 秒自動重連**同一個位址（遊戲重新啟動、Wi-Fi 斷線時）；配對碼固定時，重啟的遊戲會自動連回。
   被遊戲拒絕（配對碼錯誤、已有其他工具）時不重試；按 Disconnect 停止。重連後以遊戲目前的資料為準。
 

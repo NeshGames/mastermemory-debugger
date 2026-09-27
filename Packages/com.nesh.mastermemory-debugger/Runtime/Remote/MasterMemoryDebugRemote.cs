@@ -22,6 +22,28 @@ namespace Nesh.MasterMemoryDebugger
         Failed,
     }
 
+    public enum MasterMemoryRemoteOperationStatus : byte
+    {
+        Success, NoChange, Busy, Stale, Incompatible, ValidationError, Failed,
+    }
+
+    public sealed class MasterMemoryRemoteOperationResult
+    {
+        public string RequestId { get; internal set; }
+        public MasterMemoryRemoteOperationStatus Status { get; set; }
+        public string Message { get; set; }
+        public string OldSha { get; set; }
+        public string NewSha { get; set; }
+    }
+
+    public sealed class MasterMemoryRemoteOperationView
+    {
+        public string Id { get; internal set; }
+        public string Label { get; internal set; }
+        public string Context { get; internal set; }
+        public int Revision { get; internal set; }
+    }
+
     /// <summary>
     /// Remote editing: a desktop build of the project (the tool, see <see cref="MasterMemoryRemoteEditor"/>) connects to a
     /// game build over TCP and edits its master data with the full debugger UI; overrides stay in sync both ways.
@@ -44,6 +66,12 @@ namespace Nesh.MasterMemoryDebugger
         static bool s_reconnecting;
         static double s_retryAt = -1;
         static int s_attempt;
+        static readonly Dictionary<string, RegisteredOperation> s_operations = new Dictionary<string, RegisteredOperation>(StringComparer.Ordinal);
+        static readonly List<MasterMemoryRemoteOperationView> s_remoteOperations = new List<MasterMemoryRemoteOperationView>();
+        static readonly Dictionary<string, MasterMemoryRemoteProtocol.OperationRequest> s_pendingOperations =
+            new Dictionary<string, MasterMemoryRemoteProtocol.OperationRequest>(StringComparer.Ordinal);
+        static string s_serverEpoch;
+        internal static event Action OperationsChanged;
 
         /// <summary>Seconds between reconnection attempts.</summary>
         internal static double ReconnectDelaySeconds = 3;
@@ -103,6 +131,165 @@ namespace Nesh.MasterMemoryDebugger
 
         /// <summary>Game: the port listened on (0 when off).</summary>
         public static int ServerPort => (s_peer as MasterMemoryRemoteServer)?.Port ?? 0;
+        /// <summary>Tool: operations advertised by the connected game.</summary>
+        public static IReadOnlyList<MasterMemoryRemoteOperationView> Operations => s_remoteOperations;
+        /// <summary>Tool: the last operation result; null until one arrives.</summary>
+        public static MasterMemoryRemoteOperationResult LastOperationResult { get; private set; }
+
+        /// <summary>Tool: request an advertised operation using its current target and candidate revision.</summary>
+        public static bool RequestOperation(string id)
+        {
+            if (!(s_peer is MasterMemoryRemoteClient client) || client.State != MasterMemoryRemoteState.Connected
+                || s_pendingOperations.Count >= 32) return false;
+            foreach (var operation in s_remoteOperations)
+            {
+                if (operation.Id != id) continue;
+                var request = new MasterMemoryRemoteProtocol.OperationRequest
+                {
+                    RequestId = Guid.NewGuid().ToString("N"), OperationId = id,
+                    Context = operation.Context, Revision = operation.Revision,
+                };
+                s_pendingOperations.Add(request.RequestId, request);
+                client.SendOperation(request);
+                return true;
+            }
+            return false;
+        }
+
+        internal static void ReceiveOperations(List<MasterMemoryRemoteProtocol.Operation> operations, string serverEpoch = null)
+        {
+            if (serverEpoch != null)
+            {
+                if (s_serverEpoch != null && s_serverEpoch != serverEpoch)
+                {
+                    bool hadPendingOperations = s_pendingOperations.Count != 0;
+                    s_pendingOperations.Clear();
+                    if (hadPendingOperations) LastOperationResult = new MasterMemoryRemoteOperationResult
+                    {
+                        Status = MasterMemoryRemoteOperationStatus.Stale,
+                        Message = "The game restarted; an outstanding operation has an unknown result.",
+                    };
+                    else LastOperationResult = null;
+                }
+                s_serverEpoch = serverEpoch;
+            }
+            s_remoteOperations.Clear();
+            foreach (var operation in operations) s_remoteOperations.Add(new MasterMemoryRemoteOperationView
+            {
+                Id = operation.Id, Label = operation.Label,
+                Context = operation.Context, Revision = operation.Revision,
+            });
+            RaiseChanged();
+        }
+
+        internal static void ResendPending(MasterMemoryRemoteClient client)
+        {
+            foreach (var request in s_pendingOperations.Values) client.SendOperation(request);
+        }
+
+        internal static void ReceiveOperationResult(MasterMemoryRemoteProtocol.OperationResult result)
+        {
+            if (!s_pendingOperations.Remove(result.RequestId)) return;
+            LastOperationResult = new MasterMemoryRemoteOperationResult
+            {
+                RequestId = result.RequestId, Status = (MasterMemoryRemoteOperationStatus)result.Status,
+                Message = result.Message, OldSha = result.OldSha, NewSha = result.NewSha,
+            };
+            RaiseChanged();
+        }
+
+        /// <summary>
+        /// Game: registers a main-thread operation. The token must be disposed when its owner leaves.
+        /// Context identifies the current target (for example a battle and generation); revision identifies its data candidate.
+        /// The server rejects stale requests before invoking the callback.
+        /// </summary>
+        public static IDisposable RegisterOperation(string id, string label, Func<string> context,
+            Func<int> revision, Func<MasterMemoryRemoteOperationResult> execute)
+        {
+            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(label)) throw new ArgumentException("Operation id and label are required.");
+            if (context == null || revision == null || execute == null) throw new ArgumentNullException("Operation callbacks are required.");
+            if (!IsSupported || IsToolMode) return EmptyRegistration.Instance;
+            if (s_operations.ContainsKey(id)) throw new InvalidOperationException("Operation already registered: " + id);
+            var entry = new RegisteredOperation(id, label, context, revision, execute);
+            s_operations.Add(id, entry);
+            OperationsChanged?.Invoke();
+            return entry;
+        }
+
+        /// <summary>Game: call when a registered operation's context or candidate revision changes.</summary>
+        public static void NotifyOperationsChanged()
+        {
+            if (IsSupported && !IsToolMode) OperationsChanged?.Invoke();
+        }
+
+        internal static List<MasterMemoryRemoteProtocol.Operation> SnapshotOperations()
+        {
+            var result = new List<MasterMemoryRemoteProtocol.Operation>(s_operations.Count);
+            foreach (var entry in s_operations.Values) result.Add(new MasterMemoryRemoteProtocol.Operation
+            {
+                Id = entry.Id, Label = entry.Label, Context = entry.Context(), Revision = entry.Revision(),
+            });
+            result.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
+            return result;
+        }
+
+        internal static MasterMemoryRemoteProtocol.OperationResult ExecuteOperation(MasterMemoryRemoteProtocol.OperationRequest request)
+        {
+            var result = new MasterMemoryRemoteProtocol.OperationResult { RequestId = request.RequestId };
+            if (string.IsNullOrEmpty(request.RequestId) || request.RequestId.Length > 64
+                || string.IsNullOrEmpty(request.OperationId) || request.OperationId.Length > 128)
+            {
+                result.Status = (byte)MasterMemoryRemoteOperationStatus.Failed;
+                result.Message = "Invalid operation request.";
+                return result;
+            }
+            try
+            {
+                if (!s_operations.TryGetValue(request.OperationId, out var entry)
+                    || !string.Equals(request.Context, entry.Context(), StringComparison.Ordinal)
+                    || request.Revision != entry.Revision())
+                {
+                    result.Status = (byte)MasterMemoryRemoteOperationStatus.Stale;
+                    result.Message = "Operation target or candidate changed; refresh the operation list.";
+                    return result;
+                }
+                var answer = entry.Execute() ?? throw new InvalidOperationException("Operation returned no result.");
+                result.Status = (byte)answer.Status;
+                result.Message = answer.Message;
+                result.OldSha = answer.OldSha;
+                result.NewSha = answer.NewSha;
+            }
+            catch (Exception e)
+            {
+                result.Status = (byte)MasterMemoryRemoteOperationStatus.Failed;
+                result.Message = e.Message;
+            }
+            return result;
+        }
+
+        sealed class RegisteredOperation : IDisposable
+        {
+            public readonly string Id;
+            public readonly string Label;
+            public readonly Func<string> Context;
+            public readonly Func<int> Revision;
+            public readonly Func<MasterMemoryRemoteOperationResult> Execute;
+            public RegisteredOperation(string id, string label, Func<string> context, Func<int> revision,
+                Func<MasterMemoryRemoteOperationResult> execute)
+            { Id = id; Label = label; Context = context; Revision = revision; Execute = execute; }
+            public void Dispose()
+            {
+                if (!s_operations.TryGetValue(Id, out var current) || current != this) return;
+                s_operations.Remove(Id);
+                OperationsChanged?.Invoke();
+            }
+        }
+
+        sealed class EmptyRegistration : IDisposable
+        {
+            public static readonly EmptyRegistration Instance = new EmptyRegistration();
+            public void Dispose() { }
+        }
 
         /// <summary>Game: the code the tool must enter.</summary>
         public static string PairingCode => (s_peer as MasterMemoryRemoteServer)?.PairingCode;
@@ -185,6 +372,10 @@ namespace Nesh.MasterMemoryDebugger
             s_reconnecting = false;
             s_retryAt = -1;
             s_attempt = 0;
+            s_pendingOperations.Clear();
+            s_remoteOperations.Clear();
+            s_serverEpoch = null;
+            LastOperationResult = null;
             if (s_peer == null) return;
             var peer = s_peer;
             s_peer = null;
