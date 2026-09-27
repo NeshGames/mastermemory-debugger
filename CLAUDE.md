@@ -76,6 +76,8 @@ of remote editing and 50,000 record timing checks). Run it before every commit.
 
 - `MultiColumnListView` rebuilds on every column change; the record grid is a custom virtualized grid
   (`MasterRecordGrid`) with frozen / scrolled parts.
+- `MasterMemoryFieldDescriptor.IsObject` (nested object editing) is evaluated lazily: nested types may hold their own
+  type, and evaluating it while the reflection cache builds a descriptor would recurse forever.
 - MasterMemory `Validate()` compiles the `Exists()` expressions for every record and scans the referenced table:
   tens of thousands of records take seconds (much longer in Mono). `AutoRebuild` stops validating after every change
   when a validation takes over a second.

@@ -9,8 +9,10 @@ Everything runs only in the Editor and in Development Builds; release builds con
 ## Features
 
 - **Browse** every MasterMemory table: database viewer layout, frozen / hidden / resizable columns, sorting, pinned
-  tabs, condition search with completion and recent searches, localized table / field names with tips.
-- **Override** values at runtime without touching the MemoryDatabase: inspector editing (lists included), batch edit
+  tabs, condition search with completion and recent searches, localized table / field names with tips, and Find:
+  a value in every table (lists and nested objects included).
+- **Override** values at runtime without touching the MemoryDatabase: inspector editing (lists and the members of
+  nested objects / structs included), batch edit
   (set / add / multiply over a search), undo / redo, relation jump and "Referenced by" from `IValidatable` `Exists()`.
 - **Rebuild** the gameplay database with the overrides (`MasterMemoryDebugRebuild.AutoRebuild`) and see MasterMemory
   `Validate()` failures caused by them in the Validation tab.
@@ -26,10 +28,10 @@ Everything runs only in the Editor and in Development Builds; release builds con
 2. Package Manager → Add package from git URL:
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.9.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.10.0
    ```
 
-   `#v0.9.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
+   `#v0.10.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
 
 See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for usage.
 

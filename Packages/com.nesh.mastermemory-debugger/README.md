@@ -61,10 +61,10 @@ IL2CPP 還需要把產生的 `MasterMemoryResolver` 註冊到 MessagePack（參�
 Package Manager → `+` → **Add package from git URL...**
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.9.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.10.0
    ```
 
-   URL 最後的 `#v0.9.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
+   URL 最後的 `#v0.10.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
 
 Runtime assembly (`Nesh.MasterMemoryDebugger.Runtime`) 會自動參考 NuGetForUnity 安裝的 `MasterMemory.dll`。
 
@@ -237,7 +237,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ MasterMemory Debugger [Data][Changes (2)][Patches (3)][Validation (1 new)] Master: v1 [zh-TW ▼][Close] │
+│ MM Debugger [Data][Changes (2)][Patches (3)][Find][Validation (1 new)] [zh-TW ▼][Close]│
 ├────────────┬┬─────────────────────────────────────────────┬┬──────────────────────────┤
 │ Tables [TSV]││ [技能 ×][武器 ×] [+ Pin]                      ││ 技能 1001  Overridden     │
 │ ▼ Battle(6)││ [Damage>100..] [ ]Mod [Columns▾][Batch Edit…][Copy]││ Id  PK             │
@@ -252,7 +252,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- 標題列的頁籤：**Data**（瀏覽與編輯）、**Changes**（所有修改的總覽）、**Patches**（Patch 管理，見下方）、**Validation**（MasterMemory 驗證結果）。
+- 標題列的頁籤：**Data**（瀏覽與編輯）、**Changes**（所有修改的總覽）、**Patches**（Patch 管理，見下方）、**Find**（在所有 Table 搜尋值）、**Validation**（MasterMemory 驗證結果）。
 - Data 頁的版面和一般資料庫檢視工具相同：左側 Table 清單、中間資料表格、右側 Record 詳細資料；兩條分隔線都可以拖曳調整寬度。
 
 ### Record 表格
@@ -316,7 +316,10 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
   - 支援編輯：`int uint short ushort long ulong byte sbyte float double bool string enum`、`[Flags] enum`（以文字輸入）、`Vector2 Vector3 Vector2Int Vector3Int Color`、以及上述型別的 `Nullable<T>`
   - **Array / List**（`T[]`、`List<T>`、`IReadOnlyList<T>` 等，元素為上述簡單型別）：逐項編輯、`×` 刪除、`+ Add` 新增（複製最後一項）。
     每次修改都會建立新的陣列 / List，原始 Record 與已套用的 Override 不會被改到；Patch 會把整個 List 存成 JSON 陣列。超過 200 項時唯讀。
-  - Dictionary / 巢狀物件 / 元素為複雜型別的 List：唯讀的可折疊樹狀檢視（最多 3 層、每層最多 100 項，展開時才建立）
+  - **巢狀物件 / struct**（Record 裡的 class 或 struct，有可寫入的 public 成員）：可折疊，逐一編輯每個成員（成員也可以是 List 或巢狀物件，最多 4 層）。
+    每次修改都會建立該物件的副本，原始 Record 不會被改到；表格與 Changes 以 `{HpPerLevel: 60, CritRate: 0.05}` 顯示。
+    值為 null 的物件不能編輯；沒有可寫入成員的型別（`DateTime`、`decimal`、`Guid` 等）維持唯讀。
+  - Dictionary / 元素為複雜型別的 List：唯讀的可折疊樹狀檢視（最多 3 層、每層最多 100 項，展開時才建立）
   - 有修改的欄位會顯示 `Original: xxx`
   - 文字欄位會自動換行並長高，完整顯示很長的值（Enter 仍然是 Apply，不會插入換行）
   - **關聯跳轉**：Record 有實作 MasterMemory 的 `IValidatable<T>` 並用 `GetReferenceSet<T>().Exists(x => x.ItemId, y => y.Id)` 宣告關聯時，
@@ -356,8 +359,18 @@ Inspector 的 Apply / Reset、Changes 的 Reset、Reset All、套用 / 合併 Pa
 
 - Undo 只會把受影響的 Record 恢復成操作前的 Override（或沒有 Override），不會動到其他 Record。
 - 遊戲程式直接呼叫 `SetOverride` 等 API 修改 Override 時，歷史紀錄會清空（避免 Undo 覆蓋掉程式的修改）。
-- 焦點在搜尋框時 Ctrl+Z 不會觸發 Undo。
+- 焦點在搜尋框（或 Find 的搜尋框）時 Ctrl+Z 不會觸發 Undo。
 - 程式中：`using (MasterMemoryDebugHistory.Record("說明")) { ... }` 把自己的修改記成一個步驟，`MasterMemoryDebugHistory.Undo()` / `Redo()`。
+
+### Find（跨 Table 搜尋）
+
+標題列的 **Find** 在所有已註冊的 Table 裡搜尋一個值，例如某個 ID 或名稱被哪些 Table 使用：
+
+- 輸入後按 Enter（或 **Find**）。搜尋所有欄位的目前值（包含 Override），也包含 List 的元素、巢狀物件的成員與 Dictionary 的 key / value。
+- 比對的是 Debugger 顯示的文字，不分大小寫，預設為「包含」；勾選 **Whole value** 只找完全相同的值（`1001` 不會找到 `11001`）。
+- 結果依 Table、Record 分組，列出符合的欄位（`Growth.CritRate`、`EffectIds[1]` 等）與值；**Open** 跳到該筆 Record。最多顯示 500 個值。
+- Find 頁籤顯示中 Override 改變時會重新搜尋。50,000 筆的 Table 在 .NET 8 約 0.15 秒（Mono 會慢幾倍）。
+- 程式中：`MasterMemoryGlobalSearch.Find("1001", wholeValue: true)`。
 
 ### Validation（驗證結果）
 
@@ -514,6 +527,8 @@ Patch 只記錄 **有修改的可編輯欄位** 與其 **原始值**，不會保
 
 - 複合主鍵：`"primaryKey": { "EnemyId": 1, "Level": 2 }`
 - enum 用名稱字串，`Vector2/3` 用 `{"x","y","z"}`，`Color` 用 `{"r","g","b","a"}`，`long / ulong` 不會失去精度。
+- 巢狀物件 / struct 存成其可編輯成員的 JSON 物件：`{ "field": "Growth", "original": { "HpPerLevel": 60, ... }, "value": { "HpPerLevel": 75, ... } }`。
+  載入時會套用到原始值的副本上，所以 Patch 沒有寫到的成員（包含唯讀成員）保留原始值，手寫 Patch 可以只寫要改的成員。
 - 各專案可以依自己的主資料來源（Excel / Google Sheets / CSV …）處理這個 JSON；也可以在程式裡直接取得 DTO：
 
   ```csharp
@@ -631,7 +646,7 @@ Override Layer **只保證經過 `TryGetOverride` / `Resolve` 的 PrimaryKey 查
 - Debugger 透過 reflection 讀寫 Record 的 property / backing field，並呼叫產生出來的 `ToImmutableBuilder()` / `Diff()` / `Build()` / `Validate()`。
   這些成員如果只被 reflection 使用，Managed Code Stripping 可能會把它們移除。
 - **Development Build 會自動處理**：`MasterMemoryDebuggerLinkerProcessor`（`IUnityLinkerProcessor`）在 build 時產生 link.xml，
-  preserve 所有 `[MemoryTable]` Record、`MemoryDatabase` 與 `ImmutableBuilder`。正式版 Build 不受影響。
+  preserve 所有 `[MemoryTable]` Record、Record 裡的巢狀物件型別（Unity / .NET 的型別與泛型除外）、`MemoryDatabase` 與 `ImmutableBuilder`。正式版 Build 不受影響。
   （Unity 不會讀取 Package 裡的 link.xml，所以改用 build callback 產生。）
 - 需要手動設定時（例如想在所有 Build 保留，或自訂 build pipeline 不會執行 `IUnityLinkerProcessor`），
   可參考範例的 `Samples~/BasicExample/link.xml`，複製到 `Assets/` 底下並改成自己的 assembly / namespace：
@@ -655,7 +670,7 @@ Override Layer **只保證經過 `TryGetOverride` / `Resolve` 的 PrimaryKey 查
 | `MasterMemory.dll will not be loaded ... Unable to resolve reference 'MessagePack'` | NuGet 相依套件沒有裝齊。用 Manage NuGet Packages 重新安裝 MasterMemory，或補齊 `packages.config` 後執行 **NuGet > Restore Packages**。 |
 | 顯示「No table registered」 | 還沒呼叫 `RegisterDatabase` / `RegisterTable`，或呼叫時 database 尚未載入。 |
 | Apply 之後遊戲數值沒變 | 該讀取路徑沒有經過 `TryGetOverride` / `Resolve`，或者是 SecondaryKey / Range 查詢（參考 Query Limitation）。 |
-| 欄位顯示 `RO` | 不支援的型別（Dictionary / 巢狀物件 / 元素為複雜型別的 List…）或沒有 setter。 |
+| 欄位顯示 `RO` | 不支援的型別（Dictionary / 元素為複雜型別的 List / 沒有可寫入成員的型別…）或沒有 setter。巢狀物件的值為 null 時也不能編輯。 |
 | Apply Patch 顯示版本不同 | 用 `SetMasterVersionProvider` 提供正確版本，或在確認後選 Force Apply。 |
 | 顯示名稱變成方框 | 預設字型沒有這些字：在 Settings 的 Font 指定含有 CJK 的字型。 |
 | 表格欄位太多、看不到 | 用 Columns ▾ 隱藏不需要的欄位、凍結常用欄位，或 Shift + 滾輪水平捲動。 |

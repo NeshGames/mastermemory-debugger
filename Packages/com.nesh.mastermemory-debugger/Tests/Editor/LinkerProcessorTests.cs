@@ -24,7 +24,7 @@ namespace Nesh.MasterMemoryDebugger.Editor.Tests
 
         struct Deepest
         {
-            public int Value;
+            public int Value { get; set; }
         }
 
         [Test]

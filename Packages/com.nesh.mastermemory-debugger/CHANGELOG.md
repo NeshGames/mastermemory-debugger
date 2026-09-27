@@ -2,6 +2,19 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.10.0] - 2026-09-27
+
+### Added
+
+- Find tab: finds a value in every registered table: the current values (overrides included) of every member, list elements, members of nested objects and dictionary keys / values, compared as the shown text (case insensitive; Whole value for exact matches such as IDs). Hits are grouped by table and record; Open jumps to the record. `MasterMemoryGlobalSearch.Find`.
+- Inspector: the members of nested objects and structs (a class or struct with writable public members, held by a record) are edited one by one, up to 4 levels; every edit replaces the object with a changed copy. Patches store the value as a JSON object of its editable members and read it into a copy of the original value, so members a patch does not contain keep their values. `MasterMemoryFieldDescriptor.IsObject` / `HasSetter`, `MasterDataValueUtility.IsEditableObject`, `FromJson(json, type, baseValue)`.
+- Sample: `ExampleCharacterMaster.Growth` (a nested class with a nested struct).
+
+### Changed
+
+- Nested objects are compared member by member (`MasterDataValueUtility.AreEqual`) and shown as `{Member: value, …}` in the grid, Changes, the Console log and TSV, unless the type has its own `ToString`.
+- Development Builds also keep the nested object types of the records from managed code stripping.
+
 ## [0.9.0] - 2026-09-27
 
 ### Added
