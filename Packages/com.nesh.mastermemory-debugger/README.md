@@ -441,6 +441,12 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
 - iOS：區域網路存取需要 Info.plist 的 `NSLocalNetworkUsageDescription`，第一次會詢問使用者。
 - Android 用 USB 連線時：在 PC 執行 `adb forward tcp:7788 tcp:7788`，工具連 `127.0.0.1`（不需要同一個 Wi-Fi）。
 
+**只要遠端伺服器、不要 Debugger UI 的遊戲**（例如給工具連線的測試機 Build）：遠端伺服器和 UI 沒有綁定，Settings 設定
+
+- **Remote Server** 打勾、**Remote Pairing Code** 填固定的碼（沒有 UI 時看不到亂數配對碼）
+- **Include Debugger UI** 取消：Build 不包含 UI 檔案與字型，熱鍵 / 觸控手勢也不會建立
+- 遊戲照常註冊 Table 並接好 Override（`TryGetOverride` 或 `AutoRebuild`）
+
 ### 2. 工具端：用專案 build 一個 exe
 
 選單 **Tools > MasterMemory Debugger > Remote Editing**：
@@ -451,7 +457,8 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
 | Create Remote Editor Tool Scene | 建立 `Assets/MasterMemoryDebugger/MasterMemoryRemoteEditor.unity`：只有 `MasterMemoryRemoteEditor` 元件。在 Editor 按 Play 就是工具 |
 | Build Remote Editor Tool… | 選擇輸出資料夾，把工具 Scene build 成這台電腦的桌面版（Windows / macOS）Development Build。Build 時暫時使用視窗模式、Mono、獨立的 Product Name（工具的 PlayerPrefs / Patch 和遊戲分開），完成後還原專案設定 |
 
-執行 exe → 出現連線對話框 → 輸入遊戲的 IP、Port、配對碼 → **Connect**。
+執行 exe → 出現連線對話框：**Games on the network** 會自動搜尋同一個網路中等待連線的遊戲（產品名稱、裝置名稱、位址、主資料版本），
+點一下填入位址與 Port → 輸入配對碼 → **Connect**。找不到時（訪客 Wi-Fi、VPN 常會擋廣播）直接輸入 IP。
 手動設定也可以：空 Scene 掛上 **MasterMemoryRemoteEditor**（Add Component → MasterMemory Debugger → Remote Editor），只 build 這個 Scene，勾選 **Development Build**。
 
 同一台電腦試用：Create Example Game Scene → Play（Console 有配對碼）→ 執行 Build 出來的工具 → 連 `127.0.0.1`。
@@ -463,7 +470,8 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
   **Validation** 分頁會請遊戲端執行 `Validate()` 並顯示結果（Open 跳到工具中的該筆 Record）；頁籤標題的 `(N new)` 由遊戲端即時更新。
   遊戲端需要使用 `AutoRebuild`（validate: true）。
 - 工具的 Debugger 佔滿整個視窗，沒有 Close（Esc / F8 不會關閉）。
-- 斷線後工具保留最後收到的資料，但修改不會再送出；重新 Connect 會以遊戲目前的資料為準。
+- 斷線後工具保留最後收到的資料，並**每 3 秒自動重連**同一個位址（遊戲重新啟動、Wi-Fi 斷線時）；配對碼固定時，重啟的遊戲會自動連回。
+  被遊戲拒絕（配對碼錯誤、已有其他工具）時不重試；按 Disconnect 停止。重連後以遊戲目前的資料為準。
 
 ### 注意
 
@@ -471,6 +479,7 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
 - WebGL 沒有 socket，不支援。
 - 資料以 MessagePack 傳送（MasterMemory 本來就依賴 MessagePack，不增加套件）。IL2CPP 的遊戲請把載入 MemoryDatabase 時用的 options 設給
   `MasterMemoryDebugRemote.SerializerOptions`（含 MasterMemory / 專案的 resolver），工具端也設定相同的 options。
+  遊戲端開始等待連線時（以及之後註冊 Table 時）會試著序列化每張表的一筆資料，失敗時在 Console 說明要怎麼設定。
 - 通訊內容沒有加密，請在開發用的網路使用。
 - 在 Editor 結束 Play Mode 或重新編譯時，連線會自動關閉。
 - 工具送來的修改會觸發遊戲端的 `AutoRebuild` 驗證；驗證很慢時請看下方「重建 Gameplay Database」的說明。
@@ -550,11 +559,16 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 
 ## Settings
 
-`Project Settings > MasterMemory Debugger`（會在 `Assets/MasterMemoryDebugger/Resources/MasterMemoryDebuggerSettings.asset` 建立設定檔）
+`Project Settings > MasterMemory Debugger`（會在 `Assets/MasterMemoryDebugger/MasterMemoryDebuggerSettings.asset` 建立設定檔）
+
+設定檔和 Debugger 的 UI 檔案（UXML / USS）都**不放在 Resources**：Editor 直接讀取；Build 時只有 **Development Build** 會把它們複製到暫時的
+`Assets/MasterMemoryDebuggerBuild/Resources`（Build 結束後自動刪除），所以正式版 Build 不包含它們，也不包含設定引用的字型 / PanelSettings。
+舊版本建立在 `Resources` 裡的設定檔，設定頁會顯示 **Move out of Resources** 按鈕。
 
 | 設定 | 預設 | 說明 |
 | --- | --- | --- |
 | Enabled | true | 關閉時 UI、熱鍵、Auto Load 全部停用（Override API 仍可使用） |
+| Include Debugger UI | true | Development Build 是否包含 Debugger UI。只需要遠端伺服器的 Build 可以關閉：不包含 UI 檔案與字型，也無法開啟 Debugger（Editor 不受影響） |
 | Allow Editing | true | 關閉時變成唯讀瀏覽器 |
 | Allow Patch Save | true | Patches 頁籤顯示 Save As / Overwrite / Rename / Export / Delete |
 | Auto Load Patch | false | 註冊 Table 時自動載入已儲存的 Patch |
@@ -569,6 +583,9 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 | Font | (none) | Debugger UI 使用的字型（TTF / OTF）。顯示名稱使用中文、日文等文字時，請指定含有這些字的字型 |
 | Panel Settings | (none) | 指定專案自己的 PanelSettings；沒指定時 Debugger 會自行建立 |
 | Sorting Order | 10000 | Debugger 自行建立的 Panel 的繪製順序 |
+| Remote Server | false | Development Build 啟動時自動等待遠端編輯工具連線（見 Remote Editing） |
+| Remote Port | 7788 | 等待連線的 TCP Port（區域網路搜尋使用 UDP 7787） |
+| Remote Pairing Code | (空) | 固定的配對碼；空白時每次啟動產生 6 位數亂數 |
 
 ## Development Build Behavior
 

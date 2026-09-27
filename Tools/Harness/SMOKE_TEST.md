@@ -31,6 +31,14 @@ and Play Mode) as well.
       the tables appear; an edit in the tool changes the game (Console log of the sample) and an edit in the game shows
       in the tool; a wrong code is refused.
 - [ ] Tool: fills the window, no Close; the Validation tab shows the game's failures and Open jumps to the record.
+- [ ] Tool: "Games on the network" lists the running game; stop and restart the game's Play Mode → the tool reconnects
+      by itself (fixed Remote Pairing Code); a wrong code is not retried.
+
+## Builds
+
+- [ ] A Development Build: the debugger opens (F8); `Assets/MasterMemoryDebuggerBuild` is gone after the build.
+- [ ] Include Debugger UI off: the build runs the remote server (tool connects), F8 does nothing.
+- [ ] A release build: the Editor log's build report lists no MasterMemoryDebugger.uxml / .uss / settings asset.
 - [ ] Patches: Compare… with the current overrides and with another patch; Copy TSV.
 
 ## Window

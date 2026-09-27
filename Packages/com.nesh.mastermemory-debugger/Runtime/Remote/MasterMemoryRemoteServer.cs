@@ -21,6 +21,7 @@ namespace Nesh.MasterMemoryDebugger
         volatile bool stopped;
         bool validationChanged;
         readonly HashSet<Type> checkedTypes = new HashSet<Type>();
+        readonly MasterMemoryRemoteDiscovery.Responder discovery;
         string lastError;
 
         public MasterMemoryRemoteServer(int port, string pairingCode)
@@ -32,8 +33,17 @@ namespace Nesh.MasterMemoryDebugger
             acceptThread = new Thread(AcceptLoop) { IsBackground = true, Name = "MasterMemoryRemote accept" };
             acceptThread.Start();
             // tables are often registered after the server starts (Settings > Remote Server starts it after the first scene loads)
-            MasterMemoryDebugRegistry.TablesChanged += CheckSerialization;
+            MasterMemoryDebugRegistry.TablesChanged += OnTablesChanged;
             CheckSerialization();
+
+            try
+            {
+                discovery = new MasterMemoryRemoteDiscovery.Responder(Port, UnityEngine.Application.productName, UnityEngine.SystemInfo.deviceName, MasterMemoryDebugRegistry.GetMasterVersion());
+            }
+            catch (SocketException e)
+            {
+                MasterMemoryDebugLog.Warning($"Remote: LAN discovery is not available (UDP port {MasterMemoryRemoteDiscovery.Port}: {e.Message}); enter the address in the tool.");
+            }
         }
 
         public int Port { get; }
@@ -94,7 +104,8 @@ namespace Nesh.MasterMemoryDebugger
                 // already stopped
             }
             MasterMemoryDebugValidation.Changed -= OnValidationChanged;
-            MasterMemoryDebugRegistry.TablesChanged -= CheckSerialization;
+            MasterMemoryDebugRegistry.TablesChanged -= OnTablesChanged;
+            discovery?.Dispose();
             waitingForHello?.Dispose();
             foreach (var connection in closing) connection.Dispose();
             while (accepted.TryDequeue(out var client)) client.Close();
@@ -211,6 +222,12 @@ namespace Nesh.MasterMemoryDebugger
             connection.Send(MasterMemoryRemoteProtocol.EncodeReject(reason));
             connection.CloseAfterSending();
             closing.Add(connection);
+        }
+
+        void OnTablesChanged()
+        {
+            CheckSerialization();
+            discovery?.SetInfo(Port, UnityEngine.Application.productName, UnityEngine.SystemInfo.deviceName, MasterMemoryDebugRegistry.GetMasterVersion());
         }
 
         /// <summary>

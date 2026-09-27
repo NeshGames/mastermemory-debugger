@@ -30,6 +30,8 @@ namespace Nesh.MasterMemoryDebugger.Tests
         {
             MasterMemoryDebugRemote.Stop();
             MasterMemoryDebugRemote.SerializerOptions = null;
+            MasterMemoryDebugRemote.AutoReconnect = true;
+            MasterMemoryDebugRemote.ReconnectDelaySeconds = 3;
             MasterMemoryDebugRemote.IsToolMode = false;
             rawClient?.Close();
             rawServer?.Stop();
@@ -317,6 +319,91 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var problem = MasterMemoryRemoteServer.CheckSerialization(Table<TestSkill>());
             Assert.IsNotNull(problem);
             StringAssert.StartsWith(nameof(TestSkill), problem);
+        }
+
+        [Test]
+        public void Client_ShouldReconnectWhenTheGameComesBack()
+        {
+            MasterMemoryDebugRemote.ReconnectDelaySeconds = 0.05;
+            RegisterTestDatabase();
+            var welcome = MasterMemoryRemoteServer.CreateWelcome();
+            MasterMemoryDebugRegistry.ClearTables();
+            MasterMemoryDebugRemote.IsToolMode = true;
+
+            rawServer = new TcpListener(IPAddress.Loopback, 0);
+            rawServer.Start();
+            MasterMemoryDebugRemote.Connect("127.0.0.1", ((IPEndPoint)rawServer.LocalEndpoint).Port, "7");
+
+            // first game
+            PumpUntil(() => rawServer.Pending(), "the connection");
+            var game = rawServer.AcceptTcpClient().GetStream();
+            ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.Hello);
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(welcome));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected, "the tables");
+
+            // the game restarts: the tool comes back with the same code
+            game.Close();
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Failed, "the disconnect");
+            PumpUntil(() => rawServer.Pending(), "the reconnection");
+            var restarted = rawServer.AcceptTcpClient().GetStream();
+            Assert.AreEqual("7", MasterMemoryRemoteProtocol.DecodeHello(ReceiveOf(restarted, MasterMemoryRemoteProtocol.MessageType.Hello)).Code);
+            MasterMemoryRemoteProtocol.WriteFrame(restarted, MasterMemoryRemoteProtocol.Encode(welcome));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected, "the tables again");
+        }
+
+        [Test]
+        public void Client_ShouldNotRetryARefusal()
+        {
+            MasterMemoryDebugRemote.ReconnectDelaySeconds = 0.01;
+            rawServer = new TcpListener(IPAddress.Loopback, 0);
+            rawServer.Start();
+            MasterMemoryDebugRemote.IsToolMode = true;
+            MasterMemoryDebugRemote.Connect("127.0.0.1", ((IPEndPoint)rawServer.LocalEndpoint).Port, "wrong");
+            PumpUntil(() => rawServer.Pending(), "the connection");
+            var game = rawServer.AcceptTcpClient().GetStream();
+            ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.Hello);
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.EncodeReject("Wrong pairing code."));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Failed, "the refusal");
+
+            for (var i = 0; i < 20; i++)
+            {
+                MasterMemoryDebugRemote.Pump();
+                System.Threading.Thread.Sleep(5);
+            }
+            Assert.IsFalse(rawServer.Pending(), "no retry after a refusal");
+            StringAssert.DoesNotContain("Reconnecting", MasterMemoryDebugRemote.Status);
+        }
+
+        [Test]
+        public void Discovery_ShouldFindTheGameOnThisPC()
+        {
+            var udp = new UdpClient(0);
+            var port = ((IPEndPoint)udp.Client.LocalEndPoint).Port;
+            udp.Close();
+            var previous = MasterMemoryRemoteDiscovery.Port;
+            MasterMemoryRemoteDiscovery.Port = port;
+            try
+            {
+                RegisterTestDatabase();
+                MasterMemoryDebugRemote.StartServer(0, "1");
+                var search = new MasterMemoryRemoteDiscovery.Search(1500);
+                PumpUntil(() => search.IsDone || search.Games.Count > 0, "the answer");
+                while (!search.IsDone) System.Threading.Thread.Sleep(10);
+
+                var game = search.Games.Single();
+                Assert.AreEqual("127.0.0.1", game.Address);
+                Assert.AreEqual(MasterMemoryDebugRemote.ServerPort, game.Port);
+                Assert.AreEqual("Harness", game.ProductName);
+
+                MasterMemoryDebugRemote.Stop();
+                var none = new MasterMemoryRemoteDiscovery.Search(200);
+                while (!none.IsDone) System.Threading.Thread.Sleep(10);
+                Assert.IsEmpty(none.Games, "a stopped server does not answer");
+            }
+            finally
+            {
+                MasterMemoryRemoteDiscovery.Port = previous;
+            }
         }
     }
 }

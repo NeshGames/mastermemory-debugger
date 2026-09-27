@@ -1232,6 +1232,15 @@
     letter-spacing: 4px;
 }
 
+.mm-debugger__remote-games {
+    margin-bottom: 8px;
+}
+
+.mm-debugger .mm-debugger__remote-game {
+    -unity-text-align: middle-left;
+    margin: 1px 0;
+}
+
 .mm-debugger .mm-debugger__remote-status {
     white-space: normal;
 }

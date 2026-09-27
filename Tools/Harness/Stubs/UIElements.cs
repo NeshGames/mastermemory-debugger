@@ -26,9 +26,9 @@ namespace UnityEngine.UIElements
         public static bool RegisterValueChangedCallback<T>(this INotifyValueChanged<T> control, EventCallback<ChangeEvent<T>> callback) => true;
         public static bool UnregisterValueChangedCallback<T>(this INotifyValueChanged<T> control, EventCallback<ChangeEvent<T>> callback) => true;
     }
-    public interface IVisualElementScheduledItem { void Pause(); void Resume(); void ExecuteLater(long delayMs); IVisualElementScheduledItem StartingIn(long delayMs); }
+    public interface IVisualElementScheduledItem { void Pause(); void Resume(); void ExecuteLater(long delayMs); IVisualElementScheduledItem StartingIn(long delayMs); IVisualElementScheduledItem Every(long intervalMs); IVisualElementScheduledItem Until(Func<bool> stopCondition); }
     public interface IVisualElementScheduler { IVisualElementScheduledItem Execute(Action updateEvent); }
-    class Sched : IVisualElementScheduler, IVisualElementScheduledItem { public IVisualElementScheduledItem Execute(Action a) => this; public void Pause() { } public void Resume() { } public void ExecuteLater(long d) { } public IVisualElementScheduledItem StartingIn(long d) => this; }
+    class Sched : IVisualElementScheduler, IVisualElementScheduledItem { public IVisualElementScheduledItem Execute(Action a) => this; public void Pause() { } public void Resume() { } public void ExecuteLater(long d) { } public IVisualElementScheduledItem StartingIn(long d) => this; public IVisualElementScheduledItem Every(long i) => this; public IVisualElementScheduledItem Until(Func<bool> c) => this; }
     public class VisualElement : Focusable
     {
         public string name { get; set; }

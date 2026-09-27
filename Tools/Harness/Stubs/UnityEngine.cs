@@ -60,6 +60,7 @@ namespace UnityEngine
         public static bool Approximately(float a, float b) => Math.Abs(a - b) < 1e-6f;
     }
     public enum RuntimePlatform { OSXEditor = 0, OSXPlayer = 1, WindowsPlayer = 2, WindowsEditor = 7, IPhonePlayer = 8, Android = 11, LinuxPlayer = 13, LinuxEditor = 16, WebGLPlayer = 17 }
+    public static class SystemInfo { public static string deviceName => "harness"; }
     public static class Application
     {
         public static string persistentDataPath => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "mmdebugger-harness");
@@ -68,6 +69,7 @@ namespace UnityEngine
         public static bool isEditor => true;
         public static void OpenURL(string url) { }
         public static bool runInBackground { get; set; }
+        public static string productName => "Harness";
         public static string dataPath => "/project/Assets";
         public static int targetFrameRate { get; set; }
     }

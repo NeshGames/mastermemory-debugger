@@ -33,6 +33,14 @@ namespace Nesh.MasterMemoryDebugger
 
         public string Host { get; }
 
+        /// <summary>The tables were received: the connection worked (a reconnect is worth trying when it is lost).</summary>
+        public bool HasConnected { get; private set; }
+
+        /// <summary>The game refused the connection (wrong code, another tool, other version): retrying does not help.</summary>
+        public bool WasRefused { get; private set; }
+
+        public string PairingCode => code;
+
         public int Port { get; }
 
         public override MasterMemoryRemoteState State => state;
@@ -125,6 +133,7 @@ namespace Nesh.MasterMemoryDebugger
                         ApplyWelcome(MasterMemoryRemoteProtocol.DecodeWelcome(payload));
                         break;
                     case MasterMemoryRemoteProtocol.MessageType.Reject:
+                        WasRefused = true;
                         SetState(MasterMemoryRemoteState.Failed, "Refused by the game: " + MasterMemoryRemoteProtocol.DecodeReject(payload));
                         Connection.Dispose();
                         Connection = null;
@@ -191,6 +200,7 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugHistory.Clear();
             MasterMemoryDebugValidation.Add(validation);
 
+            HasConnected = true;
             var text = $"Connected to {Host}:{Port}: {welcome.Tables.Count - skipped.Count} tables, master {masterVersion}";
             if (skipped.Count > 0)
             {

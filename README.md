@@ -4,6 +4,21 @@ Unity UI Toolkit runtime debugger for [Cysharp/MasterMemory](https://github.com/
 
 This repository is a Unity 6 project that hosts the UPM package
 [`Packages/com.nesh.mastermemory-debugger`](Packages/com.nesh.mastermemory-debugger/README.md).
+Everything runs only in the Editor and in Development Builds; release builds contain none of the debugger's assets.
+
+## Features
+
+- **Browse** every MasterMemory table: database viewer layout, frozen / hidden / resizable columns, sorting, pinned
+  tabs, condition search with completion and recent searches, localized table / field names with tips.
+- **Override** values at runtime without touching the MemoryDatabase: inspector editing (lists included), batch edit
+  (set / add / multiply over a search), undo / redo, relation jump and "Referenced by" from `IValidatable` `Exists()`.
+- **Rebuild** the gameplay database with the overrides (`MasterMemoryDebugRebuild.AutoRebuild`) and see MasterMemory
+  `Validate()` failures caused by them in the Validation tab.
+- **Patches**: save, apply, merge, compare, import / export the changed fields as JSON; copy the changes as TSV for a
+  spreadsheet and paste edited values back.
+- **Remote editing**: a desktop build of the project (the remote editor tool) finds a running game build on the
+  network, connects with a pairing code and edits its master data with the same UI; changes sync both ways.
+  The game can run the remote server without the debugger UI.
 
 ## Install the package in a game project
 
@@ -28,6 +43,10 @@ See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for 
 4. Window > Package Manager > MasterMemory Runtime Debugger > Samples > import **Basic Example**,
    add `ExampleDebuggerLauncher` to a GameObject, enter Play Mode and press **F8**.
 5. Window > General > Test Runner runs the package tests (Edit Mode and Play Mode).
+6. Remote editing: Tools > MasterMemory Debugger > Remote Editing > Create Example Game Scene (Play), then
+   Build Remote Editor Tool… and run it; it lists the game under "Games on the network".
+
+Working with Claude Code: [CLAUDE.md](CLAUDE.md) describes the layout, the conventions and the release flow.
 
 ## Tests without Unity and CI
 

@@ -511,7 +511,9 @@ namespace Nesh.MasterMemoryDebugger
         void OnRemoteChanged()
         {
             var state = MasterMemoryDebugRemote.State;
-            if (state != remoteState && (state == MasterMemoryRemoteState.Connected || state == MasterMemoryRemoteState.Failed))
+            // one message when the connection is lost, not one per reconnection attempt
+            var retrying = MasterMemoryDebugRemote.IsReconnecting && state != MasterMemoryRemoteState.Connected;
+            if (state != remoteState && !retrying && (state == MasterMemoryRemoteState.Connected || state == MasterMemoryRemoteState.Failed))
             {
                 SetStatus("Remote: " + MasterMemoryDebugRemote.Status, state == MasterMemoryRemoteState.Failed);
             }
