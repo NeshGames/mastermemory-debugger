@@ -1,3 +1,4 @@
+using System.IO;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -66,7 +67,12 @@ namespace Nesh.MasterMemoryDebugger.Editor
                 Debug.LogError($"[MasterMemoryDebugger] The debugger UI asset {name}{extension} was not found; the debugger can not be opened in this build.");
                 return;
             }
-            AssetDatabase.CopyAsset(source, ResourcesFolder + "/" + MasterMemoryDebuggerAssets.ResourcesFolder + name + extension);
+            // the file only, not its .meta: Unity imports the copy with a .meta of its own. AssetDatabase.CopyAsset would copy
+            // the package's minimal .meta (guid only), which Unity 6.6 rejects in Assets ("below the supported minimum"),
+            // and the build then has no UI layout.
+            var destination = ResourcesFolder + "/" + MasterMemoryDebuggerAssets.ResourcesFolder + name + extension;
+            File.Copy(Path.GetFullPath(source), Path.GetFullPath(destination), true);
+            AssetDatabase.ImportAsset(destination, ImportAssetOptions.ForceSynchronousImport);
         }
 
         static void CopySettings(MasterMemoryDebuggerSettings settings, bool includeUI)

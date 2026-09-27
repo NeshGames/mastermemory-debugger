@@ -16,6 +16,10 @@ All notable changes to this package are documented in this file.
 - Nested objects are compared member by member (`MasterDataValueUtility.AreEqual`) and shown as `{Member: value, …}` in the grid, Changes, the Console log and TSV, unless the type has its own `ToString`.
 - Development Builds also keep the nested object types of the records from managed code stripping.
 
+### Fixed
+
+- Development Builds: the UI assets copied into `Assets/MasterMemoryDebuggerBuild/Resources` got the package's minimal `.meta` files, which Unity 6.6 rejects ("contains a <unknown> object at version 1, below the supported minimum (2)"), so the build showed a broken debugger. Only the files are copied now; Unity imports them with new `.meta` files.
+
 ## [0.9.0] - 2026-09-27
 
 ### Added

@@ -47,7 +47,8 @@ and Play Mode) as well.
 
 ## Builds
 
-- [ ] A Development Build: the debugger opens (F8); `Assets/MasterMemoryDebuggerBuild` is gone after the build.
+- [ ] A Development Build: no "below the supported minimum" error in the Console during the build; the debugger opens
+      (F8) and looks like in the Editor; `Assets/MasterMemoryDebuggerBuild` is gone after the build.
 - [ ] Include Debugger UI off: the build runs the remote server (tool connects), F8 does nothing.
 - [ ] A release build: the Editor log's build report lists no MasterMemoryDebugger.uxml / .uss / settings asset.
 - [ ] Patches: Compare… with the current overrides and with another patch; Copy TSV.

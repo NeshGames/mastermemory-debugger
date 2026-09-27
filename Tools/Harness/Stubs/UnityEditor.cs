@@ -42,10 +42,23 @@ namespace UnityEditor
         public static string GetAssetPath(UnityEngine.Object o) => "";
         public static void Refresh() { }
         public static bool CopyAsset(string path, string newPath) => true;
+        public static void ImportAsset(string path) { }
+        public static void ImportAsset(string path, ImportAssetOptions options) { }
         public static bool DeleteAsset(string path) => true;
         public static string MoveAsset(string oldPath, string newPath) => "";
         public static string GenerateUniqueAssetPath(string path) => path;
     }
+    [Flags]
+    public enum ImportAssetOptions
+    {
+        Default = 0,
+        ForceUpdate = 1,
+        ForceSynchronousImport = 8,
+        ImportRecursive = 256,
+        DontDownloadFromCacheServer = 8192,
+        ForceUncompressedImport = 16384,
+    }
+
     public static class EditorGUIUtility { public static void PingObject(UnityEngine.Object o) { } }
     public static class EditorUtility
     {
