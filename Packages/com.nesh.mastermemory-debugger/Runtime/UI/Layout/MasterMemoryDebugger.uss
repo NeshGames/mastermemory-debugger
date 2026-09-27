@@ -763,6 +763,39 @@
     margin: 2px 0 2px 34px;
 }
 
+/* nested object editor: one row per member, the object is copied on every change */
+.mm-debugger .mm-debugger__object-editor {
+    flex-grow: 1;
+}
+
+.mm-debugger .mm-debugger__object-editor .unity-foldout__text {
+    color: rgb(170, 176, 190);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-debugger .mm-debugger__object-member {
+    flex-direction: row;
+    align-items: flex-start;
+    margin: 1px 0;
+}
+
+.mm-debugger .mm-debugger__object-member-name {
+    width: 96px;
+    flex-shrink: 0;
+    margin: 3px 6px 0 0;
+    color: rgb(150, 157, 171);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-debugger .mm-debugger__object-member-value {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
 /* jump to the record referenced by this field (MasterMemory Validate Exists) */
 .mm-debugger__reference-button {
     flex-shrink: 1;

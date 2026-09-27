@@ -100,12 +100,17 @@ namespace Nesh.MasterMemoryDebugger.Tests
         [Test]
         public void OtherComplexFields_ShouldBeReadonly()
         {
-            foreach (var field in MasterDataReflectionCache.Get<ComplexItem>().Fields)
-            {
-                Assert.AreEqual(MasterDataValueKind.Complex, field.Kind, field.Name);
-                Assert.IsFalse(field.IsList, field.Name);
-                Assert.IsFalse(field.CanEdit, field.Name);
-            }
+            var map = Field<ComplexItem>("Map");
+            Assert.AreEqual(MasterDataValueKind.Complex, map.Kind);
+            Assert.IsFalse(map.IsList);
+            Assert.IsFalse(map.IsObject);
+            Assert.IsFalse(map.CanEdit);
+
+            // a nested object of its own type: evaluated lazily, no endless recursion
+            var child = Field<ComplexItem>("Child");
+            Assert.AreEqual(MasterDataValueKind.Complex, child.Kind);
+            Assert.IsTrue(child.IsObject);
+            Assert.IsTrue(child.CanEdit);
         }
 
         [Test]

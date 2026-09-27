@@ -95,7 +95,7 @@ namespace Nesh.MasterMemoryDebugger
             return MasterDataPatchSerializer.ToJson(CreatePatch(warnings));
         }
 
-        /// <summary>Changed fields of one record (editable, non-key, simple fields only).</summary>
+        /// <summary>Changed fields of one record (editable, non-key fields: simple values, lists of them and nested objects).</summary>
         public static MasterDataPatchRecord CreatePatchRecord(MasterMemoryTableDescriptor table, object original, object current, List<string> warnings = null)
         {
             var record = new MasterDataPatchRecord { PrimaryKey = CreatePrimaryKeyJson(table, original) };
@@ -111,11 +111,28 @@ namespace Nesh.MasterMemoryDebugger
                     warnings?.Add($"{table.TableName} {record.PrimaryKey.ToCanonicalString()}: field '{field.Name}' differs but can not be exported.");
                     continue;
                 }
+                object originalJson, valueJson;
+                try
+                {
+                    originalJson = MasterDataValueUtility.ToJson(originalValue);
+                    valueJson = MasterDataValueUtility.ToJson(currentValue);
+                }
+                catch (NotSupportedException e)
+                {
+                    warnings?.Add($"{table.TableName} {record.PrimaryKey.ToCanonicalString()}: field '{field.Name}' can not be exported ({e.Message}).");
+                    continue;
+                }
+                if (field.IsObject && MasterDataJson.Serialize(originalJson, false) == MasterDataJson.Serialize(valueJson, false))
+                {
+                    // only read-only members of the nested object differ (changed by code)
+                    warnings?.Add($"{table.TableName} {record.PrimaryKey.ToCanonicalString()}: field '{field.Name}' differs in members that can not be exported.");
+                    continue;
+                }
                 record.Changes.Add(new MasterDataPatchChange
                 {
                     Field = field.Name,
-                    Original = MasterDataValueUtility.ToJson(originalValue),
-                    Value = MasterDataValueUtility.ToJson(currentValue),
+                    Original = originalJson,
+                    Value = valueJson,
                 });
             }
             return record;
@@ -264,11 +281,12 @@ namespace Nesh.MasterMemoryDebugger
                     }
                     try
                     {
-                        var value = MasterDataValueUtility.FromJson(change.Value, field.FieldType);
+                        // nested objects are read into a copy of the original value (members missing in the patch are kept)
                         var currentOriginal = field.GetValue(original);
+                        var value = MasterDataValueUtility.FromJson(change.Value, field.FieldType, currentOriginal);
                         if (change.HasOriginal)
                         {
-                            var patchOriginal = TryFromJson(change.Original, field.FieldType, out var ok);
+                            var patchOriginal = TryFromJson(change.Original, field.FieldType, currentOriginal, out var ok);
                             if (ok && !MasterDataValueUtility.AreEqual(patchOriginal, currentOriginal))
                             {
                                 result.Warnings.Add(
@@ -294,12 +312,12 @@ namespace Nesh.MasterMemoryDebugger
             }
         }
 
-        static object TryFromJson(object json, Type type, out bool ok)
+        static object TryFromJson(object json, Type type, object baseValue, out bool ok)
         {
             try
             {
                 ok = true;
-                return MasterDataValueUtility.FromJson(json, type);
+                return MasterDataValueUtility.FromJson(json, type, baseValue);
             }
             catch (Exception)
             {

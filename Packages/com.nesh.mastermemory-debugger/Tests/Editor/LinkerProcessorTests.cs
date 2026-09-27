@@ -9,6 +9,24 @@ namespace Nesh.MasterMemoryDebugger.Editor.Tests
         {
         }
 
+        sealed class Holder
+        {
+            public Inner Inner { get; set; }
+            public (int, int) Pair { get; set; }
+            public string Name { get; set; }
+        }
+
+        sealed class Inner
+        {
+            public Deepest Deepest { get; set; }
+            public Inner Self { get; set; }
+        }
+
+        struct Deepest
+        {
+            public int Value;
+        }
+
         [Test]
         public void LinkXml_ShouldPreserveEveryTypeByAssembly()
         {
@@ -18,6 +36,13 @@ namespace Nesh.MasterMemoryDebugger.Editor.Tests
             StringAssert.Contains("<assembly fullname=\"Nesh.MasterMemoryDebugger.Editor.Tests\">", xml);
             StringAssert.Contains("<type fullname=\"Nesh.MasterMemoryDebugger.Editor.Tests.LinkerProcessorTests\" preserve=\"all\" />", xml);
             StringAssert.Contains("<type fullname=\"Nesh.MasterMemoryDebugger.Editor.Tests.LinkerProcessorTests/Nested\" preserve=\"all\" />", xml);
+        }
+
+        [Test]
+        public void NestedObjectTypes_ShouldBeCollected()
+        {
+            var types = MasterMemoryDebuggerLinkerProcessor.CollectNestedObjectTypes(new[] { typeof(Holder) });
+            CollectionAssert.AreEquivalent(new[] { typeof(Inner), typeof(Deepest) }, types, "generic types and simple values are left out");
         }
 
         [Test]

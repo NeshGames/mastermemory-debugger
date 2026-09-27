@@ -7,7 +7,7 @@ using UnityEngine.UIElements;
 namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
-    /// Creates runtime UI Toolkit editors for simple member types.
+    /// Creates runtime UI Toolkit editors for simple member types, lists of them and nested objects.
     /// Unsupported types fall back to a read-only label instead of failing.
     /// </summary>
     internal static class MasterFieldDrawerFactory
@@ -18,6 +18,9 @@ namespace Nesh.MasterMemoryDebugger
 
         /// <summary>Longer lists are shown read-only.</summary>
         public const int MaxEditableListItems = 200;
+
+        /// <summary>Nested objects deeper than this are shown read-only.</summary>
+        public const int MaxObjectDepth = 4;
 
         /// <summary>Read-only view of any value: text, or a foldout tree for arrays / lists / nested objects.</summary>
         public static VisualElement CreateReadOnly(object value)
@@ -34,8 +37,14 @@ namespace Nesh.MasterMemoryDebugger
         /// </summary>
         public static VisualElement CreateEditor(MasterMemoryFieldDescriptor field, object value, Action<object> onChanged)
         {
+            return CreateEditor(field, value, onChanged, 1);
+        }
+
+        static VisualElement CreateEditor(MasterMemoryFieldDescriptor field, object value, Action<object> onChanged, int depth)
+        {
             if (!field.CanEdit) return CreateReadOnly(value);
             if (field.IsList) return CreateListEditor(field, (IList)value, onChanged);
+            if (field.IsObject) return CreateObjectEditor(value, onChanged, depth);
             if (field.IsNullable) return CreateNullableEditor(field, value, onChanged);
 
             var editor = CreateValueEditor(field.Kind, field.ValueType, value, onChanged);
@@ -121,6 +130,48 @@ namespace Nesh.MasterMemoryDebugger
 
             Rebuild();
             foldout.Add(body);
+            return foldout;
+        }
+
+        /// <summary>
+        /// Foldout with one row per member of a nested object. The object shown by the record is never modified: every
+        /// change passes a changed copy to <paramref name="onChanged"/>. Null objects can not be edited.
+        /// </summary>
+        static VisualElement CreateObjectEditor(object value, Action<object> onChanged, int depth)
+        {
+            if (value == null || depth > MaxObjectDepth)
+            {
+                var readOnly = CreateReadOnly(value);
+                readOnly.tooltip = value == null ? "Null objects can not be edited." : $"Objects nested deeper than {MaxObjectDepth} levels are read-only.";
+                return readOnly;
+            }
+
+            var current = value;
+            var foldout = new Foldout { text = MasterDataValueUtility.Format(current), value = depth == 1 };
+            foldout.AddToClassList("mm-debugger__object-editor");
+            foreach (var member in MasterDataReflectionCache.Get(value.GetType()).Fields)
+            {
+                var row = new VisualElement();
+                row.AddToClassList("mm-debugger__object-member");
+                var name = new Label(member.Name) { tooltip = member.ToString() };
+                name.AddToClassList("mm-debugger__object-member-name");
+                row.Add(name);
+
+                var memberValue = member.GetValue(current);
+                var editor = member.CanEdit
+                    ? CreateEditor(member, memberValue, newValue =>
+                    {
+                        var copy = MasterDataCloneUtility.Clone(current);
+                        member.SetValue(copy, newValue);
+                        current = copy;
+                        foldout.text = MasterDataValueUtility.Format(current);
+                        onChanged(current);
+                    }, depth + 1)
+                    : CreateReadOnly(memberValue);
+                editor.AddToClassList("mm-debugger__object-member-value");
+                row.Add(editor);
+                foldout.Add(row);
+            }
             return foldout;
         }
 

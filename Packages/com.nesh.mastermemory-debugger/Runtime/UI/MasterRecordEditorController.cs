@@ -6,7 +6,7 @@ namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
     /// Record inspector. Edits happen on a clone ("working copy"); Apply Override stores the clone.
-    /// Primary / secondary keys and complex members are always read-only.
+    /// Primary / secondary keys and complex members other than lists and nested objects are always read-only.
     /// </summary>
     internal sealed class MasterRecordEditorController : IDisposable
     {
