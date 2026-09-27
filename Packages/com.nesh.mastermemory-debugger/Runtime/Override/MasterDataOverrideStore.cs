@@ -186,6 +186,76 @@ namespace Nesh.MasterMemoryDebugger
             }
         }
 
+        internal sealed class AtomicChange
+        {
+            public Type RecordType;
+            public object Key;
+            /// <summary>Null removes, Deleted deletes, otherwise sets the override.</summary>
+            public object Value;
+            public object ExpectedValue;
+        }
+
+        /// <summary>Commits a fully validated set in one store update and emits change notifications afterwards.</summary>
+        internal void ApplyAtomic(IReadOnlyList<AtomicChange> changes)
+        {
+            if (changes == null) throw new ArgumentNullException(nameof(changes));
+            foreach (var change in changes)
+            {
+                if (change.RecordType == null || change.Key == null)
+                    throw new ArgumentException("Every atomic change needs a type and key.");
+                if (change.Value != null && !IsDeletedValue(change.Value)
+                    && !change.RecordType.IsInstanceOfType(change.Value))
+                    throw new ArgumentException("Atomic change has an incompatible value.");
+            }
+
+            var events = new List<Tuple<MasterDataOverrideKey, object, object>>(changes.Count);
+            lock (gate)
+            {
+                foreach (var change in changes)
+                {
+                    overrides.TryGetValue(new MasterDataOverrideKey(change.RecordType, change.Key), out var before);
+                    if (!ReferenceEquals(before, change.ExpectedValue))
+                        throw new InvalidOperationException("A target override changed during Patch preflight.");
+                }
+                foreach (var change in changes)
+                {
+                    var key = new MasterDataOverrideKey(change.RecordType, change.Key);
+                    overrides.TryGetValue(key, out var before);
+                    if (change.Value == null)
+                    {
+                        if (before == null) continue;
+                        overrides.Remove(key);
+                        var count = countByType[change.RecordType] - 1;
+                        if (count == 0) countByType.Remove(change.RecordType);
+                        else countByType[change.RecordType] = count;
+                    }
+                    else
+                    {
+                        if (before == null)
+                        {
+                            countByType.TryGetValue(change.RecordType, out var count);
+                            countByType[change.RecordType] = count + 1;
+                        }
+                        overrides[key] = change.Value;
+                    }
+                    events.Add(Tuple.Create(key, before, change.Value));
+                }
+            }
+
+            var handlers = EntryChanged?.GetInvocationList();
+            foreach (var item in events)
+            {
+                if (handlers == null) break;
+                foreach (Action<MasterDataOverrideKey, object, object> handler in handlers)
+                {
+                    try { handler(item.Item1, item.Item2, item.Item3); }
+                    catch (Exception e) { MasterMemoryDebugLog.Warning("Atomic override notification failed: " + e.Message); }
+                }
+            }
+            if (events.Count == 0) return;
+            try { RaiseChanged(); }
+            catch (Exception e) { MasterMemoryDebugLog.Warning("Atomic override change notification failed: " + e.Message); }
+        }
         public void Clear()
         {
             List<KeyValuePair<MasterDataOverrideKey, object>> removed;
