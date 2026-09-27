@@ -54,6 +54,8 @@
                         <ui:VisualElement class="mm-debugger__inspector-header">
                             <ui:Label name="mm-inspector-title" text="Record Inspector" class="mm-debugger__section-title mm-debugger__inspector-title" />
                             <ui:Label name="mm-record-state" class="mm-debugger__record-state" />
+                            <ui:VisualElement class="mm-debugger__spacer" />
+                            <ui:Button name="mm-copy-json" text="Copy JSON" tooltip="Copy the record as JSON (WebGL: download)" class="mm-debugger__button mm-debugger__small-button" />
                         </ui:VisualElement>
                         <ui:ScrollView name="mm-inspector" mode="Vertical" class="mm-debugger__inspector" />
                         <ui:VisualElement name="mm-inspector-actions" class="mm-debugger__inspector-actions">
@@ -62,8 +64,6 @@
                             <ui:Button name="mm-reset-record" text="Reset" tooltip="Remove the override of this record" class="mm-debugger__button" />
                             <ui:Button name="mm-duplicate-record" text="Duplicate…" tooltip="Add a copy of this record with a new primary key" class="mm-debugger__button" />
                             <ui:Button name="mm-delete-record" text="Delete" tooltip="Delete the record: a rebuilt database leaves it out (Restore brings it back)" class="mm-debugger__button" />
-                            <ui:VisualElement class="mm-debugger__spacer" />
-                            <ui:Button name="mm-copy-json" text="Copy JSON" tooltip="Copy the record as JSON (WebGL: download)" class="mm-debugger__button" />
                         </ui:VisualElement>
                     </ui:VisualElement>
                 </ui:TwoPaneSplitView>

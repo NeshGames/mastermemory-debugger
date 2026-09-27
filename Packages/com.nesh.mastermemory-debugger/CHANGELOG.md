@@ -2,6 +2,12 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.10.1] - 2026-09-27
+
+### Fixed
+
+- Layout: the search box took the width of its placeholder, so + New… pushed Copy to a second line; it now leaves the room to the buttons. Copy JSON moved to the inspector header, so Apply / Revert / Reset / Duplicate… / Delete fit on one line. The games found by the remote editor tool wrap instead of running past the dialog.
+
 ## [0.10.0] - 2026-09-27
 
 ### Added

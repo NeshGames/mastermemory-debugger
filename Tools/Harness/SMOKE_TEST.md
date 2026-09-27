@@ -55,6 +55,8 @@ and Play Mode) as well.
 
 ## Window
 
+- [ ] The search toolbar keeps its buttons (+ New…, Batch Edit…, Copy) on one line at 1600 px wide; the inspector's
+      Apply … Delete fit on one line, Copy JSON is in its header; long game entries in the Remote dialog wrap.
 - [ ] Language dropdown switches labels; A+ / A- scale without overlapping; a narrow window wraps the header and the
       search toolbar.
 - [ ] Esc closes the dialog / popup first, then the debugger; F8 opens it again at the same table.

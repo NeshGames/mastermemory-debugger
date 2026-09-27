@@ -327,6 +327,8 @@
 
 .mm-debugger__search {
     flex-grow: 1;
+    /* not the placeholder's width: the buttons stay on the first line while they fit */
+    flex-basis: 180px;
     min-width: 180px;
     margin: 0 8px 0 0;
 }
@@ -1345,6 +1347,12 @@
 .mm-debugger .mm-debugger__remote-game {
     -unity-text-align: middle-left;
     margin: 1px 0;
+    /* product, device, address and master version can be longer than the dialog */
+    height: auto;
+    min-height: 24px;
+    padding: 3px 10px;
+    white-space: normal;
+    flex-shrink: 1;
 }
 
 .mm-debugger .mm-debugger__remote-status {
