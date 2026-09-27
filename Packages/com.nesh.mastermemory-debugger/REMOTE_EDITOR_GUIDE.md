@@ -71,7 +71,7 @@ Windows 遊戲第一次開放 Port 時，允許私人網路的防火牆提示。
 
 ## 連線後的建議操作順序
 
-1. 在 **Data** 選 Table，用搜尋條件找出目標 Record；點選一筆後，先看 Inspector 的 **Original** 與目前值。
+1. 在 **Data** 選 Table，用搜尋條件找出目標 Record；點選一筆後，先看 Inspector 的 **Original** 與目前值。 篩選可用 `&&`、`||` 和 `()` 組合，例如 `Damage>100 && (Element=Fire || Element=Ice)`；`&&` 優先於 `||`，原本以空白連接的條件仍是 AND。
 2. 修改欄位後按 **Apply**。Key 欄位唯讀；新增、複製、刪除 Record 會留在 Override Layer。可用 **Undo / Redo** 或 Inspector 的 **Revert / Reset** 撤回。
 3. 在 **Changes** 確認所有修改。需要大量編輯時可 **Copy TSV** 到試算表，修改後用 **Paste TSV…** 預覽並套用。
 4. 有 `AutoRebuild` 時，檢查 **Validation** 是否出現新失敗；對遊戲的查詢與畫面也做實際驗證。

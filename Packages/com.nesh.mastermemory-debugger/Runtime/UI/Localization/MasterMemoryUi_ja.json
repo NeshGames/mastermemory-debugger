@@ -517,6 +517,26 @@
     {
       "key": "1 record",
       "value": "1 件のレコード"
+    },
+    {
+      "key": " (no matches)",
+      "value": "（結果なし）"
+    },
+    {
+      "key": " (ignored)",
+      "value": "（無視しました）"
+    },
+    {
+      "key": "Expected a search term",
+      "value": "検索条件を入力してください"
+    },
+    {
+      "key": "Empty group",
+      "value": "空のグループです"
+    },
+    {
+      "key": "Missing ')'",
+      "value": "閉じ括弧 ) がありません"
     }
   ],
   "patterns": [
@@ -607,6 +627,18 @@
     {
       "pattern": "^▼ (\\d+) more$",
       "replacement": "▼ ほか $1 件"
+    },
+    {
+      "pattern": "^Unexpected '(.+)'$",
+      "replacement": "予期しない記号 '$1'"
+    },
+    {
+      "pattern": "^Expected a search term before '(.+)'$",
+      "replacement": "'$1' の前に検索条件が必要です"
+    },
+    {
+      "pattern": "^Unknown field '(.+)'$",
+      "replacement": "フィールド '$1' が見つかりません"
     }
   ]
 }

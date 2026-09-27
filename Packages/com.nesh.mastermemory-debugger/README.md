@@ -61,10 +61,10 @@ IL2CPP 還需要把產生的 `MasterMemoryResolver` 註冊到 MessagePack（參�
 Package Manager → `+` → **Add package from git URL...**
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.12.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.13.0
    ```
 
-   URL 最後的 `#v0.12.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
+   URL 最後的 `#v0.13.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
 
 Runtime assembly (`Nesh.MasterMemoryDebugger.Runtime`) 會自動參考 NuGetForUnity 安裝的 `MasterMemory.dll`。
 
@@ -269,7 +269,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 
 ### 搜尋 / 篩選
 
-以空白分隔多個條件，**全部符合**才會顯示：
+以空白或 `&&` 連接多個條件時，**全部符合**才會顯示；`||` 表示任一條件符合。`&&` 優先於 `||`，可用 `()` 指定分組：
 
 | 寫法 | 意義 |
 | --- | --- |
@@ -281,14 +281,18 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 | `Name="Ice Blast"` | 值有空白時加引號 |
 | `UnlockLevel=null` | null |
 | `Category=1 Damage > 100` | 多個條件（運算子前後可以有空格） |
+| `Damage>100 && Element=Fire` | AND，與空白連接相同 |
+| <code>Element=Fire &#124;&#124; Element=Ice</code> | OR，任一條件符合 |
+| <code>Damage&gt;100 &amp;&amp; (Element=Fire &#124;&#124; Element=Ice)</code> | 用括號先計算 OR；括號與運算子旁可不留空白 |
 
-欄位名稱不分大小寫；比較的是目前值（有 Override 時用 Override）。欄位不存在或值格式錯誤時，筆數旁會顯示警告並忽略該條件。
+欄位名稱不分大小寫；比較的是目前值（有 Override 時用 Override）。引號內的 `&&`、`||`、括號是值的一部分；Flags 列舉仍用單一 `|` 連接，例如 `Flags=Boss|Flying`。一般查詢中欄位不存在或值格式錯誤時會顯示警告並忽略該條件；布林／括號查詢有任何錯誤時則不回傳 Record，避免 Batch Edit 誤套用。
 只在查詢、Table、排序、Override 變更時重新計算（輸入時有 150ms debounce）。
 
 **自動完成**：輸入時搜尋框下方會出現候選清單，**↑ / ↓** 選擇，**Tab / Enter** 或點擊套用，**Esc** 關閉清單（不會關閉 Debugger）。
 
 - 欄位名稱：輸入 `da` → `Damage`。沒有開頭符合的欄位時，改用「包含」比對（`mag` → `Damage`）。
 - 運算子後的值：enum 名稱與 `true` / `false`（`Element=f` → `Fire`；Flags 可用 `|` 連接：`Flags=Boss|Fl` → `Flying`）。
+- 括號、`&&`、`||` 後仍可自動完成欄位與 enum / bool 值。
 - 欄位名稱打完整時，清單會列出可用的運算子。
 - 焦點在搜尋框時，Tab 不會跳到下一個控制項。
 - **最近的搜尋**：搜尋框是空的時，清單會列出最近 10 個搜尋條件（有文字時按 **↓** 會列出包含該文字的條件）。

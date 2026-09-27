@@ -7,12 +7,12 @@ using System.Text.RegularExpressions;
 namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
-    /// Search box query. Space separated terms that must all match:
+    /// Search box query. Adjacent space-separated terms are ANDed; explicit && and || support grouping with parentheses.
     /// <list type="bullet">
     /// <item><c>Field op Value</c> with op <c>= != &gt; &gt;= &lt; &lt;= ~</c> (<c>~</c> = contains), e.g. <c>Damage&gt;100 Element=Fire</c></item>
     /// <item>any other text: matches the primary key, the display name or a string member (contains, case-insensitive)</item>
     /// </list>
-    /// Values with spaces are quoted: <c>Name="Ice Blast"</c>. <c>Field=null</c> matches null values.
+    /// && binds tighter than ||. Values with spaces are quoted: <c>Name="Ice Blast"</c>. <c>Field=null</c> matches null values.
     /// Conditions read the current value (override when present).
     /// </summary>
     public sealed class MasterRecordQuery
@@ -40,12 +40,42 @@ namespace Nesh.MasterMemoryDebugger
             public object EnumValue;
         }
 
-        static readonly Regex s_operatorSpacing = new Regex(@"\s*(>=|<=|!=|=|>|<|~)\s*", RegexOptions.CultureInvariant);
+        abstract class QueryNode
+        {
+            public abstract bool Matches(MasterMemoryRecordDescriptor record);
+        }
+
+        sealed class TermNode : QueryNode
+        {
+            public Condition Condition;
+            public string Text;
+
+            public override bool Matches(MasterMemoryRecordDescriptor record)
+            {
+                if (Condition == null) return record.Matches(Text);
+                var current = record.Current;
+                return current != null && Evaluate(Condition, Condition.Field.GetValue(current));
+            }
+        }
+
+        sealed class BinaryNode : QueryNode
+        {
+            public QueryNode Left;
+            public QueryNode Right;
+            public bool IsOr;
+
+            public override bool Matches(MasterMemoryRecordDescriptor record) =>
+                IsOr ? Left.Matches(record) || Right.Matches(record) : Left.Matches(record) && Right.Matches(record);
+        }
+
         static readonly Regex s_condition = new Regex(@"^([A-Za-z_][A-Za-z0-9_]*)(>=|<=|!=|=|>|<|~)(.*)$", RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
         readonly List<Condition> conditions = new List<Condition>();
         readonly List<string> textTerms = new List<string>();
         readonly List<string> errors = new List<string>();
+        QueryNode expression;
+        bool invalidExpression;
+        bool hasBooleanSyntax;
 
         MasterRecordQuery()
         {
@@ -53,7 +83,9 @@ namespace Nesh.MasterMemoryDebugger
 
         public static MasterRecordQuery Empty { get; } = new MasterRecordQuery();
 
-        public bool IsEmpty => conditions.Count == 0 && textTerms.Count == 0;
+        public bool IsEmpty => !invalidExpression && conditions.Count == 0 && textTerms.Count == 0;
+
+        public bool HasBooleanSyntax => hasBooleanSyntax;
 
         /// <summary>Problems found while parsing (unknown fields, invalid values). Those terms are ignored.</summary>
         public IReadOnlyList<string> Errors => errors;
@@ -67,31 +99,26 @@ namespace Nesh.MasterMemoryDebugger
             var query = new MasterRecordQuery();
             if (string.IsNullOrWhiteSpace(text)) return query;
 
-            foreach (var token in Tokenize(s_operatorSpacing.Replace(text.Trim(), "$1")))
+            var tokens = new List<string>(Tokenize(NormalizeOperators(text.Trim())));
+            query.hasBooleanSyntax = tokens.Exists(IsBooleanToken);
+            if (!query.hasBooleanSyntax)
             {
-                var match = s_condition.Match(token);
-                if (!match.Success || type == null)
-                {
-                    query.textTerms.Add(Unquote(token));
-                    continue;
-                }
-
-                var field = FindField(type, match.Groups[1].Value);
-                if (field == null)
-                {
-                    query.errors.Add($"Unknown field '{match.Groups[1].Value}'");
-                    continue;
-                }
-
-                var condition = CreateCondition(field, ParseOperator(match.Groups[2].Value), Unquote(match.Groups[3].Value), out var error);
-                if (condition == null) query.errors.Add(error);
-                else query.conditions.Add(condition);
+                foreach (var token in tokens) ParseTerm(query, token, type);
+                return query;
             }
+
+            var position = 0;
+            query.expression = ParseOr(query, tokens, type, ref position);
+            if (position < tokens.Count) query.errors.Add($"Unexpected '{tokens[position]}'");
+            // A malformed grouped query must never widen a filter, especially before Batch Edit.
+            query.invalidExpression = query.expression == null || query.errors.Count > 0;
             return query;
         }
 
         public bool Matches(MasterMemoryRecordDescriptor record)
         {
+            if (invalidExpression) return false;
+            if (expression != null) return expression.Matches(record);
             if (IsEmpty) return true;
             foreach (var term in textTerms)
             {
@@ -110,28 +137,143 @@ namespace Nesh.MasterMemoryDebugger
 
         // ------------------------------------------------------------------ parse
 
-        static IEnumerable<string> Tokenize(string text)
+        static bool IsBooleanToken(string token) => token == "&&" || token == "||" || token == "(" || token == ")";
+
+        static QueryNode ParseOr(MasterRecordQuery query, List<string> tokens, MasterDataTypeDescriptor type, ref int position)
         {
-            var sb = new StringBuilder();
-            var quoted = false;
-            foreach (var c in text)
+            var left = ParseAnd(query, tokens, type, ref position);
+            while (position < tokens.Count && tokens[position] == "||")
             {
+                position++;
+                var right = ParseAnd(query, tokens, type, ref position);
+                left = left == null || right == null ? null : new BinaryNode { Left = left, Right = right, IsOr = true };
+            }
+            return left;
+        }
+
+        static QueryNode ParseAnd(MasterRecordQuery query, List<string> tokens, MasterDataTypeDescriptor type, ref int position)
+        {
+            var left = ParsePrimary(query, tokens, type, ref position);
+            while (position < tokens.Count && tokens[position] != ")" && tokens[position] != "||")
+            {
+                if (tokens[position] == "&&") position++;
+                var right = ParsePrimary(query, tokens, type, ref position);
+                left = left == null || right == null ? null : new BinaryNode { Left = left, Right = right };
+            }
+            return left;
+        }
+
+        static QueryNode ParsePrimary(MasterRecordQuery query, List<string> tokens, MasterDataTypeDescriptor type, ref int position)
+        {
+            if (position >= tokens.Count)
+            {
+                query.errors.Add("Expected a search term");
+                return null;
+            }
+            var token = tokens[position++];
+            if (token == "(")
+            {
+                if (position < tokens.Count && tokens[position] == ")")
+                {
+                    position++;
+                    query.errors.Add("Empty group");
+                    return null;
+                }
+                var inner = ParseOr(query, tokens, type, ref position);
+                if (position >= tokens.Count || tokens[position] != ")") query.errors.Add("Missing ')'");
+                else position++;
+                return inner;
+            }
+            if (IsBooleanToken(token))
+            {
+                query.errors.Add($"Expected a search term before '{token}'");
+                return null;
+            }
+            return ParseTerm(query, token, type);
+        }
+
+        static QueryNode ParseTerm(MasterRecordQuery query, string token, MasterDataTypeDescriptor type)
+        {
+            var match = s_condition.Match(token);
+            if (!match.Success || type == null)
+            {
+                var text = Unquote(token);
+                query.textTerms.Add(text);
+                return new TermNode { Text = text };
+            }
+
+            var field = FindField(type, match.Groups[1].Value);
+            if (field == null)
+            {
+                query.errors.Add($"Unknown field '{match.Groups[1].Value}'");
+                return null;
+            }
+
+            var condition = CreateCondition(field, ParseOperator(match.Groups[2].Value), Unquote(match.Groups[3].Value), out var error);
+            if (condition == null)
+            {
+                query.errors.Add(error);
+                return null;
+            }
+            query.conditions.Add(condition);
+            return new TermNode { Condition = condition };
+        }
+
+        // Remove spaces around field comparison operators without changing quoted values.
+        static string NormalizeOperators(string text)
+        {
+            var result = new StringBuilder();
+            var quoted = false;
+            for (var i = 0; i < text.Length; i++)
+            {
+                var c = text[i];
                 if (c == '"')
                 {
                     quoted = !quoted;
-                    sb.Append(c);
+                    result.Append(c);
+                    continue;
                 }
-                else if (char.IsWhiteSpace(c) && !quoted)
+                if (!quoted && (c == '=' || c == '>' || c == '<' || c == '~' || (c == '!' && i + 1 < text.Length && text[i + 1] == '=')))
                 {
-                    if (sb.Length > 0) yield return sb.ToString();
-                    sb.Clear();
+                    while (result.Length > 0 && char.IsWhiteSpace(result[result.Length - 1])) result.Length--;
+                    result.Append(c);
+                    if (i + 1 < text.Length && text[i + 1] == '=' && c != '=') result.Append(text[++i]);
+                    while (i + 1 < text.Length && char.IsWhiteSpace(text[i + 1])) i++;
+                    continue;
                 }
-                else
-                {
-                    sb.Append(c);
-                }
+                result.Append(c);
             }
-            if (sb.Length > 0) yield return sb.ToString();
+            return result.ToString();
+        }
+
+        static IEnumerable<string> Tokenize(string text)
+        {
+            var word = new StringBuilder();
+            var quoted = false;
+            for (var i = 0; i < text.Length; i++)
+            {
+                var c = text[i];
+                if (c == '"')
+                {
+                    quoted = !quoted;
+                    word.Append(c);
+                    continue;
+                }
+                if (!quoted && (c == '(' || c == ')' || (c == '&' && i + 1 < text.Length && text[i + 1] == '&') || (c == '|' && i + 1 < text.Length && text[i + 1] == '|')))
+                {
+                    if (word.Length > 0) { yield return word.ToString(); word.Clear(); }
+                    if (c == '&' || c == '|') { yield return new string(c, 2); i++; }
+                    else yield return c.ToString();
+                    continue;
+                }
+                if (!quoted && char.IsWhiteSpace(c))
+                {
+                    if (word.Length > 0) { yield return word.ToString(); word.Clear(); }
+                    continue;
+                }
+                word.Append(c);
+            }
+            if (word.Length > 0) yield return word.ToString();
         }
 
         static string Unquote(string text) => text.Replace("\"", string.Empty);
@@ -214,7 +356,7 @@ namespace Nesh.MasterMemoryDebugger
                 case MasterDataValueKind.FlagsEnum:
                     try
                     {
-                        condition.EnumValue = MasterDataValueUtility.ParseEnum(field.ValueType, value);
+                        condition.EnumValue = MasterDataValueUtility.ParseEnum(field.ValueType, field.Kind == MasterDataValueKind.FlagsEnum ? value.Replace('|', ',') : value);
                         return condition;
                     }
                     catch (Exception)

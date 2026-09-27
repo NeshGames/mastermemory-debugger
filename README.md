@@ -9,7 +9,7 @@ Everything runs only in the Editor and in Development Builds; release builds con
 ## Features
 
 - **Browse** every MasterMemory table: database viewer layout, frozen / hidden / resizable columns, sorting, pinned
-  tabs, condition search with completion and recent searches, localized table / field names with tips, and Find:
+  tabs, condition search with `&&`, `||`, grouping, completion and recent searches, stable code-name table / field labels, and Find:
   a value in every table (lists and nested objects included).
 - **Override** values at runtime without touching the MemoryDatabase: inspector editing (lists and the members of
   nested objects / structs included), add / duplicate / delete records, batch edit
@@ -28,10 +28,10 @@ Everything runs only in the Editor and in Development Builds; release builds con
 2. Package Manager → Add package from git URL:
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.12.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.13.0
    ```
 
-   `#v0.12.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
+   `#v0.13.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
 
 See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for usage, or follow the [Remote Editor Build guide](Packages/com.nesh.mastermemory-debugger/REMOTE_EDITOR_GUIDE.md) to build and use the desktop tool. The [illustrated Traditional Chinese guide](https://neshgames.github.io/mastermemory-debugger/) shows the actual remote editor interface step by step.
 

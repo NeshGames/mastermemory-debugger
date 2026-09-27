@@ -60,6 +60,17 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void GroupedQueries_ShouldCompleteFieldsAndValues()
+        {
+            Assert.AreEqual("Damage>100 && (Element", AcceptFirst("Damage>100 && (El"));
+            Assert.AreEqual("Damage>100||(Element=Fire)", AcceptFirst("Damage>100||(Element=F)", "Damage>100||(Element=F".Length));
+            Assert.AreEqual("Damage>100 || Category", AcceptFirst("Damage>100 || Ca"));
+            Assert.AreEqual("Damage>100||Category", AcceptFirst("Damage>100||Ca"));
+            Assert.AreEqual("Element=Fire||Category", AcceptFirst("Element=Fire||Ca"));
+            Assert.AreEqual("Damage>100 && (Category=1)", AcceptFirst("Damage>100 && (Ca=1)", "Damage>100 && (Ca".Length));
+        }
+
+        [Test]
         public void TextTermsAndOtherValues_ShouldNotComplete()
         {
             Assert.IsNull(Context("fireball"));
