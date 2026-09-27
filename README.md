@@ -28,10 +28,10 @@ Everything runs only in the Editor and in Development Builds; release builds con
 2. Package Manager → Add package from git URL:
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.10.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.10.1
    ```
 
-   `#v0.10.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
+   `#v0.10.1` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
 
 See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for usage.
 
