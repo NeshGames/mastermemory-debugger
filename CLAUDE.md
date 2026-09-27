@@ -76,6 +76,10 @@ of remote editing and 50,000 record timing checks). Run it before every commit.
 
 - `MultiColumnListView` rebuilds on every column change; the record grid is a custom virtualized grid
   (`MasterRecordGrid`) with frozen / scrolled parts.
+- Added records are overrides without an original (`MasterMemoryRecordDescriptor.IsAdded`, `Original` is null); deleted
+  ones are the `MasterDataOverrideStore.Deleted` marker as the store value. `TryGet` never returns the marker (gameplay
+  keeps the original), but `GetEntries` / `EntryChanged` / the history carry it: check `IsDeleted` wherever entry values
+  are used.
 - `MasterMemoryFieldDescriptor.IsObject` (nested object editing) is evaluated lazily: nested types may hold their own
   type, and evaluating it while the reflection cache builds a descriptor would recurse forever.
 - MasterMemory `Validate()` compiles the `Exists()` expressions for every record and scans the referenced table:

@@ -15,6 +15,11 @@ and Play Mode) as well.
 - [ ] `ExampleCharacterMaster` → Growth: the foldout lists the members; edit `CritRate` and `DamageRange.Max`, Enter →
       the grid shows `{HpPerLevel: …}`, `Original:` shown; Reset restores it; Save As… a patch, Reset All, Apply the patch
       → the values come back.
+- [ ] **+ New…** on `ExampleSkillMaster`: the key dialog suggests the next Id; an existing Id is refused with the reason;
+      the new row shows `+` and opens in the inspector; edit it, Apply; **Duplicate…** copies a record with a new key.
+- [ ] **Delete** a skill: `×` in the grid, the inspector is read-only with **Restore**; Changes lists ADDED / DELETED;
+      Ctrl+Z undoes the delete and the add; with AutoRebuild, `StartSkillId` of a character pointing at a deleted skill
+      shows a NEW validation failure.
 - [ ] `→ Table` reference button and **Referenced by → Show** open the related records.
 - [ ] **Batch Edit…**: `Damage` × 1.1 on a search; enum field shows a dropdown.
 - [ ] Ctrl+Z undoes the batch edit, Ctrl+Y redoes it; Undo / Redo buttons enable and disable.
@@ -35,7 +40,7 @@ and Play Mode) as well.
       addresses, port and pairing code.
 - [ ] Build Remote Editor Tool… → run it, connect with the code →
       the tables appear; an edit in the tool changes the game (Console log of the sample) and an edit in the game shows
-      in the tool; editing `Growth.CritRate` in the tool reaches the game; a wrong code is refused.
+      in the tool; editing `Growth.CritRate`, adding and deleting a record in the tool reach the game; a wrong code is refused.
 - [ ] Tool: fills the window, no Close; the Validation tab shows the game's failures and Open jumps to the record.
 - [ ] Tool: "Games on the network" lists the running game; stop and restart the game's Play Mode → the tool reconnects
       by itself (fixed Remote Pairing Code); a wrong code is not retried.

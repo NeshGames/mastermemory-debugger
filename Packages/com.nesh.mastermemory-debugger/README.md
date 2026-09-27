@@ -5,11 +5,11 @@
 [Cysharp/MasterMemory](https://github.com/Cysharp/MasterMemory) v3 的 Runtime 資料查閱與開發用 Override 工具，UI 完全使用 **UI Toolkit**。
 
 - 在 Unity Editor / Development Build 中瀏覽、搜尋所有 MasterMemory Table
-- 對既有 Record 的非 Key 欄位建立 **Runtime Override**（MasterMemory 本體維持 Immutable）
+- 對既有 Record 的非 Key 欄位建立 **Runtime Override**（MasterMemory 本體維持 Immutable），也可以新增 / 複製 / 刪除 Record
 - 將修改過的欄位存成 / 匯出為 JSON Patch，重開遊戲後可載入，也能交給企劃回填主資料
 
 > 本 Package 的定位是 **Development Runtime Inspector + Value Override Tool**，不是 Runtime Database Editor。
-> 不支援新增 / 刪除 / 複製 Record、修改 PrimaryKey / SecondaryKey、Schema 變更。
+> 不支援修改既有 Record 的 PrimaryKey / SecondaryKey、Schema 變更。新增 / 刪除的 Record 只存在於 Override Layer（見下方「新增 / 複製 / 刪除 Record」）。
 > 原始 MemoryDatabase 永遠不會被修改；需要時可以用 `MasterMemoryDebugRebuild` 產生一份套用了 Override 的新 database（選用）。
 
 ---
@@ -211,6 +211,16 @@ public EnemyLevelMaster GetEnemyLevel(int enemyId, int level)
 
 沒有任何 Override 的型別不會進行 dictionary 查詢，也不會 boxing。
 
+- Debugger 新增的 Record：`TryGetOverride` / `Resolve` 會回傳它（`FindById` 找不到它，所以一定要經過上面的讀取路徑，或使用 AutoRebuild）。
+- Debugger 刪除的 Record：`TryGetOverride` 回傳 **false**，`Resolve` 照舊回傳原始資料（既有程式不會收到 null）。
+  只有重建後的 database（`MasterMemoryDebugRebuild`）真的沒有這筆資料。需要時可以自己判斷：
+
+  ```csharp
+  if (MasterMemoryDebugRuntime.IsDeleted<SkillMaster, int>(id)) return null;
+  ```
+
+  `GetOverrides<T>()` 不包含刪除；`GetDeletedKeys<T, TKey>()` 取得被刪除的主鍵。
+
 ### （選用）重建 Gameplay Database：`MasterMemoryDebugRebuild`
 
 如果希望 SecondaryKey / Range / `All` 查詢也能讀到 Override，讓遊戲端讀取的 database 參考換成「套用了 Override 的新 database」。只要一行：
@@ -328,9 +338,22 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
   - **Referenced by**（反向關聯）：Inspector 最下方列出參照這筆 Record 的其他 Table 欄位與筆數（使用目前值，包含 Override），
     **Show** 會開啟來源 Table 並以 `StartSkillId=1001` 篩選。修改或刪減資料前可以先確認影響範圍。
     區塊可以折疊（折疊時不計算）；程式中可用 `MasterMemoryReferences.GetIncoming(table)` / `FindReferencing(reference, value)`。
-- **Apply** 會把編輯中的副本存進 Override Store；如果所有值都和原始值相同，會改為移除 Override。
+- **Apply** 會把編輯中的副本存進 Override Store；如果所有值都和原始值相同，會改為移除 Override（新增的 Record 除外）。
 - **Copy JSON**：把整筆 Record（包含陣列與巢狀物件、未套用的編輯）複製為 JSON。Editor / Windows 複製到剪貼簿，WebGL 下載成檔案。
 - 有未套用的編輯時切換 Record / Table，會詢問 **Apply / Discard / Cancel**。
+
+### 新增 / 複製 / 刪除 Record
+
+- **+ New…**（搜尋列）：用預設值建立一筆 Record（字串為空、List 為空、巢狀物件會建立）。**Duplicate…**（Inspector）：複製目前的 Record。
+  兩者都會詢問新的主鍵（預設為最大值 + 1；複合主鍵只遞增最後一個成員），主鍵已存在時會說明原因。
+- 新增的 Record 只存在於 Override Store：表格中標示 `+`，`TryGetOverride` 與重建後的 database 看得到它。
+  可以像一般 Record 一樣編輯，SecondaryKey 也可以改（重建時會建立索引）；**Delete** 移除它。
+- **Delete**（Inspector）：刪除原始 Record。表格中標示 `×`、Inspector 變成唯讀，**Restore**（或 Changes 的 Restore）還原。
+  重建後的 database 不包含它（MasterMemory 產生的 `RemoveXxx(keys)`）；遊戲讀取的行為見上方「Integrate Override」。
+  被其他 Table 參照的 Record 刪除後，Validation 頁籤會顯示新的失敗。
+- 新增、刪除、還原都可以 Undo；Changes 以 **ADDED** / **DELETED** 標示；Find 不會找到被刪除的 Record。
+- 需要 `[PrimaryKey]` 且主鍵可寫入（`init` / setter / backing field）。手動註冊、沒有 `[PrimaryKey]` 的 Table 不能新增。
+- 程式中：`MasterMemoryRecordFactory.TryCreate(table, template, keyTexts, out record, out key, out error)`、`Store.Delete(type, key)`、`Store.IsDeleted(type, key)`。
 
 ### Changes（修改總覽）
 
@@ -339,6 +362,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 
 **Copy TSV** 會把所有修改過的欄位複製成 `table / key / name / field / original / current` 的 Tab 分隔表格，
 可以貼到試算表，對照著把調整好的數值回填到主資料的原始檔（WebGL 下載成 `changes.tsv`；程式中：`MasterMemoryChangeSummary.ToTsv(...)`）。
+新增的 Record 每個欄位一行（original 空白），刪除的 Record 一行、field 為 `(deleted)`（Paste TSV 會忽略這一行）。
 
 **Paste TSV…** 是反方向：把在試算表裡改好的表格貼回來，變成 Override。
 
@@ -479,7 +503,7 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
 - 工具只執行這個 Scene，遊戲本身的邏輯不會跑；它只需要專案的 Record 型別（所以要從**同一個版本**的專案 build）。
   主資料的類別改了之後請重新 build 工具（可以放進 CI 和遊戲一起 build）。
 - 也可以不 build：在 Editor 開這個 Scene 按 Play，Editor 本身就是工具。
-- 表格、搜尋、Batch Edit、Paste TSV、Undo、Patch（存在 PC 上）都可以用；修改都會送到遊戲。
+- 表格、搜尋、Batch Edit、Paste TSV、新增 / 刪除 Record、Undo、Patch（存在 PC 上）都可以用；修改都會送到遊戲。
   **Validation** 分頁會請遊戲端執行 `Validate()` 並顯示結果（Open 跳到工具中的該筆 Record）；頁籤標題的 `(N new)` 由遊戲端即時更新。
   遊戲端需要使用 `AutoRebuild`（validate: true）。
 - 工具的 Debugger 佔滿整個視窗，沒有 Close（Esc / F8 不會關閉）。
@@ -527,6 +551,9 @@ Patch 只記錄 **有修改的可編輯欄位** 與其 **原始值**，不會保
 
 - 複合主鍵：`"primaryKey": { "EnemyId": 1, "Level": 2 }`
 - enum 用名稱字串，`Vector2/3` 用 `{"x","y","z"}`，`Color` 用 `{"r","g","b","a"}`，`long / ulong` 不會失去精度。
+- 新增的 Record：`{ "primaryKey": { "Id": 9001 }, "added": true, "changes": [{ "field": "Name", "value": "New" }, ...] }`（所有可寫入的非主鍵欄位，沒有 original）。
+  刪除的 Record：`{ "primaryKey": { "Id": 1003 }, "deleted": true, "changes": [] }`。
+  含有新增 / 刪除的 Patch 寫成 `formatVersion: 2`（舊版 Package 無法讀取）；沒有的維持 1。
 - 巢狀物件 / struct 存成其可編輯成員的 JSON 物件：`{ "field": "Growth", "original": { "HpPerLevel": 60, ... }, "value": { "HpPerLevel": 75, ... } }`。
   載入時會套用到原始值的副本上，所以 Patch 沒有寫到的成員（包含唯讀成員）保留原始值，手寫 Patch 可以只寫要改的成員。
 - 各專案可以依自己的主資料來源（Excel / Google Sheets / CSV …）處理這個 JSON；也可以在程式裡直接取得 DTO：
@@ -567,7 +594,8 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 載入時：
 
 - Master Version 不同 → 顯示警告，可選 **Cancel** 或 **Force Apply**。
-- Record 不存在 → 略過（不能新增 Record）。
+- Record 不存在 → 略過（`added` 的 Record 會被新增；`added` 的 Record 已經存在於主資料時，其值當作修改套用並警告）。
+- `deleted` 的 Record 不存在 → 略過並警告。
 - Key 欄位或不存在的欄位 → 略過。
 - `original` 和目前主資料不同 → 仍然套用，但會列出警告（代表主資料已經改過）。
 - `Auto Load Patch` 開啟時，會在 Table 註冊時自動套用 `Default Patch Name` 的 Patch；版本不同時不會自動套用。

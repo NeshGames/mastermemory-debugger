@@ -12,7 +12,7 @@ Everything runs only in the Editor and in Development Builds; release builds con
   tabs, condition search with completion and recent searches, localized table / field names with tips, and Find:
   a value in every table (lists and nested objects included).
 - **Override** values at runtime without touching the MemoryDatabase: inspector editing (lists and the members of
-  nested objects / structs included), batch edit
+  nested objects / structs included), add / duplicate / delete records, batch edit
   (set / add / multiply over a search), undo / redo, relation jump and "Referenced by" from `IValidatable` `Exists()`.
 - **Rebuild** the gameplay database with the overrides (`MasterMemoryDebugRebuild.AutoRebuild`) and see MasterMemory
   `Validate()` failures caused by them in the Validation tab.
