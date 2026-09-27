@@ -148,6 +148,187 @@ namespace Nesh.MasterMemoryDebugger.Tests
             PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Listening, "the disconnect");
         }
 
+        [Test]
+        public void PatchPlan_ShouldRejectAllTargetsWhenOneFieldIsInvalid()
+        {
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            RegisterTestDatabase();
+            MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 185 });
+            var patch = MasterDataPatchService.CreatePatch();
+            patch.Tables[0].Records[0].Changes.Add(new MasterDataPatchChange { Field = "MissingField", Value = 1 });
+            var json = MasterDataPatchSerializer.ToJson(patch);
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+
+            var plan = MasterMemoryRemotePatch.Build(new MasterMemoryRemoteProtocol.PatchRequest
+            { RequestId = "invalid", ServerEpoch = "epoch", MasterVersion = "v1", PatchJson = json }, "epoch");
+
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Invalid, plan.Response.Status);
+            Assert.IsTrue(plan.Response.Errors.Exists(x => x.Code == "FIELD_NOT_EDITABLE"));
+            Assert.AreEqual(0, plan.Changes.Count);
+            Assert.AreEqual(0, MasterMemoryDebugRuntime.OverrideCount);
+        }
+
+        [Test]
+        public void PatchPlan_ShouldApplyAtomicallyAndRejectWrongOriginal()
+        {
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            RegisterTestDatabase();
+            MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 185 });
+            var json = MasterDataPatchService.CreatePatchJson();
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            var request = new MasterMemoryRemoteProtocol.PatchRequest
+            { RequestId = "apply-1", ServerEpoch = "epoch", MasterVersion = "v1", PatchJson = json };
+
+            var plan = MasterMemoryRemotePatch.Build(request, "epoch");
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, plan.Response.Status);
+            Assert.AreEqual(1, plan.Response.Targets.Count);
+            var applied = MasterMemoryRemotePatch.Apply(plan, plan.Response.PlanSha);
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, applied.Status);
+            Assert.AreEqual(1, applied.AppliedRecords);
+            Assert.AreEqual(1, applied.AppliedFields);
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1001, out var skill));
+            Assert.AreEqual(185, skill.Damage);
+
+            var wrong = MasterDataPatchSerializer.FromJson(json);
+            wrong.Tables[0].Records[0].Changes[0].Original = 999;
+            request.PatchJson = MasterDataPatchSerializer.ToJson(wrong);
+            var rejected = MasterMemoryRemotePatch.Build(request, "epoch");
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Invalid, rejected.Response.Status);
+            Assert.IsTrue(rejected.Response.Errors.Exists(x => x.Code == "ORIGINAL_MISMATCH"));
+        }
+
+        [Test]
+        public void PatchApply_ShouldCommitAddedAndDeletedRecordsTogether()
+        {
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            RegisterTestDatabase();
+            var patch = new MasterDataPatch { MasterVersion = "v1" };
+            patch.Tables.Add(new MasterDataPatchTable
+            {
+                TableName = nameof(TestSkill), RecordType = typeof(TestSkill).FullName,
+                Records = new System.Collections.Generic.List<MasterDataPatchRecord>
+                {
+                    new MasterDataPatchRecord
+                    {
+                        PrimaryKey = new MasterDataJsonObject { { "Id", 1003 } }, Deleted = true,
+                    },
+                    new MasterDataPatchRecord
+                    {
+                        PrimaryKey = new MasterDataJsonObject { { "Id", 9001 } }, Added = true,
+                        Changes = new System.Collections.Generic.List<MasterDataPatchChange>
+                        {
+                            new MasterDataPatchChange { Field = "Name", Value = "New" },
+                            new MasterDataPatchChange { Field = "Damage", Value = 50 },
+                        },
+                    },
+                },
+            });
+            var plan = MasterMemoryRemotePatch.Build(new MasterMemoryRemoteProtocol.PatchRequest
+            { RequestId = "add-delete", ServerEpoch = "epoch", MasterVersion = "v1",
+                PatchJson = MasterDataPatchSerializer.ToJson(patch) }, "epoch");
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, plan.Response.Status,
+                string.Join("; ", plan.Response.Errors.ConvertAll(x => x.Message)));
+
+            var result = MasterMemoryRemotePatch.Apply(plan, plan.Response.PlanSha);
+
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, result.Status);
+            Assert.AreEqual(2, result.AppliedRecords);
+            Assert.IsTrue(MasterMemoryDebugRuntime.IsDeleted<TestSkill, int>(1003));
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(9001, out var added));
+            Assert.AreEqual("New", added.Name);
+            Assert.AreEqual(50, added.Damage);
+        }
+        [Test]
+        public void PatchApply_ShouldRejectChangedTargetAfterPlanning()
+        {
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            RegisterTestDatabase();
+            MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 185 });
+            var json = MasterDataPatchService.CreatePatchJson();
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            var request = new MasterMemoryRemoteProtocol.PatchRequest
+            { RequestId = "conflict", ServerEpoch = "epoch", MasterVersion = "v1", PatchJson = json };
+            var first = MasterMemoryRemotePatch.Build(request, "epoch");
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, first.Response.Status);
+
+            MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Name = "renamed" });
+            var current = MasterMemoryRemotePatch.Build(request, "epoch");
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, current.Response.Status);
+            Assert.AreNotEqual(first.Response.Targets[0].BeforeSha, current.Response.Targets[0].BeforeSha);
+            var result = MasterMemoryRemotePatch.Apply(current, first.Response.PlanSha);
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Conflict, result.Status);
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1001, out var skill));
+            Assert.AreEqual(120, skill.Damage);
+            Assert.AreEqual("renamed", skill.Name);
+        }
+        [Test]
+        public void PatchApply_ShouldRejectConcurrentWriteAfterPreflight()
+        {
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            RegisterTestDatabase();
+            MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 185 });
+            var json = MasterDataPatchService.CreatePatchJson();
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            var request = new MasterMemoryRemoteProtocol.PatchRequest
+            { RequestId = "race", ServerEpoch = "epoch", MasterVersion = "v1", PatchJson = json };
+            var plan = MasterMemoryRemotePatch.Build(request, "epoch");
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, plan.Response.Status);
+            MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 999 });
+
+            var result = MasterMemoryRemotePatch.Apply(plan, plan.Response.PlanSha);
+
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Conflict, result.Status);
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1001, out var skill));
+            Assert.AreEqual(999, skill.Damage);
+        }
+        [Test]
+        public void PatchApply_ShouldReplayResultForTheSameRequestId()
+        {
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            RegisterTestDatabase();
+            MasterMemoryDebugRemote.StartServer(0, "123456");
+            var stream = ConnectRaw("123456");
+            var welcome = MasterMemoryRemoteProtocol.DecodeWelcome(Receive(stream, "welcome"));
+            var patch = new MasterDataPatch { MasterVersion = "v1" };
+            patch.Tables.Add(new MasterDataPatchTable
+            {
+                TableName = nameof(TestSkill), RecordType = typeof(TestSkill).FullName,
+                Records = new System.Collections.Generic.List<MasterDataPatchRecord>
+                {
+                    new MasterDataPatchRecord
+                    {
+                        PrimaryKey = new MasterDataJsonObject { { "Id", 1001 } },
+                        Changes = new System.Collections.Generic.List<MasterDataPatchChange>
+                        { new MasterDataPatchChange { Field = "Damage", Original = 120, Value = 185 } },
+                    },
+                },
+            });
+            var request = new MasterMemoryRemoteProtocol.PatchRequest
+            {
+                RequestId = "patch-1", ServerEpoch = welcome.ServerEpoch, MasterVersion = "v1",
+                PatchJson = MasterDataPatchSerializer.ToJson(patch),
+            };
+            MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.EncodePatchRequest(
+                MasterMemoryRemoteProtocol.MessageType.PatchPlanRequest, request));
+            var planned = MasterMemoryRemoteProtocol.DecodePatchResponse(ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.PatchResponse));
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, planned.Status);
+            request.PlanSha = planned.PlanSha;
+            MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.EncodePatchRequest(
+                MasterMemoryRemoteProtocol.MessageType.PatchApplyRequest, request));
+            var first = MasterMemoryRemoteProtocol.DecodePatchResponse(ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.PatchResponse));
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, first.Status);
+            Assert.AreEqual(1, MasterMemoryDebugRuntime.OverrideCount);
+            MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.EncodePatchRequest(
+                MasterMemoryRemoteProtocol.MessageType.PatchApplyRequest, request));
+            var replay = MasterMemoryRemoteProtocol.DecodePatchResponse(ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.PatchResponse));
+            Assert.AreEqual(first.StateSha, replay.StateSha);
+            Assert.AreEqual(1, MasterMemoryDebugRuntime.OverrideCount);
+            request.PatchJson += " ";
+            MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.EncodePatchRequest(
+                MasterMemoryRemoteProtocol.MessageType.PatchApplyRequest, request));
+            var collision = MasterMemoryRemoteProtocol.DecodePatchResponse(ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.PatchResponse));
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Conflict, collision.Status);
+        }
         // ------------------------------------------------------------------ tool side (client)
 
         [Test]

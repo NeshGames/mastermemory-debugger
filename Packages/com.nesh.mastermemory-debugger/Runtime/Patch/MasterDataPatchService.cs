@@ -462,7 +462,7 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         /// <summary>Re-reads key values with the member types so that e.g. 1001.0 and 1001 match.</summary>
-        static string NormalizePrimaryKeyJson(MasterMemoryTableDescriptor table, MasterDataJsonObject key)
+        internal static string NormalizePrimaryKeyJson(MasterMemoryTableDescriptor table, MasterDataJsonObject key)
         {
             var keyFields = table.TypeDescriptor.PrimaryKeyFields;
             if (keyFields.Count == 0) return key.ToCanonicalString();

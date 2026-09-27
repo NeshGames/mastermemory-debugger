@@ -25,7 +25,8 @@ namespace Nesh.MasterMemoryDebugger
         readonly string serverEpoch = Guid.NewGuid().ToString("N");
         readonly Dictionary<string, MasterMemoryRemoteProtocol.OperationResult> operationResults =
             new Dictionary<string, MasterMemoryRemoteProtocol.OperationResult>(StringComparer.Ordinal);
-        readonly HashSet<Type> checkedTypes = new HashSet<Type>();
+        readonly Dictionary<string, Tuple<string, MasterMemoryRemoteProtocol.PatchResponse>> patchResults =
+            new Dictionary<string, Tuple<string, MasterMemoryRemoteProtocol.PatchResponse>>(StringComparer.Ordinal);        readonly HashSet<Type> checkedTypes = new HashSet<Type>();
         readonly MasterMemoryRemoteDiscovery.Responder discovery;
         string lastError;
 
@@ -219,7 +220,11 @@ namespace Nesh.MasterMemoryDebugger
                     case MasterMemoryRemoteProtocol.MessageType.ValidateRequest:
                         Connection.Send(MasterMemoryRemoteProtocol.Encode(Validate()));
                         break;
-                    case MasterMemoryRemoteProtocol.MessageType.OperationRequest:
+                    case MasterMemoryRemoteProtocol.MessageType.PatchExportRequest:
+                    case MasterMemoryRemoteProtocol.MessageType.PatchPlanRequest:
+                    case MasterMemoryRemoteProtocol.MessageType.PatchApplyRequest:
+                        HandlePatch(MasterMemoryRemoteProtocol.GetType(payload), payload);
+                        break;                    case MasterMemoryRemoteProtocol.MessageType.OperationRequest:
                         HandleOperation(MasterMemoryRemoteProtocol.DecodeOperationRequest(payload));
                         break;
                 }
@@ -266,6 +271,48 @@ namespace Nesh.MasterMemoryDebugger
             Connection?.Send(MasterMemoryRemoteProtocol.Encode(result));
         }
 
+        void HandlePatch(MasterMemoryRemoteProtocol.MessageType type, byte[] payload)
+        {
+            var request = MasterMemoryRemoteProtocol.DecodePatchRequest(payload, type);
+            if (string.IsNullOrEmpty(request.RequestId) || request.RequestId.Length > 64) return;
+            MasterMemoryRemoteProtocol.PatchResponse response;
+            if (type == MasterMemoryRemoteProtocol.MessageType.PatchExportRequest)
+                response = MasterMemoryRemotePatch.Export(request.RequestId, serverEpoch);
+            else if (type == MasterMemoryRemoteProtocol.MessageType.PatchPlanRequest)
+                response = MasterMemoryRemotePatch.Build(request, serverEpoch).Response;
+            else
+            {
+                var fingerprint = MasterMemoryRemotePatch.Fingerprint(request);
+                if (patchResults.TryGetValue(request.RequestId, out var cached))
+                {
+                    if (cached.Item1 == fingerprint) response = cached.Item2;
+                    else response = new MasterMemoryRemoteProtocol.PatchResponse
+                    {
+                        RequestId = request.RequestId,
+                        Status = MasterMemoryRemoteProtocol.PatchStatus.Conflict,
+                        Message = "Request ID was already used with different Patch content.",
+                        ServerEpoch = serverEpoch,
+                        MasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
+                    };
+                }
+                else if (patchResults.Count >= MaxOperationResults)
+                    response = new MasterMemoryRemoteProtocol.PatchResponse
+                    {
+                        RequestId = request.RequestId,
+                        Status = MasterMemoryRemoteProtocol.PatchStatus.Failed,
+                        Message = "Patch request limit reached; restart the Remote server.",
+                        ServerEpoch = serverEpoch,
+                        MasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
+                    };
+                else
+                {
+                    var plan = MasterMemoryRemotePatch.Build(request, serverEpoch);
+                    response = MasterMemoryRemotePatch.Apply(plan, request.PlanSha);
+                    patchResults.Add(request.RequestId, Tuple.Create(fingerprint, response));
+                }
+            }
+            Connection?.Send(MasterMemoryRemoteProtocol.Encode(response));
+        }
         void OnTablesChanged()
         {
             CheckSerialization();

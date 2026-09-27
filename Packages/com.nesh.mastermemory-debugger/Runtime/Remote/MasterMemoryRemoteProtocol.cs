@@ -13,10 +13,60 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     internal static class MasterMemoryRemoteProtocol
     {
-        /// <summary>2: validation messages. 3: deleted records. 4: remote operations.</summary>
-        public const int Version = 4;
+        /// <summary>2: validation. 3: deleted records. 4: operations. 5: transactional patch requests.</summary>
+        public const int Version = 5;
         public const int MaxFrameBytes = 512 * 1024 * 1024;
 
+        public const int MaxPatchJsonBytes = 16 * 1024 * 1024;
+
+        public enum PatchStatus : byte
+        {
+            Success, Invalid, Stale, Conflict, Failed,
+        }
+
+        public sealed class PatchTarget
+        {
+            public string TableName;
+            public string Key;
+            public string BeforeSha;
+        }
+
+        public sealed class PatchError
+        {
+            public string TableName;
+            public string Key;
+            public string Field;
+            public string Code;
+            public string Message;
+        }
+
+        public sealed class PatchRequest
+        {
+            public string RequestId;
+            public string ServerEpoch;
+            public string MasterVersion;
+            public string PatchSha;
+            public string PlanSha;
+            public string PatchJson;
+        }
+
+        public sealed class PatchResponse
+        {
+            public string RequestId;
+            public PatchStatus Status;
+            public string Message;
+            public string ServerEpoch;
+            public string MasterVersion;
+            public string PatchSha;
+            public string PlanSha;
+            public string StateSha;
+            public string PatchJson;
+            public int AppliedRecords;
+            public int AppliedFields;
+            public List<PatchTarget> Targets = new List<PatchTarget>();
+            public List<PatchError> Errors = new List<PatchError>();
+            public List<Failure> Failures = new List<Failure>();
+        }
         public enum MessageType : byte
         {
             /// <summary>Client → server: protocol version and pairing code.</summary>
@@ -39,6 +89,14 @@ namespace Nesh.MasterMemoryDebugger
             OperationRequest = 9,
             /// <summary>Server → client: one request's outcome.</summary>
             OperationResult = 10,
+            /// <summary>Client → server: export the current overrides as a patch.</summary>
+            PatchExportRequest = 11,
+            /// <summary>Client → server: validate a patch and get per-record preconditions.</summary>
+            PatchPlanRequest = 12,
+            /// <summary>Client → server: apply a previously planned patch.</summary>
+            PatchApplyRequest = 13,
+            /// <summary>Server → client: patch export, plan, or apply outcome.</summary>
+            PatchResponse = 14,
         }
 
         public sealed class Operation
@@ -138,6 +196,56 @@ namespace Nesh.MasterMemoryDebugger
             public byte[] Record;
         }
 
+        public static byte[] EncodePatchRequest(MessageType type, PatchRequest request) => Write(type, w =>
+        {
+            if (type != MessageType.PatchExportRequest && type != MessageType.PatchPlanRequest
+                && type != MessageType.PatchApplyRequest) throw new ArgumentOutOfRangeException(nameof(type));
+            w.Write(request.RequestId ?? string.Empty);
+            w.Write(request.ServerEpoch ?? string.Empty);
+            w.Write(request.MasterVersion ?? string.Empty);
+            w.Write(request.PatchSha ?? string.Empty);
+            w.Write(request.PlanSha ?? string.Empty);
+            w.Write(request.PatchJson ?? string.Empty);
+        });
+
+        public static byte[] Encode(PatchResponse response) => Write(MessageType.PatchResponse, w =>
+        {
+            w.Write(response.RequestId ?? string.Empty);
+            w.Write((byte)response.Status);
+            w.Write(response.Message ?? string.Empty);
+            w.Write(response.ServerEpoch ?? string.Empty);
+            w.Write(response.MasterVersion ?? string.Empty);
+            w.Write(response.PatchSha ?? string.Empty);
+            w.Write(response.PlanSha ?? string.Empty);
+            w.Write(response.StateSha ?? string.Empty);
+            w.Write(response.PatchJson ?? string.Empty);
+            w.Write(response.AppliedRecords);
+            w.Write(response.AppliedFields);
+            w.Write(response.Targets.Count);
+            foreach (var target in response.Targets)
+            {
+                w.Write(target.TableName ?? string.Empty);
+                w.Write(target.Key ?? string.Empty);
+                w.Write(target.BeforeSha ?? string.Empty);
+            }
+            w.Write(response.Errors.Count);
+            foreach (var error in response.Errors)
+            {
+                w.Write(error.TableName ?? string.Empty);
+                w.Write(error.Key ?? string.Empty);
+                w.Write(error.Field ?? string.Empty);
+                w.Write(error.Code ?? string.Empty);
+                w.Write(error.Message ?? string.Empty);
+            }
+            w.Write(response.Failures.Count);
+            foreach (var failure in response.Failures)
+            {
+                w.Write(failure.TableName ?? string.Empty);
+                w.Write(failure.Key ?? string.Empty);
+                w.Write(failure.Message ?? string.Empty);
+                w.Write(failure.IsNew);
+            }
+        });
         // ------------------------------------------------------------------ encode
 
         public static byte[] Encode(Hello message) => Write(MessageType.Hello, w =>
@@ -217,6 +325,34 @@ namespace Nesh.MasterMemoryDebugger
             w.Write(result.NewSha ?? string.Empty);
         });
 
+        public static PatchRequest DecodePatchRequest(byte[] payload, MessageType type) => Read(payload, type, r =>
+            new PatchRequest
+            {
+                RequestId = r.ReadString(), ServerEpoch = r.ReadString(), MasterVersion = r.ReadString(),
+                PatchSha = r.ReadString(), PlanSha = r.ReadString(), PatchJson = r.ReadString(),
+            });
+
+        public static PatchResponse DecodePatchResponse(byte[] payload) => Read(payload, MessageType.PatchResponse, r =>
+        {
+            var response = new PatchResponse
+            {
+                RequestId = r.ReadString(), Status = (PatchStatus)r.ReadByte(), Message = r.ReadString(),
+                ServerEpoch = r.ReadString(), MasterVersion = r.ReadString(), PatchSha = r.ReadString(),
+                PlanSha = r.ReadString(), StateSha = r.ReadString(), PatchJson = r.ReadString(),
+                AppliedRecords = r.ReadInt32(), AppliedFields = r.ReadInt32(),
+            };
+            var targets = ReadCount(r);
+            for (var i = 0; i < targets; i++) response.Targets.Add(new PatchTarget
+            { TableName = r.ReadString(), Key = r.ReadString(), BeforeSha = r.ReadString() });
+            var errors = ReadCount(r);
+            for (var i = 0; i < errors; i++) response.Errors.Add(new PatchError
+            { TableName = r.ReadString(), Key = r.ReadString(), Field = r.ReadString(),
+                Code = r.ReadString(), Message = r.ReadString() });
+            var failures = ReadCount(r);
+            for (var i = 0; i < failures; i++) response.Failures.Add(new Failure
+            { TableName = r.ReadString(), Key = r.ReadString(), Message = r.ReadString(), IsNew = r.ReadBoolean() });
+            return response;
+        });
         // ------------------------------------------------------------------ decode
 
         public static MessageType GetType(byte[] payload)
