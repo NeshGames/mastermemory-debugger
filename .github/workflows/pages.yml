@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - codex/remote-editor-pages
     paths:
       - 'docs/**'
       - '.github/workflows/pages.yml'

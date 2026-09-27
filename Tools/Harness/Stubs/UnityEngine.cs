@@ -18,6 +18,8 @@ namespace UnityEngine
         public static implicit operator bool(Object o) => !ReferenceEquals(o, null);
     }
     [Flags] public enum HideFlags { None = 0, HideInHierarchy = 1, HideInInspector = 2, DontSaveInEditor = 4, NotEditable = 8, DontSaveInBuild = 16, DontUnloadUnusedAsset = 32, DontSave = 52, HideAndDontSave = 61 }
+    public class TextAsset : Object { public string text { get; set; } }
+    public static class JsonUtility { public static T FromJson<T>(string json) => default; }
     public class ScriptableObject : Object
     {
         public static T CreateInstance<T>() where T : ScriptableObject => Activator.CreateInstance<T>();

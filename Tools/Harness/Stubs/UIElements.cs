@@ -38,6 +38,7 @@ namespace UnityEngine.UIElements
         public UnityEngine.Rect layout => default;
         public object userData { get; set; }
         public int childCount => 0;
+        public IEnumerable<VisualElement> Children() => Array.Empty<VisualElement>();
         public VisualElement contentContainer => this;
         public bool ClassListContains(string c) => false;
         public void RemoveFromHierarchy() { }
