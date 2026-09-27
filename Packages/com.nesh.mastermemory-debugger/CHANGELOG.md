@@ -2,6 +2,18 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.12.0] - 2026-09-27
+
+### Added
+
+- Standalone .NET 8 Remote Debugger CLI for inspecting tables and records, reviewing changes and validation, invoking registered operations, and exporting, planning, or applying JSON patches without Unity Editor or game record assemblies.
+- Remote protocol v5 patch planning and application with server epoch, master version, patch and plan hashes, per-record state checks, and request IDs for safe retries. Patch application preflights the whole batch and commits overrides atomically; conflicts and validation results are returned to the caller.
+- Traditional Chinese and Japanese UI localization for the remote editor, plus an illustrated single-page guide covering search, setup, and everyday workflows.
+
+### Changed
+
+- Remote protocol v5 requires the game and desktop tool to use this package version together.
+
 ## [0.11.0] - 2026-09-27
 
 ### Added

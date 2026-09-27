@@ -48,6 +48,15 @@ and Play Mode) as well.
       fingerprints. Change its target or candidate revision before clicking an older list item: the game rejects the stale
       request. Leaving the owner removes the operation from the tool.
 
+## Remote CLI and patch safety
+
+- [ ] Build `Tools/RemoteCli/RemoteCli.csproj`; pair with the running example game and run `inspect`, `tables`, `records`,
+      `changes`, `validate`, and `operations`. Check that the JSON output and exit codes match the results in the tool.
+- [ ] With an override present, run `patch-export`, then `patch-plan` and `patch-apply` using its returned epoch, master
+      version, and plan hash. Confirm the game and desktop tool show the applied values and validation results.
+- [ ] Edit a planned target before applying its patch: the CLI reports a conflict and leaves every target unchanged.
+      Retry a successful apply with the same request ID and patch: the original result is returned without applying twice.
+
 ## Builds
 
 - [ ] A Development Build: no "below the supported minimum" error in the Console during the build; the debugger opens
