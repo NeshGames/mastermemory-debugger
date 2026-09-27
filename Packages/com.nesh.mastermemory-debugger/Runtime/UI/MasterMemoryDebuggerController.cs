@@ -17,7 +17,7 @@ namespace Nesh.MasterMemoryDebugger
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
             "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template", "mm-batch-edit",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json",
-            "mm-close", "mm-remote", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel",
+            "mm-close", "mm-remote", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel", "mm-tab-find", "mm-find-panel",
             "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary", "mm-changes-copy", "mm-changes-paste",
             "mm-log", "mm-log-toggle", "mm-undo", "mm-redo",
         };
@@ -31,6 +31,7 @@ namespace Nesh.MasterMemoryDebugger
             Data,
             Changes,
             Patches,
+            Find,
             Validation,
         }
 
@@ -44,6 +45,8 @@ namespace Nesh.MasterMemoryDebugger
             public static float Scale = 1f;
             public static string PatchName;
             public static Tab Tab = Tab.Data;
+            public static string FindQuery;
+            public static bool FindWholeValue;
         }
 
         readonly MasterMemoryDebuggerDocument host;
@@ -54,9 +57,11 @@ namespace Nesh.MasterMemoryDebugger
         readonly Button changesTab;
         readonly Button patchesTab;
         readonly Button validationTab;
+        readonly Button findTab;
         readonly MasterChangesController changes;
         readonly MasterPatchesController patches;
         readonly MasterValidationController validation;
+        readonly MasterFindController find;
         Tab currentTab;
         readonly ScrollView logView;
         readonly Button logToggle;
@@ -123,6 +128,7 @@ namespace Nesh.MasterMemoryDebugger
             changesTab = Required<Button>(root, "mm-tab-changes");
             patchesTab = Required<Button>(root, "mm-tab-patches");
             validationTab = Required<Button>(root, "mm-tab-validation");
+            findTab = Required<Button>(root, "mm-tab-find");
             changes = new MasterChangesController(
                 Required<VisualElement>(root, "mm-changes-panel"),
                 Required<ScrollView>(root, "mm-changes-list"),
@@ -134,6 +140,7 @@ namespace Nesh.MasterMemoryDebugger
                 dialog);
             patches = new MasterPatchesController(patchesPanel, dialog, SetStatus, Session.PatchName);
             validation = new MasterValidationController(Required<VisualElement>(root, "mm-validation-panel"), OpenRecord);
+            find = new MasterFindController(Required<VisualElement>(root, "mm-find-panel"), OpenRecord, Session.FindQuery, Session.FindWholeValue);
             logView = Required<ScrollView>(root, "mm-log");
             logToggle = Required<Button>(root, "mm-log-toggle");
             remoteButton = Required<Button>(root, "mm-remote");
@@ -146,6 +153,7 @@ namespace Nesh.MasterMemoryDebugger
             Bind(root, "mm-tab-changes", () => SelectTab(Tab.Changes));
             Bind(root, "mm-tab-patches", () => SelectTab(Tab.Patches));
             Bind(root, "mm-tab-validation", () => SelectTab(Tab.Validation));
+            Bind(root, "mm-tab-find", () => SelectTab(Tab.Find));
             Bind(root, "mm-log-toggle", ToggleLog);
             Bind(root, "mm-remote", () => MasterRemoteDialog.Show(dialog, SetStatus));
             Bind(root, "mm-undo", Undo);
@@ -217,6 +225,8 @@ namespace Nesh.MasterMemoryDebugger
             Session.RecordKey = editor.Record?.PrimaryKey;
             Session.PatchName = patches.SelectedName;
             Session.Tab = currentTab;
+            Session.FindQuery = find.Query;
+            Session.FindWholeValue = find.WholeValue;
 
             MasterMemoryDebugRegistry.TablesChanged -= OnTablesChanged;
             MasterMemoryDebugRuntime.OverridesChanged -= OnOverridesChanged;
@@ -246,6 +256,7 @@ namespace Nesh.MasterMemoryDebugger
 
         void OnTablesChanged()
         {
+            find.MarkStale();
             tableList.Reload();
             tableTabs.Refresh();
             RefreshHeader();
@@ -346,6 +357,7 @@ namespace Nesh.MasterMemoryDebugger
             editor.OnOverridesChanged();
             changes.Refresh();
             patches.RefreshCurrent();
+            find.MarkStale();
             RefreshHeader();
         }
 
@@ -367,13 +379,15 @@ namespace Nesh.MasterMemoryDebugger
             if (tab == Tab.Patches) patches.Refresh();
             if (tab == Tab.Validation) validation.Show();
             else validation.Hide();
+            if (tab == Tab.Find) find.Show();
+            else find.Hide();
             recordList.CloseColumnsPopup();
             RefreshHeader();
         }
 
         void HideChanges() => SelectTab(Tab.Data);
 
-        /// <summary>Jumps from the Changes / Validation view to a record.</summary>
+        /// <summary>Jumps from the Changes / Find / Validation view to a record.</summary>
         void OpenRecord(MasterMemoryTableDescriptor table, object key)
         {
             RunAfterEditGuard(() =>
@@ -642,8 +656,10 @@ namespace Nesh.MasterMemoryDebugger
 
         bool IsInSearch(VisualElement target)
         {
+            if (target == null) return false;
+            if (find.QueryField.Contains(target)) return true;
             var toolbar = root.Q("mm-search-toolbar");
-            return target != null && toolbar != null && toolbar.Contains(target);
+            return toolbar != null && toolbar.Contains(target);
         }
 
         void ChangeScale(float delta)
@@ -665,6 +681,7 @@ namespace Nesh.MasterMemoryDebugger
             changesTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Changes);
             patchesTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Patches);
             validationTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Validation);
+            findTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Find);
             var newFailures = MasterMemoryDebugValidation.NewFailureCount;
             validationTab.text = newFailures > 0 ? $"Validation ({newFailures} new)" : "Validation";
             validationTab.EnableInClassList("mm-debugger__tab--alert", newFailures > 0);

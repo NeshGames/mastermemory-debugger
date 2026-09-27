@@ -1324,6 +1324,43 @@
     margin: 0 6px 0 0;
 }
 
+/* ------------------------------------------------------------------ find (every table) */
+
+.mm-debugger .mm-debugger__find-header {
+    flex-wrap: wrap;
+}
+
+.mm-debugger .mm-debugger__find-query {
+    margin: 0 8px;
+}
+
+.mm-debugger .mm-debugger__find-header > .mm-debugger__button {
+    margin-left: 8px;
+}
+
+.mm-debugger .mm-debugger__find-header > .mm-debugger__header-info {
+    margin-left: 8px;
+}
+
+.mm-debugger .mm-debugger__find-table {
+    margin-bottom: 6px;
+}
+
+.mm-debugger .mm-debugger__find-table > .mm-debugger__section-title {
+    color: rgb(150, 190, 255);
+    margin: 4px 0 2px 0;
+}
+
+.mm-debugger .mm-debugger__find-table .mm-debugger__change-new {
+    flex-shrink: 1;
+    white-space: normal;
+}
+
+.mm-debugger__badge--modified {
+    background-color: rgb(255, 184, 76);
+    margin: 0 6px 0 0;
+}
+
 /* ------------------------------------------------------------------ complex value tree */
 
 .mm-debugger__tree .unity-foldout__text {
