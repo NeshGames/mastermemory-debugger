@@ -447,9 +447,13 @@ namespace Nesh.MasterMemoryDebugger
                 countLabel.RemoveFromClassList("mm-debugger__record-count--error");
                 return;
             }
-            var text = $"{filtered.Count} / {snapshot.Count} records";
+            var text = MasterMemoryDebugUiLocalization.Text($"{filtered.Count} / {snapshot.Count} records");
             if (matches > filtered.Count) text += $"  (showing first {max} of {matches} matches, refine the search)";
-            if (query.Errors.Count > 0) text += "   ⚠ " + string.Join("; ", query.Errors) + " (ignored)";
+            if (query.Errors.Count > 0)
+            {
+                text += "   ⚠ " + string.Join("; ", query.Errors.Select(MasterMemoryDebugUiLocalization.Text));
+                text += MasterMemoryDebugUiLocalization.Text(query.HasBooleanSyntax ? " (no matches)" : " (ignored)");
+            }
             countLabel.text = text;
             countLabel.EnableInClassList("mm-debugger__record-count--error", query.Errors.Count > 0);
         }

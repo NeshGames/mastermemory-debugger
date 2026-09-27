@@ -2,6 +2,18 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.13.0] - 2026-09-28
+
+### Added
+
+- Data table queries support `&&`, `||`, and parentheses. AND has higher precedence than OR, adjacent terms remain implicit AND, and quoted values and Flags enum values retain their existing meanings.
+- Field and enum/bool value completion works inside grouped queries and immediately after boolean operators.
+- The illustrated Pages search guide explains boolean syntax, precedence, grouping, and invalid-query behavior.
+
+### Changed
+
+- Invalid boolean or grouped expressions match no records and show a warning, preventing Batch Edit from using an unexpectedly broad result set. Legacy invalid terms without boolean syntax continue to be ignored.
+
 ## [0.12.0] - 2026-09-27
 
 ### Added

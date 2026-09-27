@@ -517,6 +517,26 @@
     {
       "key": "1 record",
       "value": "1 record"
+    },
+    {
+      "key": " (no matches)",
+      "value": " (no matches)"
+    },
+    {
+      "key": " (ignored)",
+      "value": " (ignored)"
+    },
+    {
+      "key": "Expected a search term",
+      "value": "Expected a search term"
+    },
+    {
+      "key": "Empty group",
+      "value": "Empty group"
+    },
+    {
+      "key": "Missing ')'",
+      "value": "Missing ')'"
     }
   ],
   "patterns": []

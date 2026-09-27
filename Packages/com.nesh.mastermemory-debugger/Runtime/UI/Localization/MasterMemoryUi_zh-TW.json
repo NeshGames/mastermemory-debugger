@@ -517,6 +517,26 @@
     {
       "key": "1 record",
       "value": "1 筆資料"
+    },
+    {
+      "key": " (no matches)",
+      "value": "（不顯示結果）"
+    },
+    {
+      "key": " (ignored)",
+      "value": "（已略過）"
+    },
+    {
+      "key": "Expected a search term",
+      "value": "請輸入搜尋條件"
+    },
+    {
+      "key": "Empty group",
+      "value": "括號內不可為空"
+    },
+    {
+      "key": "Missing ')'",
+      "value": "缺少右括號 )"
     }
   ],
   "patterns": [
@@ -607,6 +627,18 @@
     {
       "pattern": "^▼ (\\d+) more$",
       "replacement": "▼ 還有 $1 項"
+    },
+    {
+      "pattern": "^Unexpected '(.+)'$",
+      "replacement": "非預期的符號 '$1'"
+    },
+    {
+      "pattern": "^Expected a search term before '(.+)'$",
+      "replacement": "'$1' 前需要搜尋條件"
+    },
+    {
+      "pattern": "^Unknown field '(.+)'$",
+      "replacement": "找不到欄位 '$1'"
     }
   ]
 }

@@ -23,8 +23,8 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         // Field op [quote] value-prefix, up to the caret. Flags values may be joined with | or ,
-        static readonly Regex s_value = new Regex(@"(?:^|\s)([A-Za-z_][A-Za-z0-9_]*)\s*(?:>=|<=|!=|=|>|<)\s*""?(?:[^\s""]*[|,])?([^\s""|,]*)$", RegexOptions.CultureInvariant);
-        static readonly Regex s_field = new Regex(@"(?:^|\s)([A-Za-z_][A-Za-z0-9_]*)?$", RegexOptions.CultureInvariant);
+        static readonly Regex s_value = new Regex(@"(?:^|\s|\(|&&|\|\|)([A-Za-z_][A-Za-z0-9_]*)\s*(?:>=|<=|!=|=|>|<)\s*""?(?:[^\s""|&,()]*[|,])?([^\s""|&,()]*)$", RegexOptions.CultureInvariant);
+        static readonly Regex s_field = new Regex(@"(?:^|\s|\(|&&|\|\|)([A-Za-z_][A-Za-z0-9_]*)?$", RegexOptions.CultureInvariant);
         static readonly string[] s_booleans = { "true", "false" };
 
         /// <summary>Returns null when nothing at the caret can be completed.</summary>
@@ -33,16 +33,20 @@ namespace Nesh.MasterMemoryDebugger
             if (type == null) return null;
             text ??= string.Empty;
             caret = Math.Max(0, Math.Min(caret, text.Length));
-            var value = TryValueContext(text, caret, type);
+            var left = text.Substring(0, caret);
+            // After a boolean operator the next completion is a field, not a flags enum value.
+            var value = left.EndsWith("||", StringComparison.Ordinal) || left.EndsWith("&&", StringComparison.Ordinal)
+                ? null : TryValueContext(text, caret, type);
             if (value != null || IsInsideQuotes(text, caret)) return value;
 
-            var left = text.Substring(0, caret);
             var match = s_field.Match(left);
             if (!match.Success) return null;
             var start = match.Groups[1].Success ? match.Groups[1].Index : caret;
             var end = ExtendWord(text, caret);
             // an operator right after the word means we are on a field name; any other character, on a text term
-            if (end < text.Length && !char.IsWhiteSpace(text[end]) && !IsOperatorChar(text[end])) return null;
+            if (end < text.Length && !char.IsWhiteSpace(text[end]) && !IsOperatorChar(text[end]) && text[end] != ')'
+                && !(text[end] == '&' && end + 1 < text.Length && text[end + 1] == '&')
+                && !(text[end] == '|' && end + 1 < text.Length && text[end + 1] == '|')) return null;
             // "Damage > |" is a value position, not a new field name
             var before = left.Substring(0, start).TrimEnd();
             if (before.Length > 0 && IsOperatorChar(before[before.Length - 1])) return null;
@@ -90,7 +94,8 @@ namespace Nesh.MasterMemoryDebugger
 
             var start = match.Groups[2].Index;
             var end = caret;
-            while (end < text.Length && !char.IsWhiteSpace(text[end]) && text[end] != '"' && text[end] != '|' && text[end] != ',') end++;
+            while (end < text.Length && !char.IsWhiteSpace(text[end]) && text[end] != '"' && text[end] != '|'
+                && text[end] != ',' && text[end] != ')' && text[end] != '&') end++;
             var candidates = Filter(values, match.Groups[2].Value);
             if (candidates.Count == 0) return null;
             return new Context { Start = start, End = end, Word = text.Substring(start, end - start), ValueField = field, Candidates = candidates };

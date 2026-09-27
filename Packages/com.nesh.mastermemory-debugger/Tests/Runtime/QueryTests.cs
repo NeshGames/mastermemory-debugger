@@ -50,6 +50,44 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void BooleanOperators_ShouldRespectPrecedenceAndGrouping()
+        {
+            CollectionAssert.AreEqual(new[] { 1001, 1002 }, Ids("Damage>=120 || Element=Ice"));
+            CollectionAssert.AreEqual(new[] { 1001 }, Ids("Damage>=120 || Element=Ice && IsPassive=true"), "AND binds tighter than OR");
+            CollectionAssert.AreEqual(new[] { 1002 }, Ids("(Damage>=120 || Element=Ice) && Name~blast"), "parentheses override precedence");
+            CollectionAssert.AreEqual(new[] { 1001 }, Ids("Damage>=120&&(Element=Fire||Element=Ice)"), "spaces around operators are optional");
+            CollectionAssert.AreEqual(new[] { 1002 }, Ids("(Damage>=120 || Element=Ice) Name~blast"), "adjacent terms remain AND");
+            CollectionAssert.AreEqual(new[] { 1001, 1002 }, Ids("Name=\"Fireball\" || Name=\"Ice Blast\""));
+        }
+
+        [Test]
+        public void BooleanSyntax_ShouldPreserveQuotedTextAndRejectMalformedQueries()
+        {
+            Ids("Name=\"Ice || Blast\"", out var quoted);
+            Assert.AreEqual(0, quoted.Errors.Count, "an operator inside quotes is part of the value");
+            Assert.AreEqual(1, quoted.ConditionCount);
+
+            foreach (var text in new[] { "Damage>100 ||", "Damage>100 && (Element=Fire", "()", "Damage>100 || Dmg>1" })
+            {
+                CollectionAssert.IsEmpty(Ids(text, out var query), text);
+                Assert.IsNotEmpty(query.Errors, text);
+            }
+        }
+
+        [Test]
+        public void FlagsValue_ShouldKeepSinglePipeSeparateFromBooleanOr()
+        {
+            MasterMemoryDebugRuntime.SetOverride((1, 2), Database.TestEnemyLevelTable.FindByEnemyIdAndLevel((1, 2))
+                with { Flags = TestFlags.Boss | TestFlags.Flying });
+            var table = Table<TestEnemyLevel>();
+            var query = MasterRecordQuery.Parse("Flags=Boss|Flying || Hp>300", table.TypeDescriptor);
+            Assert.IsEmpty(query.Errors);
+            var matches = new List<MasterMemoryRecordDescriptor>();
+            MasterRecordListController.Filter(table.CreateRecordSnapshot(), query, false, int.MaxValue, matches);
+            CollectionAssert.AreEqual(new[] { (1, 2), (2, 1) }, matches.Select(x => ((int, int))x.PrimaryKey).ToArray());
+        }
+
+        [Test]
         public void Conditions_ShouldUseOverriddenValues()
         {
             MasterMemoryDebugRuntime.SetOverride(1003, Database.TestSkillTable.FindById(1003) with { Damage = 999 });
