@@ -160,33 +160,15 @@ MasterMemoryDebugRegistry.RegisterCloneProvider<SkillMaster>(x => x with { });
 
 所有註冊 API 在非 Editor / 非 Development Build 中都不會做任何事。
 
-### 顯示名稱與 Tips（多語言）
+### 介面語言與搜尋名稱
 
-Table 與欄位可以設定各語言的顯示名稱和提示（Tips）。標題列的語言下拉選單可以在「Code names」（程式名稱）與各語言之間切換（記在 PlayerPrefs）。
-顯示名稱會用在 Table 清單、釘選頁籤、表格標題、Inspector 與搜尋自動完成；程式名稱仍會出現在 Tooltip 裡，搜尋條件與 Patch 也一律使用程式名稱。
+標題列的語言選單可切換 **English**、**繁體中文** 與 **日本語**；選擇會記在 PlayerPrefs，重新開啟工具仍會保留。
+切換只影響工具的按鈕、提示、對話框及狀態文字。Table 與欄位保持 Record 的程式名稱，搜尋條件、自動完成插入的欄位名稱與 Patch 使用同一組名稱，例如 `Damage>100`、`Element=Fire`。
+這樣可以直接複製查詢條件，不必在中文顯示名稱與程式欄位之間轉換。
 
-```csharp
-MasterMemoryDebugLocalization.SetTableLabel<SkillMaster>("zh-TW", "技能", "所有技能的基本數值");
-MasterMemoryDebugLocalization.SetFieldLabel<SkillMaster>("Damage", "zh-TW", "傷害", "基礎傷害，未含角色加成");
-// 語言給 null：這個 Tip 在所有語言（包含 Code names）都會顯示
-MasterMemoryDebugLocalization.SetFieldLabel<SkillMaster>("Cooldown", null, null, "單位：秒");
+介面文案分別存放在 `Runtime/UI/Localization/MasterMemoryUi_en.json`、`MasterMemoryUi_zh-TW.json` 與 `MasterMemoryUi_ja.json`。新增或修正翻譯時，三份 JSON 的 `strings` key 應維持一致；Development Build 會隨 UI 複製這些檔案，Release Build 不包含。
 
-// 或從試算表匯出的 Tab 分隔文字一次載入：table, field（Table 本身留空）, language, label, tip
-MasterMemoryDebugLocalization.LoadTsv(labelsTextAsset.text);
-```
-
-```text
-table	field	language	label	tip
-SkillMaster		zh-TW	技能	所有技能的基本數值
-SkillMaster	Damage	zh-TW	傷害	基礎傷害\n未含角色加成
-```
-
-- Table 名稱可以用註冊名稱（`RegisterDatabase` 時是 Record 類別名稱）或 `[MemoryTable]` 名稱。
-- Tip 中的 `\n` 會換行；`#` 開頭的行、label 與 tip 都空白的行會被略過。
-- **範本**：Debugger 的 Tables 標題旁 **Labels TSV** 會把所有 Table 與欄位名稱複製成上面的格式（已設定的名稱與 Tip 會一併填入，
-  語言欄是目前選擇的語言；選 Code names 時留空）。貼到試算表填好後，存成文字交給 `LoadTsv`。程式中：`MasterMemoryDebugLocalization.CreateTsvTemplate("zh-TW")`。
-- 中文、日文等名稱需要字型支援：在 Settings 的 **Font** 指定含有這些字的字型（例如 Noto Sans TC），否則會顯示成方框。
-
+若專案自行透過 `MasterMemoryDebugLocalization` 設定顯示名稱，該 API 仍可使用；工具的介面語言選單不會切換這些資料標籤。範例專案不再預設註冊中文 Table 或欄位名稱。
 ## Integrate Override
 
 ```csharp
@@ -246,20 +228,13 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 ## UI Toolkit Runtime Debugger
 
 ```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ MM Debugger [Data][Changes (2)][Patches (3)][Find][Validation (1 new)] [zh-TW ▼][Close]│
-├────────────┬┬─────────────────────────────────────────────┬┬──────────────────────────┤
-│ Tables [TSV]││ [技能 ×][武器 ×] [+ Pin]                      ││ 技能 1001  Overridden     │
-│ ▼ Battle(6)││ [Damage>100..] [ ]Mod [Columns▾][Batch Edit…][Copy]││ Id  PK             │
-│   技能     ││ ● │ Id (PK)┃ 分類 (SK)│ 名稱    │ 傷害 ▼│ ...   ││ 1001                     │
-│   武器     ││   │   1004 ┃        1 │ Thunder │   180 │       ││ 傷害       Original: 120 │
-│ ▶ Economy  ││ ● │   1001 ┃        1 │ Fireball│   185 │       ││ [185                   ] │
-│            ││ 2 / 2005 records                ◀━━━━━━━━▶   ││ ▼ Referenced by           │
-│            ││                                             ││   角色.初始技能 3 [Show] │
-│            ││                                             ││ [Apply][Revert][Reset]   │
-├────────────┴┴─────────────────────────────────────────────┴┴──────────────────────────┤
-│ status...                                                   [↶ Undo][↷ Redo][Log (12)] │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ MM Debugger [資料][變更][補丁][跨表搜尋][驗證] [繁體中文 ▼][關閉]             │
+├───────────────┬────────────────────────────┬─────────────────────────────────┤
+│ Tables        │ ExampleSkillMaster ×       │ ExampleSkillMaster / Id 1001    │
+│ ExampleSkill… │ [Damage>100] [欄位] [複製]  │ Damage   Original: 120          │
+│ ExampleWeapon…│ Id  Name      Damage        │ [185] [套用][還原]              │
+└───────────────┴────────────────────────────┴─────────────────────────────────┘
 ```
 
 - 標題列的頁籤：**Data**（瀏覽與編輯）、**Changes**（所有修改的總覽）、**Patches**（Patch 管理，見下方）、**Find**（在所有 Table 搜尋值）、**Validation**（MasterMemory 驗證結果）。

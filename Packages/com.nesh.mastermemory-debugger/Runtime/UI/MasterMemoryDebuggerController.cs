@@ -74,6 +74,8 @@ namespace Nesh.MasterMemoryDebugger
         readonly MasterRecordListController recordList;
         readonly MasterTableTabsController tableTabs;
         readonly DropdownField languageField;
+        readonly MasterMemoryDebugUiLocalization uiLocalization = new MasterMemoryDebugUiLocalization();
+        IVisualElementScheduledItem uiLocalizationRefresh;
         readonly MasterSearchCompletionController searchCompletion;
         readonly MasterRecordEditorController editor;
         readonly MasterMemoryDebuggerDialog dialog;
@@ -87,6 +89,7 @@ namespace Nesh.MasterMemoryDebugger
             this.host = host;
             this.root = root;
             var settings = MasterMemoryDebuggerSettings.Current;
+            MasterMemoryDebugLocalization.Language = MasterMemoryDebugLocalization.CodeNames;
 
             statusLabel = Required<Label>(root, "mm-status");
             versionLabel = Required<Label>(root, "mm-master-version");
@@ -220,6 +223,8 @@ namespace Nesh.MasterMemoryDebugger
             {
                 statusLabel.text = "Ready.  Enter: Apply   Esc: Close";
             }
+            uiLocalization.Apply(root);
+            uiLocalizationRefresh = root.schedule.Execute(() => uiLocalization.Apply(root)).Every(250);
         }
 
         public void Dispose()
@@ -233,6 +238,7 @@ namespace Nesh.MasterMemoryDebugger
             Session.FindQuery = find.Query;
             Session.FindWholeValue = find.WholeValue;
 
+            uiLocalizationRefresh?.Pause();
             MasterMemoryDebugRegistry.TablesChanged -= OnTablesChanged;
             MasterMemoryDebugRuntime.OverridesChanged -= OnOverridesChanged;
             MasterMemoryDebuggerMessages.Changed -= OnMessagesChanged;
@@ -281,26 +287,29 @@ namespace Nesh.MasterMemoryDebugger
             }, () => { });
         }
 
-        // ------------------------------------------------------------------ labels (language)
-
-        const string CodeNamesChoice = "Code names";
+        // ------------------------------------------------------------------ interface language
 
         void RefreshLanguageChoices()
         {
-            var languages = MasterMemoryDebugLocalization.Languages;
-            var choices = new List<string> { CodeNamesChoice };
-            choices.AddRange(languages);
+            var choices = new List<string>();
+            foreach (var code in MasterMemoryDebugUiLocalization.Languages)
+                choices.Add(MasterMemoryDebugUiLocalization.DisplayName(code));
             languageField.choices = choices;
-            var language = MasterMemoryDebugLocalization.Language;
-            languageField.SetValueWithoutNotify(string.IsNullOrEmpty(language) || !choices.Contains(language) ? CodeNamesChoice : language);
-            languageField.style.display = languages.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            languageField.SetValueWithoutNotify(MasterMemoryDebugUiLocalization.DisplayName(MasterMemoryDebugUiLocalization.Language));
+            languageField.style.display = DisplayStyle.Flex;
         }
 
         void OnLanguageSelected(ChangeEvent<string> evt)
         {
-            MasterMemoryDebugLocalization.Language = evt.newValue == CodeNamesChoice ? MasterMemoryDebugLocalization.CodeNames : evt.newValue;
+            foreach (var code in MasterMemoryDebugUiLocalization.Languages)
+            {
+                if (evt.newValue != MasterMemoryDebugUiLocalization.DisplayName(code)) continue;
+                MasterMemoryDebugUiLocalization.Language = code;
+                uiLocalization.Apply(root);
+                find.MarkStale();
+                return;
+            }
         }
-
         void OnLabelsChanged()
         {
             RefreshLanguageChoices();
@@ -308,6 +317,7 @@ namespace Nesh.MasterMemoryDebugger
             recordList.RefreshLabels();
             editor.RefreshLabels();
             tableTabs.Refresh();
+            uiLocalization.Apply(root);
         }
 
         void OnTableSelected(MasterMemoryTableDescriptor table)

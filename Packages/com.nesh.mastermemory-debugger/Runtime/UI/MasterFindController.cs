@@ -161,7 +161,7 @@ namespace Nesh.MasterMemoryDebugger
                 badge.AddToClassList("mm-debugger__badge--modified");
                 header.Add(badge);
             }
-            var openButton = new Button(() => open(record.Table, record.PrimaryKey)) { text = "Open" };
+            var openButton = new Button(() => open(record.Table, record.PrimaryKey)) { text = MasterMemoryDebugUiLocalization.Text("Open") };
             openButton.AddToClassList("mm-debugger__button");
             header.Add(openButton);
             root.Add(header);

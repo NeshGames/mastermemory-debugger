@@ -1,0 +1,612 @@
+{
+  "language": "zh-TW",
+  "displayName": "繁體中文",
+  "strings": [
+    {
+      "key": "MasterMemory Runtime Debugger",
+      "value": "MasterMemory 執行時除錯工具"
+    },
+    {
+      "key": "Data",
+      "value": "資料"
+    },
+    {
+      "key": "Changes",
+      "value": "變更"
+    },
+    {
+      "key": "Patches",
+      "value": "修補檔"
+    },
+    {
+      "key": "Find",
+      "value": "跨表搜尋"
+    },
+    {
+      "key": "Validation",
+      "value": "資料驗證"
+    },
+    {
+      "key": "Remote",
+      "value": "遠端"
+    },
+    {
+      "key": "Close",
+      "value": "關閉"
+    },
+    {
+      "key": "Code names",
+      "value": "程式名稱"
+    },
+    {
+      "key": "Tables",
+      "value": "資料表"
+    },
+    {
+      "key": "Labels TSV",
+      "value": "標籤 TSV"
+    },
+    {
+      "key": "Modified Only",
+      "value": "只看已修改"
+    },
+    {
+      "key": "Columns ▾",
+      "value": "欄位 ▾"
+    },
+    {
+      "key": "+ New…",
+      "value": "+ 新增…"
+    },
+    {
+      "key": "Batch Edit…",
+      "value": "批次修改…"
+    },
+    {
+      "key": "Copy",
+      "value": "複製"
+    },
+    {
+      "key": "Copy JSON",
+      "value": "複製 JSON"
+    },
+    {
+      "key": "Record Inspector",
+      "value": "資料檢視器"
+    },
+    {
+      "key": "Apply",
+      "value": "套用"
+    },
+    {
+      "key": "Revert",
+      "value": "放棄編輯"
+    },
+    {
+      "key": "Reset",
+      "value": "重設"
+    },
+    {
+      "key": "Duplicate…",
+      "value": "複製資料…"
+    },
+    {
+      "key": "Delete",
+      "value": "刪除"
+    },
+    {
+      "key": "Paste TSV…",
+      "value": "貼上 TSV…"
+    },
+    {
+      "key": "Copy TSV",
+      "value": "複製 TSV"
+    },
+    {
+      "key": "↶ Undo",
+      "value": "↶ 復原"
+    },
+    {
+      "key": "↷ Redo",
+      "value": "↷ 重做"
+    },
+    {
+      "key": "Log",
+      "value": "記錄"
+    },
+    {
+      "key": "Remote editing",
+      "value": "遠端編輯"
+    },
+    {
+      "key": "Game address",
+      "value": "遊戲位址"
+    },
+    {
+      "key": "Port",
+      "value": "連接埠"
+    },
+    {
+      "key": "Pairing code",
+      "value": "配對碼"
+    },
+    {
+      "key": "Games on the network",
+      "value": "網路上的遊戲"
+    },
+    {
+      "key": "Search",
+      "value": "搜尋"
+    },
+    {
+      "key": "Connect",
+      "value": "連線"
+    },
+    {
+      "key": "Disconnect",
+      "value": "中斷連線"
+    },
+    {
+      "key": "Game operations",
+      "value": "遊戲操作"
+    },
+    {
+      "key": "Addresses",
+      "value": "位址"
+    },
+    {
+      "key": "Start",
+      "value": "啟動"
+    },
+    {
+      "key": "Stop",
+      "value": "停止"
+    },
+    {
+      "key": "Saved patches",
+      "value": "已儲存的修補檔"
+    },
+    {
+      "key": "Save As…",
+      "value": "另存為…"
+    },
+    {
+      "key": "Import…",
+      "value": "匯入…"
+    },
+    {
+      "key": "Export…",
+      "value": "匯出…"
+    },
+    {
+      "key": "Import",
+      "value": "匯入"
+    },
+    {
+      "key": "Export",
+      "value": "匯出"
+    },
+    {
+      "key": "Save",
+      "value": "儲存"
+    },
+    {
+      "key": "Load",
+      "value": "載入"
+    },
+    {
+      "key": "Merge",
+      "value": "合併"
+    },
+    {
+      "key": "Compare",
+      "value": "比較"
+    },
+    {
+      "key": "Rename",
+      "value": "重新命名"
+    },
+    {
+      "key": "Reset All",
+      "value": "全部重設"
+    },
+    {
+      "key": "Force Apply",
+      "value": "強制套用"
+    },
+    {
+      "key": "Overwrite",
+      "value": "覆寫"
+    },
+    {
+      "key": "Cancel",
+      "value": "取消"
+    },
+    {
+      "key": "Discard",
+      "value": "捨棄"
+    },
+    {
+      "key": "No",
+      "value": "否"
+    },
+    {
+      "key": "Yes",
+      "value": "是"
+    },
+    {
+      "key": "OK",
+      "value": "確定"
+    },
+    {
+      "key": "Name",
+      "value": "名稱"
+    },
+    {
+      "key": "New name",
+      "value": "新名稱"
+    },
+    {
+      "key": "Patch JSON",
+      "value": "修補檔 JSON"
+    },
+    {
+      "key": "New only",
+      "value": "只看新錯誤"
+    },
+    {
+      "key": "Validate",
+      "value": "執行驗證"
+    },
+    {
+      "key": "Whole value",
+      "value": "完整值"
+    },
+    {
+      "key": "Open",
+      "value": "開啟"
+    },
+    {
+      "key": "Overridden",
+      "value": "已覆寫"
+    },
+    {
+      "key": "NEW",
+      "value": "新增"
+    },
+    {
+      "key": "ADDED",
+      "value": "已新增"
+    },
+    {
+      "key": "DELETED",
+      "value": "已刪除"
+    },
+    {
+      "key": "Recent searches",
+      "value": "最近的搜尋"
+    },
+    {
+      "key": "No table selected",
+      "value": "尚未選取資料表"
+    },
+    {
+      "key": "Current: no overrides",
+      "value": "目前沒有覆寫資料"
+    },
+    {
+      "key": "No saved patches",
+      "value": "沒有已儲存的修補檔"
+    },
+    {
+      "key": "Select a patch",
+      "value": "選取修補檔"
+    },
+    {
+      "key": "No failures",
+      "value": "沒有驗證錯誤"
+    },
+    {
+      "key": "Validating in the game…",
+      "value": "正在遊戲中驗證…"
+    },
+    {
+      "key": "Connect to a game to use its operations.",
+      "value": "連線至遊戲後即可使用遊戲操作。"
+    },
+    {
+      "key": "The game has no available operations.",
+      "value": "遊戲沒有可用的操作。"
+    },
+    {
+      "key": "searching…",
+      "value": "正在搜尋…"
+    },
+    {
+      "key": "Select a table to see its records.",
+      "value": "選取資料表以檢視資料。"
+    },
+    {
+      "key": "Select a record to inspect it.",
+      "value": "選取資料以檢視欄位。"
+    },
+    {
+      "key": "No changes",
+      "value": "沒有變更"
+    },
+    {
+      "key": "No results",
+      "value": "沒有結果"
+    },
+    {
+      "key": "No overrides",
+      "value": "沒有覆寫資料"
+    },
+    {
+      "key": "Select a record.",
+      "value": "請選取一筆資料。"
+    },
+    {
+      "key": "No overrides. Every value comes from MasterMemory.",
+      "value": "沒有覆寫資料；所有值都來自 MasterMemory。"
+    },
+    {
+      "key": "Search text, or conditions like  Damage>100 Element=Fire Name~ice",
+      "value": "搜尋文字或輸入條件，例如 Damage>100 Element=Fire Name~ice"
+    },
+    {
+      "key": "Copy every table and field name as a label template (tab separated) to fill in and load with MasterMemoryDebugLocalization.LoadTsv",
+      "value": "複製所有資料表與欄位名稱的 TSV 範本，填寫後可透過 MasterMemoryDebugLocalization.LoadTsv 載入"
+    },
+    {
+      "key": "Browse and edit tables",
+      "value": "瀏覽與編輯資料表"
+    },
+    {
+      "key": "Every changed field across all tables",
+      "value": "查看所有資料表中已變更的欄位"
+    },
+    {
+      "key": "Save, apply, merge, import and export patches",
+      "value": "儲存、套用、合併、匯入與匯出修補檔"
+    },
+    {
+      "key": "Find a value in every table",
+      "value": "在所有資料表中搜尋值"
+    },
+    {
+      "key": "MasterMemory Validate() failures of the rebuilt database",
+      "value": "檢視重建資料庫的 MasterMemory Validate() 錯誤"
+    },
+    {
+      "key": "Remote editing: edit this game from the remote editor tool, or connect the tool to a game",
+      "value": "從遠端工具編輯此遊戲，或讓工具連線至遊戲"
+    },
+    {
+      "key": "Interface language (table and field names remain code names)",
+      "value": "介面語言（資料表與欄位維持程式名稱）"
+    },
+    {
+      "key": "Space separated terms, all must match.\nText: primary key / name / string members (contains).\nField op Value with = != > >= < <= ~ (contains). Quote values with spaces: Name=\"Ice Blast\". Field=null matches null.\nField names, and enum / bool values after an operator, are suggested while typing: Up / Down select, Tab / Enter accept, Esc closes.",
+      "value": "以空白分隔條件，所有條件都需符合。\n一般文字：在主鍵、名稱與字串欄位中尋找包含的值。\n欄位條件支援 = != > >= < <= ~；有空白的值請加引號，例如 Name=\"Ice Blast\"。Field=null 可尋找空值。\n輸入時會提示欄位名稱、列舉與布林值；方向鍵選取，Tab / Enter 套用，Esc 關閉。"
+    },
+    {
+      "key": "Smaller UI",
+      "value": "縮小介面"
+    },
+    {
+      "key": "Larger UI",
+      "value": "放大介面"
+    },
+    {
+      "key": "Close (F8)",
+      "value": "關閉（F8）"
+    },
+    {
+      "key": "Show, hide and freeze columns",
+      "value": "顯示、隱藏與凍結欄位"
+    },
+    {
+      "key": "Add a record with default values (it exists as an override: a rebuilt database and TryGetOverride see it)",
+      "value": "以預設值新增資料；重建資料庫與 TryGetOverride 可讀到此覆寫"
+    },
+    {
+      "key": "Set, add to or multiply a field of every record that matches the search (one undo step)",
+      "value": "對所有符合搜尋條件的資料欄位設定、加值或乘值（一次復原步驟）"
+    },
+    {
+      "key": "Copy the shown rows and columns as tab separated text (paste into a spreadsheet; WebGL: download)",
+      "value": "將畫面上的資料列與欄位複製為 TSV，可貼進試算表（WebGL 為下載）"
+    },
+    {
+      "key": "Copy the record as JSON (WebGL: download)",
+      "value": "以 JSON 複製資料（WebGL 為下載）"
+    },
+    {
+      "key": "Apply the edits as an override (Enter)",
+      "value": "將修改套用為覆寫（Enter）"
+    },
+    {
+      "key": "Discard the edits that are not applied",
+      "value": "放棄尚未套用的修改"
+    },
+    {
+      "key": "Remove the override of this record",
+      "value": "移除此筆資料的覆寫"
+    },
+    {
+      "key": "Add a copy of this record with a new primary key",
+      "value": "以新的主鍵複製此筆資料"
+    },
+    {
+      "key": "Delete the record: a rebuilt database leaves it out (Restore brings it back)",
+      "value": "刪除此筆資料；重建資料庫將略過它（可用還原取回）"
+    },
+    {
+      "key": "Import values edited in a spreadsheet (the Copy TSV format) as overrides, after a preview",
+      "value": "預覽後匯入試算表修改的 TSV，套用為覆寫"
+    },
+    {
+      "key": "Copy every changed field (table, key, name, field, original, current) as tab separated text, to paste into a spreadsheet (WebGL: download)",
+      "value": "將所有變更欄位複製為 TSV，可貼進試算表（WebGL 為下載）"
+    },
+    {
+      "key": "Undo (Ctrl+Z)",
+      "value": "復原（Ctrl+Z）"
+    },
+    {
+      "key": "Redo (Ctrl+Y / Ctrl+Shift+Z)",
+      "value": "重做（Ctrl+Y / Ctrl+Shift+Z）"
+    },
+    {
+      "key": "Recent messages, warnings and changes",
+      "value": "最近的訊息、警告與變更"
+    },
+    {
+      "key": "IP address of the device running the game (shown in its Remote dialog). 127.0.0.1 for a game on this PC, or an Android device over USB after adb forward tcp:PORT tcp:PORT.",
+      "value": "執行遊戲裝置的 IP 位址（可在遊戲的遠端對話框查看）。本機遊戲或完成 adb forward 的 USB Android 裝置可用 127.0.0.1。"
+    },
+    {
+      "key": "Shown in the game's Remote dialog and log.",
+      "value": "顯示於遊戲的遠端對話框與日誌。"
+    },
+    {
+      "key": "Use this game's address and port (the pairing code is still needed)",
+      "value": "使用此遊戲的位址與連接埠（仍需輸入配對碼）"
+    },
+    {
+      "key": "A value to find in every table: a key, a name, a number… (Enter)",
+      "value": "輸入要在所有資料表搜尋的值：主鍵、名稱或數字等（Enter）"
+    },
+    {
+      "key": "Only values that equal the text (1001 does not find 11001)",
+      "value": "只尋找與文字完全相符的值（1001 不會找到 11001）"
+    },
+    {
+      "key": "Find the text in every member of every table (overrides included)",
+      "value": "搜尋所有資料表的每個欄位（包含覆寫）"
+    },
+    {
+      "key": "Only the failures that the original data does not have (caused by the overrides)",
+      "value": "只顯示覆寫造成、原始資料沒有的錯誤"
+    },
+    {
+      "key": "Run MasterMemory Validate() again (in the game when connected to it)",
+      "value": "重新執行 MasterMemory Validate()（遠端連線時在遊戲端執行）"
+    },
+    {
+      "key": "The values shown include the override",
+      "value": "顯示的值包含覆寫"
+    },
+    {
+      "key": "Remote editor: connect to a game build.",
+      "value": "遠端編輯器：請連線至遊戲建置版本。"
+    },
+    {
+      "key": "Ready.  Enter: Apply   Esc: Close",
+      "value": "就緒。Enter：套用　Esc：關閉"
+    },
+    {
+      "key": "No table registered. Call MasterMemoryDebugRegistry.RegisterDatabase / RegisterTable.",
+      "value": "尚未註冊資料表。請呼叫 MasterMemoryDebugRegistry.RegisterDatabase / RegisterTable。"
+    },
+    {
+      "key": "Deleted: a rebuilt database (AutoRebuild) leaves this record out; TryGetOverride still returns the original. Restore brings it back.",
+      "value": "已刪除：重建資料庫（AutoRebuild）會略過此筆資料；TryGetOverride 仍會回傳原始資料。可用還原取回。"
+    },
+    {
+      "key": "1 record",
+      "value": "1 筆資料"
+    }
+  ],
+  "patterns": [
+    {
+      "pattern": "^Saved patches \\((\\d+)\\)$",
+      "replacement": "已儲存的修補檔 ($1)"
+    },
+    {
+      "pattern": "^(\\d+) / (\\d+) records$",
+      "replacement": "$1 / $2 筆資料"
+    },
+    {
+      "pattern": "^(\\d+) overrides$",
+      "replacement": "$1 筆覆寫資料"
+    },
+    {
+      "pattern": "^Master: (.+)$",
+      "replacement": "主資料：$1"
+    },
+    {
+      "pattern": "^Remote( ●)?$",
+      "replacement": "遠端$1"
+    },
+    {
+      "pattern": "^Log \\((\\d+)\\)$",
+      "replacement": "記錄 ($1)"
+    },
+    {
+      "pattern": "^Remote: Connected to (.+): (\\d+) tables, master (.+)$",
+      "replacement": "遠端：已連線至 $1，$2 個資料表，主資料版本 $3"
+    },
+    {
+      "pattern": "^Current: (\\d+) overridden records$",
+      "replacement": "目前有 $1 筆覆寫資料"
+    },
+    {
+      "pattern": "^(\\d+) failures, (\\d+) caused by overrides$",
+      "replacement": "共 $1 個錯誤，$2 個由覆寫造成"
+    },
+    {
+      "pattern": "^(\\d+) values in (\\d+) records of (\\d+) tables  \\((\\d+) ms\\)$",
+      "replacement": "在 $3 個資料表的 $2 筆資料中找到 $1 個值（$4 毫秒）"
+    },
+    {
+      "pattern": "^Not found  \\((\\d+) ms\\)$",
+      "replacement": "找不到結果（$1 毫秒）"
+    },
+    {
+      "pattern": "^(\\d+) found: click one to use its address\\.$",
+      "replacement": "找到 $1 個遊戲；點選即可帶入位址。"
+    },
+    {
+      "pattern": "^Request sent: (.+)$",
+      "replacement": "已送出請求：$1"
+    },
+    {
+      "pattern": "^Remote: disconnected\\. The tables shown are the last received\\.$",
+      "replacement": "遠端連線已中斷；目前顯示的是最後收到的資料表。"
+    },
+    {
+      "pattern": "^Remote: enter a port between 1 and 65535\\.$",
+      "replacement": "遠端連線：請輸入 1 到 65535 的連接埠。"
+    },
+    {
+      "pattern": "^Connected to (.+): (\\d+) tables, master (.+)$",
+      "replacement": "已連線至 $1：$2 個資料表，主資料版本 $3"
+    },
+    {
+      "pattern": "^Connecting to (.+)\\.\\.\\.$",
+      "replacement": "正在連線至 $1…"
+    },
+    {
+      "pattern": "^Changes \\((\\d+)\\)$",
+      "replacement": "變更 ($1)"
+    },
+    {
+      "pattern": "^Patches \\((\\d+)\\)$",
+      "replacement": "修補檔 ($1)"
+    },
+    {
+      "pattern": "^Validation \\((.+)\\)$",
+      "replacement": "資料驗證 ($1)"
+    },
+    {
+      "pattern": "^▲ (\\d+) more$",
+      "replacement": "▲ 還有 $1 項"
+    },
+    {
+      "pattern": "^▼ (\\d+) more$",
+      "replacement": "▼ 還有 $1 項"
+    }
+  ]
+}

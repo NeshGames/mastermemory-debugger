@@ -1,0 +1,612 @@
+{
+  "language": "ja",
+  "displayName": "日本語",
+  "strings": [
+    {
+      "key": "MasterMemory Runtime Debugger",
+      "value": "MasterMemory ランタイムデバッガー"
+    },
+    {
+      "key": "Data",
+      "value": "データ"
+    },
+    {
+      "key": "Changes",
+      "value": "変更"
+    },
+    {
+      "key": "Patches",
+      "value": "パッチ"
+    },
+    {
+      "key": "Find",
+      "value": "全体検索"
+    },
+    {
+      "key": "Validation",
+      "value": "検証"
+    },
+    {
+      "key": "Remote",
+      "value": "リモート"
+    },
+    {
+      "key": "Close",
+      "value": "閉じる"
+    },
+    {
+      "key": "Code names",
+      "value": "コード名"
+    },
+    {
+      "key": "Tables",
+      "value": "テーブル"
+    },
+    {
+      "key": "Labels TSV",
+      "value": "ラベル TSV"
+    },
+    {
+      "key": "Modified Only",
+      "value": "変更済みのみ"
+    },
+    {
+      "key": "Columns ▾",
+      "value": "列 ▾"
+    },
+    {
+      "key": "+ New…",
+      "value": "+ 新規…"
+    },
+    {
+      "key": "Batch Edit…",
+      "value": "一括編集…"
+    },
+    {
+      "key": "Copy",
+      "value": "コピー"
+    },
+    {
+      "key": "Copy JSON",
+      "value": "JSON をコピー"
+    },
+    {
+      "key": "Record Inspector",
+      "value": "レコード詳細"
+    },
+    {
+      "key": "Apply",
+      "value": "適用"
+    },
+    {
+      "key": "Revert",
+      "value": "編集を破棄"
+    },
+    {
+      "key": "Reset",
+      "value": "リセット"
+    },
+    {
+      "key": "Duplicate…",
+      "value": "複製…"
+    },
+    {
+      "key": "Delete",
+      "value": "削除"
+    },
+    {
+      "key": "Paste TSV…",
+      "value": "TSV を貼り付け…"
+    },
+    {
+      "key": "Copy TSV",
+      "value": "TSV をコピー"
+    },
+    {
+      "key": "↶ Undo",
+      "value": "↶ 元に戻す"
+    },
+    {
+      "key": "↷ Redo",
+      "value": "↷ やり直す"
+    },
+    {
+      "key": "Log",
+      "value": "ログ"
+    },
+    {
+      "key": "Remote editing",
+      "value": "リモート編集"
+    },
+    {
+      "key": "Game address",
+      "value": "ゲームのアドレス"
+    },
+    {
+      "key": "Port",
+      "value": "ポート"
+    },
+    {
+      "key": "Pairing code",
+      "value": "ペアリングコード"
+    },
+    {
+      "key": "Games on the network",
+      "value": "ネットワーク上のゲーム"
+    },
+    {
+      "key": "Search",
+      "value": "検索"
+    },
+    {
+      "key": "Connect",
+      "value": "接続"
+    },
+    {
+      "key": "Disconnect",
+      "value": "切断"
+    },
+    {
+      "key": "Game operations",
+      "value": "ゲーム操作"
+    },
+    {
+      "key": "Addresses",
+      "value": "アドレス"
+    },
+    {
+      "key": "Start",
+      "value": "開始"
+    },
+    {
+      "key": "Stop",
+      "value": "停止"
+    },
+    {
+      "key": "Saved patches",
+      "value": "保存済みパッチ"
+    },
+    {
+      "key": "Save As…",
+      "value": "名前を付けて保存…"
+    },
+    {
+      "key": "Import…",
+      "value": "インポート…"
+    },
+    {
+      "key": "Export…",
+      "value": "エクスポート…"
+    },
+    {
+      "key": "Import",
+      "value": "インポート"
+    },
+    {
+      "key": "Export",
+      "value": "エクスポート"
+    },
+    {
+      "key": "Save",
+      "value": "保存"
+    },
+    {
+      "key": "Load",
+      "value": "読み込む"
+    },
+    {
+      "key": "Merge",
+      "value": "結合"
+    },
+    {
+      "key": "Compare",
+      "value": "比較"
+    },
+    {
+      "key": "Rename",
+      "value": "名前を変更"
+    },
+    {
+      "key": "Reset All",
+      "value": "すべてリセット"
+    },
+    {
+      "key": "Force Apply",
+      "value": "強制適用"
+    },
+    {
+      "key": "Overwrite",
+      "value": "上書き"
+    },
+    {
+      "key": "Cancel",
+      "value": "キャンセル"
+    },
+    {
+      "key": "Discard",
+      "value": "破棄"
+    },
+    {
+      "key": "No",
+      "value": "いいえ"
+    },
+    {
+      "key": "Yes",
+      "value": "はい"
+    },
+    {
+      "key": "OK",
+      "value": "OK"
+    },
+    {
+      "key": "Name",
+      "value": "名前"
+    },
+    {
+      "key": "New name",
+      "value": "新しい名前"
+    },
+    {
+      "key": "Patch JSON",
+      "value": "パッチ JSON"
+    },
+    {
+      "key": "New only",
+      "value": "新規のみ"
+    },
+    {
+      "key": "Validate",
+      "value": "検証を実行"
+    },
+    {
+      "key": "Whole value",
+      "value": "完全一致"
+    },
+    {
+      "key": "Open",
+      "value": "開く"
+    },
+    {
+      "key": "Overridden",
+      "value": "上書き済み"
+    },
+    {
+      "key": "NEW",
+      "value": "新規"
+    },
+    {
+      "key": "ADDED",
+      "value": "追加済み"
+    },
+    {
+      "key": "DELETED",
+      "value": "削除済み"
+    },
+    {
+      "key": "Recent searches",
+      "value": "最近の検索"
+    },
+    {
+      "key": "No table selected",
+      "value": "テーブルが選択されていません"
+    },
+    {
+      "key": "Current: no overrides",
+      "value": "現在、上書きはありません"
+    },
+    {
+      "key": "No saved patches",
+      "value": "保存済みパッチはありません"
+    },
+    {
+      "key": "Select a patch",
+      "value": "パッチを選択"
+    },
+    {
+      "key": "No failures",
+      "value": "検証エラーはありません"
+    },
+    {
+      "key": "Validating in the game…",
+      "value": "ゲームで検証中…"
+    },
+    {
+      "key": "Connect to a game to use its operations.",
+      "value": "ゲームに接続すると操作できます。"
+    },
+    {
+      "key": "The game has no available operations.",
+      "value": "利用可能なゲーム操作はありません。"
+    },
+    {
+      "key": "searching…",
+      "value": "検索中…"
+    },
+    {
+      "key": "Select a table to see its records.",
+      "value": "テーブルを選択するとレコードが表示されます。"
+    },
+    {
+      "key": "Select a record to inspect it.",
+      "value": "レコードを選択すると詳細が表示されます。"
+    },
+    {
+      "key": "No changes",
+      "value": "変更はありません"
+    },
+    {
+      "key": "No results",
+      "value": "結果はありません"
+    },
+    {
+      "key": "No overrides",
+      "value": "上書きはありません"
+    },
+    {
+      "key": "Select a record.",
+      "value": "レコードを選択してください。"
+    },
+    {
+      "key": "No overrides. Every value comes from MasterMemory.",
+      "value": "上書きはありません。すべての値は MasterMemory から読み込まれます。"
+    },
+    {
+      "key": "Search text, or conditions like  Damage>100 Element=Fire Name~ice",
+      "value": "テキストまたは条件で検索（例: Damage>100 Element=Fire Name~ice）"
+    },
+    {
+      "key": "Copy every table and field name as a label template (tab separated) to fill in and load with MasterMemoryDebugLocalization.LoadTsv",
+      "value": "すべてのテーブル名とフィールド名をタブ区切りのテンプレートとしてコピーします。記入後、MasterMemoryDebugLocalization.LoadTsv で読み込めます"
+    },
+    {
+      "key": "Browse and edit tables",
+      "value": "テーブルを表示・編集"
+    },
+    {
+      "key": "Every changed field across all tables",
+      "value": "全テーブルで変更されたフィールド"
+    },
+    {
+      "key": "Save, apply, merge, import and export patches",
+      "value": "パッチの保存、適用、結合、インポート、エクスポート"
+    },
+    {
+      "key": "Find a value in every table",
+      "value": "すべてのテーブルで値を検索"
+    },
+    {
+      "key": "MasterMemory Validate() failures of the rebuilt database",
+      "value": "再構築したデータベースの MasterMemory Validate() エラー"
+    },
+    {
+      "key": "Remote editing: edit this game from the remote editor tool, or connect the tool to a game",
+      "value": "リモートツールからこのゲームを編集するか、ツールをゲームに接続します"
+    },
+    {
+      "key": "Interface language (table and field names remain code names)",
+      "value": "UI 言語（テーブル名とフィールド名はコード名のまま）"
+    },
+    {
+      "key": "Space separated terms, all must match.\nText: primary key / name / string members (contains).\nField op Value with = != > >= < <= ~ (contains). Quote values with spaces: Name=\"Ice Blast\". Field=null matches null.\nField names, and enum / bool values after an operator, are suggested while typing: Up / Down select, Tab / Enter accept, Esc closes.",
+      "value": "スペース区切りの条件はすべて一致する必要があります。\nテキスト: 主キー、名前、文字列フィールドを部分一致で検索します。\nフィールド条件: = != > >= < <= ~ を使用します。空白を含む値は Name=\"Ice Blast\" のように引用符で囲みます。Field=null は null と一致します。\n入力中はフィールド名、列挙値、真偽値を候補表示します。上下キーで選択、Tab / Enter で確定、Esc で閉じます。"
+    },
+    {
+      "key": "Smaller UI",
+      "value": "UI を縮小"
+    },
+    {
+      "key": "Larger UI",
+      "value": "UI を拡大"
+    },
+    {
+      "key": "Close (F8)",
+      "value": "閉じる（F8）"
+    },
+    {
+      "key": "Show, hide and freeze columns",
+      "value": "列を表示、非表示、固定する"
+    },
+    {
+      "key": "Add a record with default values (it exists as an override: a rebuilt database and TryGetOverride see it)",
+      "value": "既定値でレコードを追加します。再構築したデータベースと TryGetOverride から参照できます"
+    },
+    {
+      "key": "Set, add to or multiply a field of every record that matches the search (one undo step)",
+      "value": "検索に一致するすべてのレコードのフィールドを設定、加算、乗算します（元に戻す操作は 1 回）"
+    },
+    {
+      "key": "Copy the shown rows and columns as tab separated text (paste into a spreadsheet; WebGL: download)",
+      "value": "表示中の行と列をタブ区切りでコピーします。表計算ソフトに貼り付けられます（WebGL ではダウンロード）"
+    },
+    {
+      "key": "Copy the record as JSON (WebGL: download)",
+      "value": "レコードを JSON としてコピーします（WebGL ではダウンロード）"
+    },
+    {
+      "key": "Apply the edits as an override (Enter)",
+      "value": "編集内容を上書きとして適用します（Enter）"
+    },
+    {
+      "key": "Discard the edits that are not applied",
+      "value": "未適用の編集を破棄します"
+    },
+    {
+      "key": "Remove the override of this record",
+      "value": "このレコードの上書きを削除します"
+    },
+    {
+      "key": "Add a copy of this record with a new primary key",
+      "value": "新しい主キーでこのレコードを複製します"
+    },
+    {
+      "key": "Delete the record: a rebuilt database leaves it out (Restore brings it back)",
+      "value": "レコードを削除します。再構築したデータベースから除外されます（復元可能）"
+    },
+    {
+      "key": "Import values edited in a spreadsheet (the Copy TSV format) as overrides, after a preview",
+      "value": "表計算ソフトで編集した TSV をプレビュー後に上書きとして取り込みます"
+    },
+    {
+      "key": "Copy every changed field (table, key, name, field, original, current) as tab separated text, to paste into a spreadsheet (WebGL: download)",
+      "value": "変更済みフィールドを TSV としてコピーし、表計算ソフトに貼り付けます（WebGL ではダウンロード）"
+    },
+    {
+      "key": "Undo (Ctrl+Z)",
+      "value": "元に戻す（Ctrl+Z）"
+    },
+    {
+      "key": "Redo (Ctrl+Y / Ctrl+Shift+Z)",
+      "value": "やり直す（Ctrl+Y / Ctrl+Shift+Z）"
+    },
+    {
+      "key": "Recent messages, warnings and changes",
+      "value": "最近のメッセージ、警告、変更"
+    },
+    {
+      "key": "IP address of the device running the game (shown in its Remote dialog). 127.0.0.1 for a game on this PC, or an Android device over USB after adb forward tcp:PORT tcp:PORT.",
+      "value": "ゲームを実行している端末の IP アドレスです（ゲームのリモート画面に表示）。同じ PC のゲーム、または adb forward 後の USB 接続 Android 端末には 127.0.0.1 を使用します。"
+    },
+    {
+      "key": "Shown in the game's Remote dialog and log.",
+      "value": "ゲームのリモート画面とログに表示されます。"
+    },
+    {
+      "key": "Use this game's address and port (the pairing code is still needed)",
+      "value": "このゲームのアドレスとポートを使用します（ペアリングコードも必要です）"
+    },
+    {
+      "key": "A value to find in every table: a key, a name, a number… (Enter)",
+      "value": "すべてのテーブルで検索する値を入力します: 主キー、名前、数値など（Enter）"
+    },
+    {
+      "key": "Only values that equal the text (1001 does not find 11001)",
+      "value": "テキストと完全に一致する値のみを検索します（1001 では 11001 は見つかりません）"
+    },
+    {
+      "key": "Find the text in every member of every table (overrides included)",
+      "value": "すべてのテーブルの全フィールドを検索します（上書きを含む）"
+    },
+    {
+      "key": "Only the failures that the original data does not have (caused by the overrides)",
+      "value": "元データにない、上書きによって生じたエラーのみを表示します"
+    },
+    {
+      "key": "Run MasterMemory Validate() again (in the game when connected to it)",
+      "value": "MasterMemory Validate() を再実行します（リモート接続中はゲーム側で実行）"
+    },
+    {
+      "key": "The values shown include the override",
+      "value": "表示中の値には上書きが含まれます"
+    },
+    {
+      "key": "Remote editor: connect to a game build.",
+      "value": "リモートエディター: ゲームのビルドに接続してください。"
+    },
+    {
+      "key": "Ready.  Enter: Apply   Esc: Close",
+      "value": "準備完了。Enter: 適用　Esc: 閉じる"
+    },
+    {
+      "key": "No table registered. Call MasterMemoryDebugRegistry.RegisterDatabase / RegisterTable.",
+      "value": "テーブルが登録されていません。MasterMemoryDebugRegistry.RegisterDatabase / RegisterTable を呼び出してください。"
+    },
+    {
+      "key": "Deleted: a rebuilt database (AutoRebuild) leaves this record out; TryGetOverride still returns the original. Restore brings it back.",
+      "value": "削除済み: 再構築したデータベース（AutoRebuild）からは除外されます。TryGetOverride は元のレコードを返します。復元できます。"
+    },
+    {
+      "key": "1 record",
+      "value": "1 件のレコード"
+    }
+  ],
+  "patterns": [
+    {
+      "pattern": "^Saved patches \\((\\d+)\\)$",
+      "replacement": "保存済みパッチ ($1)"
+    },
+    {
+      "pattern": "^(\\d+) / (\\d+) records$",
+      "replacement": "$1 / $2 件のレコード"
+    },
+    {
+      "pattern": "^(\\d+) overrides$",
+      "replacement": "$1 件の上書き"
+    },
+    {
+      "pattern": "^Master: (.+)$",
+      "replacement": "マスターデータ: $1"
+    },
+    {
+      "pattern": "^Remote( ●)?$",
+      "replacement": "リモート$1"
+    },
+    {
+      "pattern": "^Log \\((\\d+)\\)$",
+      "replacement": "ログ ($1)"
+    },
+    {
+      "pattern": "^Remote: Connected to (.+): (\\d+) tables, master (.+)$",
+      "replacement": "リモート: $1 に接続しました。$2 テーブル、マスターデータ $3"
+    },
+    {
+      "pattern": "^Current: (\\d+) overridden records$",
+      "replacement": "現在、$1 件の上書きレコード"
+    },
+    {
+      "pattern": "^(\\d+) failures, (\\d+) caused by overrides$",
+      "replacement": "エラー $1 件（うち $2 件は上書きによる）"
+    },
+    {
+      "pattern": "^(\\d+) values in (\\d+) records of (\\d+) tables  \\((\\d+) ms\\)$",
+      "replacement": "$3 テーブルの $2 レコードで $1 個の値が見つかりました（$4 ミリ秒）"
+    },
+    {
+      "pattern": "^Not found  \\((\\d+) ms\\)$",
+      "replacement": "結果なし（$1 ミリ秒）"
+    },
+    {
+      "pattern": "^(\\d+) found: click one to use its address\\.$",
+      "replacement": "$1 件のゲームが見つかりました。クリックするとアドレスを使用します。"
+    },
+    {
+      "pattern": "^Request sent: (.+)$",
+      "replacement": "リクエストを送信しました: $1"
+    },
+    {
+      "pattern": "^Remote: disconnected\\. The tables shown are the last received\\.$",
+      "replacement": "リモート接続が切断されました。表示中のテーブルは最後に受信したものです。"
+    },
+    {
+      "pattern": "^Remote: enter a port between 1 and 65535\\.$",
+      "replacement": "リモート: 1～65535 のポートを入力してください。"
+    },
+    {
+      "pattern": "^Connected to (.+): (\\d+) tables, master (.+)$",
+      "replacement": "$1 に接続しました: $2 テーブル、マスターデータ $3"
+    },
+    {
+      "pattern": "^Connecting to (.+)\\.\\.\\.$",
+      "replacement": "$1 に接続中…"
+    },
+    {
+      "pattern": "^Changes \\((\\d+)\\)$",
+      "replacement": "変更 ($1)"
+    },
+    {
+      "pattern": "^Patches \\((\\d+)\\)$",
+      "replacement": "パッチ ($1)"
+    },
+    {
+      "pattern": "^Validation \\((.+)\\)$",
+      "replacement": "検証 ($1)"
+    },
+    {
+      "pattern": "^▲ (\\d+) more$",
+      "replacement": "▲ ほか $1 件"
+    },
+    {
+      "pattern": "^▼ (\\d+) more$",
+      "replacement": "▼ ほか $1 件"
+    }
+  ]
+}

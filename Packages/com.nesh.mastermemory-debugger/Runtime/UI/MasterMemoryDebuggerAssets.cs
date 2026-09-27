@@ -23,12 +23,28 @@ namespace Nesh.MasterMemoryDebugger
         public const string LayoutGuid = "77a202a7071242eb8de1e30667caeb6f";
         public const string StyleGuid = "109368658aa34c9f97d4dfa867261d58";
         public const string ThemeGuid = "72598048e1c94e68b0b91d0185b438f0";
+        public const string UiEnglishGuid = "6f6a7a20e2e8454b8c86a8fb64b4cbe2";
+        public const string UiChineseGuid = "78298061daa64b1ca56d31cba77d084c";
+        public const string UiJapaneseGuid = "9144bc33e38f476a811eef91c65e4dd5";
+        public const string UiEnglishName = "MasterMemoryUi_en";
+        public const string UiChineseName = "MasterMemoryUi_zh-TW";
+        public const string UiJapaneseName = "MasterMemoryUi_ja";
 
         public static VisualTreeAsset Layout => Load<VisualTreeAsset>(LayoutGuid, LayoutName);
 
         public static StyleSheet Style => Load<StyleSheet>(StyleGuid, StyleName);
 
         public static ThemeStyleSheet Theme => Load<ThemeStyleSheet>(ThemeGuid, ThemeName);
+
+        public static TextAsset UiCatalog(string language)
+        {
+            switch (language)
+            {
+                case "zh-TW": return Load<TextAsset>(UiChineseGuid, UiChineseName);
+                case "ja": return Load<TextAsset>(UiJapaneseGuid, UiJapaneseName);
+                default: return Load<TextAsset>(UiEnglishGuid, UiEnglishName);
+            }
+        }
 
         /// <summary>False in a build made with Include Debugger UI turned off (the debugger can not be opened).</summary>
         public static bool IsUIIncluded => Layout != null;
