@@ -19,6 +19,7 @@ All notable changes to this package are documented in this file.
 ### Fixed
 
 - Development Builds: the UI assets copied into `Assets/MasterMemoryDebuggerBuild/Resources` got the package's minimal `.meta` files, which Unity 6.6 rejects ("contains a <unknown> object at version 1, below the supported minimum (2)"), so the build showed a broken debugger. Only the files are copied now; Unity imports them with new `.meta` files.
+- Development Builds: the debugger had other colors and styles than in the Editor. The copies of the UXML and the USS had the same Resources name, and loading the style sheet could return the UXML's inline style sheet instead of the USS; the copies have distinct names now. A missing style sheet or theme is reported in the log.
 
 ## [0.9.0] - 2026-09-27
 
