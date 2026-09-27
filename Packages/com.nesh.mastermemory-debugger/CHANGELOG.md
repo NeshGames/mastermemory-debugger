@@ -2,6 +2,19 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.9.0] - 2026-09-27
+
+### Added
+
+- Remote editor tool: the Validation tab shows the game's `Validate()` results. The game pushes whether it validates and the number of failures caused by the overrides (tab title), and validates when the tab asks; Open jumps to the tool's copy of the record. The game needs `AutoRebuild` with validation.
+- Patches tab: Compare… a saved patch with the current overrides or another patch: the fields changed to different values or by one side only, with their original values; Copy TSV. `MasterDataPatchCompare.Compare` / `ToTsv`.
+- `MasterMemoryDebugValidation.IsPending` / `Invalidate()`.
+
+### Changed
+
+- Remote editor tool: the debugger fills the whole window and has no Close button (Esc and the toggle key / gesture do not close it).
+- Remote protocol version 2 (validation messages): update the game and the tool together.
+
 ## [0.8.0] - 2026-09-26
 
 ### Added

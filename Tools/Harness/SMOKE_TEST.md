@@ -30,6 +30,8 @@ and Play Mode) as well.
 - [ ] Build Remote Editor Tool… → run it, connect with the code →
       the tables appear; an edit in the tool changes the game (Console log of the sample) and an edit in the game shows
       in the tool; a wrong code is refused.
+- [ ] Tool: fills the window, no Close; the Validation tab shows the game's failures and Open jumps to the record.
+- [ ] Patches: Compare… with the current overrides and with another patch; Copy TSV.
 
 ## Window
 

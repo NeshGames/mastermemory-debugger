@@ -38,7 +38,11 @@ namespace Nesh.MasterMemoryDebugger
             newOnlyToggle.AddToClassList("mm-debugger__modified-only");
             newOnlyToggle.RegisterValueChangedCallback(_ => Refresh());
             header.Add(newOnlyToggle);
-            var runButton = new Button(Refresh) { text = "Validate", tooltip = "Run MasterMemory Validate() again" };
+            var runButton = new Button(() =>
+            {
+                MasterMemoryDebugValidation.Invalidate();
+                Refresh();
+            }) { text = "Validate", tooltip = "Run MasterMemory Validate() again (in the game when connected to it)" };
             runButton.AddToClassList("mm-debugger__button");
             header.Add(runButton);
             panel.Add(header);
@@ -71,16 +75,24 @@ namespace Nesh.MasterMemoryDebugger
             if (!MasterMemoryDebugValidation.IsAvailable)
             {
                 summaryLabel.text = string.Empty;
-                AddHint("No database is validated. Rebuild the gameplay database with\n" +
+                AddHint((MasterMemoryDebugRemote.IsToolMode ? "The connected game does not validate. " : string.Empty) +
+                        "No database is validated. Rebuild the gameplay database with\n" +
                         "MasterMemoryDebugRebuild.AutoRebuild(database, db => ...)  (validate: true)\n" +
                         "to list the failures of MasterMemory Validate() (IValidatable<T>) here.");
                 return;
             }
 
             var failures = MasterMemoryDebugValidation.Run();
+            if (MasterMemoryDebugValidation.IsPending && failures.Count == 0)
+            {
+                summaryLabel.text = "Validating in the game…";
+                AddHint("The game runs Validate(); the results appear here when they arrive.");
+                return;
+            }
             var newCount = 0;
             foreach (var failure in failures) if (failure.IsNew) newCount++;
             summaryLabel.text = failures.Count == 0 ? "No failures" : $"{failures.Count} failures, {newCount} caused by overrides";
+            if (MasterMemoryDebugValidation.IsPending) summaryLabel.text += "  (validating again in the game…)";
 
             var shown = 0;
             foreach (var failure in failures)

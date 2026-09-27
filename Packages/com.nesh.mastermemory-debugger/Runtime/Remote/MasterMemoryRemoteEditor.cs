@@ -11,7 +11,7 @@ namespace Nesh.MasterMemoryDebugger
     [AddComponentMenu("MasterMemory Debugger/Remote Editor")]
     public sealed class MasterMemoryRemoteEditor : MonoBehaviour
     {
-        [Tooltip("Keeps the debugger open (Esc / F8 do not leave an empty window).")]
+        [Tooltip("Reopens the debugger if something closes it (it fills the window and has no Close button in the tool).")]
         [SerializeField] bool keepOpen = true;
 
         [Tooltip("Frames per second of the tool; low values save CPU.")]

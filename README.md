@@ -11,10 +11,10 @@ This repository is a Unity 6 project that hosts the UPM package
 2. Package Manager → Add package from git URL:
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.8.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.9.0
    ```
 
-   `#v0.8.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
+   `#v0.9.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
 
 See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for usage.
 

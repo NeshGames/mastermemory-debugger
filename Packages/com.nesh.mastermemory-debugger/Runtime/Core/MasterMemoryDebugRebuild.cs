@@ -177,6 +177,15 @@ namespace Nesh.MasterMemoryDebugger
 
             public int NewFailureCount => newFailureCount;
 
+            public bool IsAvailable => true;
+
+            public bool IsPending => false;
+
+            // the results of the last rebuild describe the current database
+            public void Invalidate()
+            {
+            }
+
             public void Dispose()
             {
                 if (disposed) return;

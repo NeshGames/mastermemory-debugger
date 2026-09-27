@@ -19,6 +19,7 @@ namespace Nesh.MasterMemoryDebugger
         readonly List<MasterMemoryRemoteConnection> closing = new List<MasterMemoryRemoteConnection>();
         MasterMemoryRemoteConnection waitingForHello;
         volatile bool stopped;
+        bool validationChanged;
         string lastError;
 
         public MasterMemoryRemoteServer(int port, string pairingCode)
@@ -62,6 +63,7 @@ namespace Nesh.MasterMemoryDebugger
                 {
                     MasterMemoryDebugLog.Warning("Remote: " + (Connection.CloseReason ?? "the tool disconnected."));
                     lastError = null;
+                    MasterMemoryDebugValidation.Changed -= OnValidationChanged;
                     StopSyncing();
                     Connection.Dispose();
                     Connection = null;
@@ -70,6 +72,7 @@ namespace Nesh.MasterMemoryDebugger
                 else
                 {
                     Flush();
+                    if (validationChanged) SendValidationState();
                 }
             }
             closing.RemoveAll(x => x.IsClosed);
@@ -86,6 +89,7 @@ namespace Nesh.MasterMemoryDebugger
             {
                 // already stopped
             }
+            MasterMemoryDebugValidation.Changed -= OnValidationChanged;
             waitingForHello?.Dispose();
             foreach (var connection in closing) connection.Dispose();
             while (accepted.TryDequeue(out var client)) client.Close();
@@ -171,6 +175,8 @@ namespace Nesh.MasterMemoryDebugger
             lastError = null;
             connection.Send(welcome);
             StartSyncing();
+            MasterMemoryDebugValidation.Changed += OnValidationChanged;
+            SendValidationState();
             MasterMemoryDebugLog.Warning($"Remote: the tool at {connection.RemoteAddress} connected.");
             RaiseChanged();
         }
@@ -179,9 +185,14 @@ namespace Nesh.MasterMemoryDebugger
         {
             try
             {
-                if (MasterMemoryRemoteProtocol.GetType(payload) == MasterMemoryRemoteProtocol.MessageType.Changes)
+                switch (MasterMemoryRemoteProtocol.GetType(payload))
                 {
-                    ApplyRemote(MasterMemoryRemoteProtocol.DecodeChanges(payload));
+                    case MasterMemoryRemoteProtocol.MessageType.Changes:
+                        ApplyRemote(MasterMemoryRemoteProtocol.DecodeChanges(payload));
+                        break;
+                    case MasterMemoryRemoteProtocol.MessageType.ValidateRequest:
+                        Connection.Send(MasterMemoryRemoteProtocol.Encode(Validate()));
+                        break;
                 }
             }
             catch (Exception e)
@@ -195,6 +206,46 @@ namespace Nesh.MasterMemoryDebugger
             connection.Send(MasterMemoryRemoteProtocol.EncodeReject(reason));
             connection.CloseAfterSending();
             closing.Add(connection);
+        }
+
+        // raised by rebuilds; sent once per Pump
+        void OnValidationChanged() => validationChanged = true;
+
+        void SendValidationState()
+        {
+            validationChanged = false;
+            Connection?.Send(MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.ValidationState
+            {
+                IsAvailable = MasterMemoryDebugValidation.IsAvailable,
+                NewFailureCount = MasterMemoryDebugValidation.NewFailureCount,
+            }));
+        }
+
+        /// <summary>Runs the game's validation for the tool; records are identified by table name and key text.</summary>
+        internal static List<MasterMemoryRemoteProtocol.Failure> Validate()
+        {
+            var result = new List<MasterMemoryRemoteProtocol.Failure>();
+            foreach (var failure in MasterMemoryDebugValidation.Run())
+            {
+                var item = new MasterMemoryRemoteProtocol.Failure { TableName = failure.RecordType?.Name ?? "?", Key = string.Empty, Message = failure.Message, IsNew = failure.IsNew };
+                if (failure.RecordType != null && MasterMemoryDebugRegistry.TryGetTable(failure.RecordType, out var table))
+                {
+                    item.TableName = table.TableName;
+                    if (failure.Record != null && table.RecordType.IsInstanceOfType(failure.Record))
+                    {
+                        try
+                        {
+                            item.Key = MasterDataValueUtility.FormatKey(table.GetPrimaryKey(failure.Record));
+                        }
+                        catch (Exception)
+                        {
+                            // no key: shown without Open
+                        }
+                    }
+                }
+                result.Add(item);
+            }
+            return result;
         }
 
         /// <summary>Every registered table with its original records, and the current overrides.</summary>

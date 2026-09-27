@@ -61,10 +61,10 @@ IL2CPP 還需要把產生的 `MasterMemoryResolver` 註冊到 MessagePack（參�
 Package Manager → `+` → **Add package from git URL...**
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.8.0
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.9.0
    ```
 
-   URL 最後的 `#v0.8.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
+   URL 最後的 `#v0.9.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
 
 Runtime assembly (`Nesh.MasterMemoryDebugger.Runtime`) 會自動參考 NuGetForUnity 安裝的 `MasterMemory.dll`。
 
@@ -460,7 +460,9 @@ RuntimeMasterMemoryDebugger.OpenStateChanged += isOpen => Time.timeScale = isOpe
   主資料的類別改了之後請重新 build 工具（可以放進 CI 和遊戲一起 build）。
 - 也可以不 build：在 Editor 開這個 Scene 按 Play，Editor 本身就是工具。
 - 表格、搜尋、Batch Edit、Paste TSV、Undo、Patch（存在 PC 上）都可以用；修改都會送到遊戲。
-  Validation 分頁在工具中不可用（驗證在遊戲端執行，結果會出現在遊戲的 Log）。
+  **Validation** 分頁會請遊戲端執行 `Validate()` 並顯示結果（Open 跳到工具中的該筆 Record）；頁籤標題的 `(N new)` 由遊戲端即時更新。
+  遊戲端需要使用 `AutoRebuild`（validate: true）。
+- 工具的 Debugger 佔滿整個視窗，沒有 Close（Esc / F8 不會關閉）。
 - 斷線後工具保留最後收到的資料，但修改不會再送出；重新 Connect 會以遊戲目前的資料為準。
 
 ### 注意
@@ -516,7 +518,7 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 ┌ Current: 3 overridden records  [Save As…][Export][Reset All]              [Import][Open Folder] ┐
 ├ Saved patches (3)          ┃ balance-A                                                          │
 │ balance-A                  ┃ 12 records, 30 fields · master version v1 · saved 2026-09-26 14:00 │
-│  12 records · 30 fields    ┃ [Apply][Merge][Overwrite][Rename…][Export][Delete]                 │
+│  12 records · 30 fields    ┃ [Apply][Merge][Compare…][Overwrite][Rename…][Export][Delete]       │
 │ debug  (default)           ┃ SkillMaster (2)                                                    │
 │  3 records · 5 fields      ┃  {"Id":1001}   Damage  120 → 185                                   │
 └────────────────────────────┴────────────────────────────────────────────────────────────────────┘
@@ -533,6 +535,7 @@ Patch 可以命名，存成 `Application.persistentDataPath/MasterMemoryDebugger
 | Apply | **取代**目前所有 Override（目前有 Override 時會先確認） |
 | Merge | 疊加在目前的 Override 上（同一筆 Record 會被 Patch 的內容取代） |
 | Overwrite | 用目前的 Override 覆蓋這個 Patch |
+| Compare… | 和**目前的 Override** 或**另一個 Patch** 比較：列出兩邊改成不同值、只有一邊有改的欄位（含原始值），可以 Copy TSV。程式中：`MasterDataPatchCompare.Compare(a, b)` |
 | Rename… / Export / Delete | 改名、匯出這個 Patch、刪除（目前的 Override 不受影響） |
 
 程式碼中也可以直接使用：`MasterDataPatchStorage.Save(patch, "balance-A")`、`Load("balance-A")`、`ListPatchNames()`、`Delete("balance-A")`。

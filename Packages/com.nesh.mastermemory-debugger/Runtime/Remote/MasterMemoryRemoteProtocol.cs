@@ -13,7 +13,8 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     internal static class MasterMemoryRemoteProtocol
     {
-        public const int Version = 1;
+        /// <summary>2: validation messages.</summary>
+        public const int Version = 2;
         public const int MaxFrameBytes = 512 * 1024 * 1024;
 
         public enum MessageType : byte
@@ -26,6 +27,28 @@ namespace Nesh.MasterMemoryDebugger
             Reject = 3,
             /// <summary>Both ways: overrides set or removed.</summary>
             Changes = 4,
+            /// <summary>Server → client: whether the game validates, and the failures caused by the overrides.</summary>
+            ValidationState = 5,
+            /// <summary>Client → server: validate now (Validation tab).</summary>
+            ValidateRequest = 6,
+            /// <summary>Server → client: every failure of the game's Validate().</summary>
+            ValidateResult = 7,
+        }
+
+        public sealed class ValidationState
+        {
+            public bool IsAvailable;
+            public int NewFailureCount;
+        }
+
+        public sealed class Failure
+        {
+            /// <summary>Registered table name, or the record type name when the table is not registered.</summary>
+            public string TableName;
+            /// <summary>Key as shown in the debugger (<c>1001</c>, <c>(2, 1)</c>); empty when unknown.</summary>
+            public string Key;
+            public string Message;
+            public bool IsNew;
         }
 
         public sealed class Hello
@@ -100,6 +123,26 @@ namespace Nesh.MasterMemoryDebugger
 
         public static byte[] Encode(List<Change> changes) => Write(MessageType.Changes, w => WriteChanges(w, changes));
 
+        public static byte[] Encode(ValidationState state) => Write(MessageType.ValidationState, w =>
+        {
+            w.Write(state.IsAvailable);
+            w.Write(state.NewFailureCount);
+        });
+
+        public static byte[] EncodeValidateRequest() => Write(MessageType.ValidateRequest, _ => { });
+
+        public static byte[] Encode(List<Failure> failures) => Write(MessageType.ValidateResult, w =>
+        {
+            w.Write(failures.Count);
+            foreach (var failure in failures)
+            {
+                w.Write(failure.TableName ?? string.Empty);
+                w.Write(failure.Key ?? string.Empty);
+                w.Write(failure.Message ?? string.Empty);
+                w.Write(failure.IsNew);
+            }
+        });
+
         // ------------------------------------------------------------------ decode
 
         public static MessageType GetType(byte[] payload)
@@ -113,6 +156,17 @@ namespace Nesh.MasterMemoryDebugger
         public static string DecodeReject(byte[] payload) => Read(payload, MessageType.Reject, r => r.ReadString());
 
         public static List<Change> DecodeChanges(byte[] payload) => Read(payload, MessageType.Changes, ReadChanges);
+
+        public static ValidationState DecodeValidationState(byte[] payload) =>
+            Read(payload, MessageType.ValidationState, r => new ValidationState { IsAvailable = r.ReadBoolean(), NewFailureCount = r.ReadInt32() });
+
+        public static List<Failure> DecodeValidateResult(byte[] payload) => Read(payload, MessageType.ValidateResult, r =>
+        {
+            var count = ReadCount(r);
+            var failures = new List<Failure>(count);
+            for (var i = 0; i < count; i++) failures.Add(new Failure { TableName = r.ReadString(), Key = r.ReadString(), Message = r.ReadString(), IsNew = r.ReadBoolean() });
+            return failures;
+        });
 
         public static Welcome DecodeWelcome(byte[] payload) => Read(payload, MessageType.Welcome, r =>
         {

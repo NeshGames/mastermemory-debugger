@@ -158,6 +158,10 @@ namespace Nesh.MasterMemoryDebugger
 
             SetVisible(root, "mm-batch-edit", settings.AllowEditing);
             SetVisible(root, "mm-remote", MasterMemoryDebugRemote.IsSupported);
+            // the remote editor tool fills its window and has nothing to close to
+            var isTool = MasterMemoryDebugRemote.IsToolMode;
+            root.EnableInClassList("mm-debugger--tool", isTool);
+            SetVisible(root, "mm-close", !isTool);
             SetVisible(root, "mm-changes-paste", settings.AllowEditing);
 
             var canScale = host.OwnedPanelSettings != null;
@@ -606,7 +610,7 @@ namespace Nesh.MasterMemoryDebugger
                     if (dialog.IsVisible) dialog.Cancel();
                     else if (searchCompletion.IsOpen) searchCompletion.Close();
                     else if (recordList.IsColumnsPopupOpen) recordList.CloseColumnsPopup();
-                    else RuntimeMasterMemoryDebugger.Close();
+                    else if (!MasterMemoryDebugRemote.IsToolMode) RuntimeMasterMemoryDebugger.Close();
                     evt.StopPropagation();
                     break;
                 case KeyCode.Return:

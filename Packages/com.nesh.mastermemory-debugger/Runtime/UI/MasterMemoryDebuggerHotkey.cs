@@ -42,7 +42,8 @@ namespace Nesh.MasterMemoryDebugger
         {
             var settings = MasterMemoryDebuggerSettings.Current;
             var touchToggle = touchGesture.Update(GetTouchCount(), settings.TouchToggleFingers, settings.TouchToggleSeconds, Time.unscaledTime);
-            if (WasTogglePressed() || touchToggle) RuntimeMasterMemoryDebugger.Toggle();
+            // the remote editor tool is the debugger: it is never closed
+            if ((WasTogglePressed() || touchToggle) && !MasterMemoryDebugRemote.IsToolMode) RuntimeMasterMemoryDebugger.Toggle();
         }
 
         static int GetTouchCount()
