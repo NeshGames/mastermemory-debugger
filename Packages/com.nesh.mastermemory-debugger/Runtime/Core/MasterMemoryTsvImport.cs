@@ -114,6 +114,8 @@ namespace Nesh.MasterMemoryDebugger
                     Fail(plan, lineNumber, "table, key, field or value is missing");
                     continue;
                 }
+                // a deleted record in Copy TSV: nothing to import
+                if (fieldName == MasterMemoryChangeSummary.DeletedField) continue;
                 if (!MasterMemoryDebugRegistry.TryGetTable(tableName, out var table))
                 {
                     Fail(plan, lineNumber, $"table {tableName} is not registered");
@@ -130,6 +132,11 @@ namespace Nesh.MasterMemoryDebugger
                     Fail(plan, lineNumber, $"{tableName} has no record {keyText}");
                     continue;
                 }
+                if (record.IsDeleted || record.Current == null)
+                {
+                    Fail(plan, lineNumber, $"{tableName} {keyText} is deleted");
+                    continue;
+                }
                 if (!MasterMemoryBatchEdit.TryParseValue(field, MasterMemoryBatchOperation.Set, valueText, out var value, out var error))
                 {
                     Fail(plan, lineNumber, $"{tableName} {keyText} {fieldName}: {error}");
@@ -137,8 +144,8 @@ namespace Nesh.MasterMemoryDebugger
                 }
 
                 var originalText = Cell(columns.Original);
-                var original = CellText(field.GetValue(record.Original));
-                if (originalText != null && originalText != original)
+                var original = record.IsAdded ? string.Empty : CellText(field.GetValue(record.Original));
+                if (originalText != null && !record.IsAdded && originalText != original)
                 {
                     plan.Outdated++;
                     plan.AddProblem(lineNumber, $"{tableName} {keyText} {fieldName}: the original value is now {original}, not {originalText} (imported anyway)");
@@ -188,7 +195,8 @@ namespace Nesh.MasterMemoryDebugger
                 {
                     var copy = MasterDataCloneUtility.Clone(record.Current);
                     foreach (var change in byRecord[record]) change.Field.SetValue(copy, change.Value);
-                    if (MasterDataDiffUtility.GetChanges(record.Original, copy).Count == 0) store.Remove(record.Table.RecordType, record.PrimaryKey);
+                    // an added record keeps its override; a changed one equal to the original loses it
+                    if (!record.IsAdded && MasterDataDiffUtility.GetChanges(record.Original, copy).Count == 0) store.Remove(record.Table.RecordType, record.PrimaryKey);
                     else store.Set(record.Table.RecordType, record.PrimaryKey, copy);
                     applied += byRecord[record].Count;
                 }

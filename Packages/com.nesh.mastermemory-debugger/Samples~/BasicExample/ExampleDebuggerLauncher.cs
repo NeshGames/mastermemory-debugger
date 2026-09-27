@@ -72,7 +72,18 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
             foreach (var entry in overrides)
             {
                 if (!MasterMemoryDebugRegistry.TryGetTable(entry.Key.RecordType, out var table)) continue;
-                if (!table.TryFindOriginal(entry.Key.PrimaryKey, out var original)) continue;
+                var keyText = MasterDataValueUtility.FormatKey(entry.Key.PrimaryKey);
+                if (entry.IsDeleted)
+                {
+                    // TryGetOverride keeps returning the original; only a rebuilt database leaves the record out
+                    sb.Append($"\n{table.TableName} {keyText}: deleted (IsDeleted = true)");
+                    continue;
+                }
+                if (!table.TryFindOriginal(entry.Key.PrimaryKey, out var original))
+                {
+                    sb.Append($"\n{table.TableName} {keyText} {table.GetDisplayName(entry.Value)}: added (TryGetOverride returns it)");
+                    continue;
+                }
 
                 var current = ReadThroughService(entry);
                 var title = $"{table.TableName} {MasterDataValueUtility.FormatKey(entry.Key.PrimaryKey)} {table.GetDisplayName(current)}";

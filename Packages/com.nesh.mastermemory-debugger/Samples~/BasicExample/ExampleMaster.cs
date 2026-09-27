@@ -66,6 +66,27 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
     }
 
     /// <summary>
+    /// Nested object of <see cref="ExampleCharacterMaster"/>: the debugger edits its members one by one (a changed copy
+    /// replaces it on every edit) and patches store it as a JSON object.
+    /// </summary>
+    [MessagePackObject(true)]
+    public sealed class ExampleGrowth
+    {
+        public int HpPerLevel { get; init; }
+        public int AttackPerLevel { get; init; }
+        public float CritRate { get; init; }
+        public ExampleRange DamageRange { get; init; }
+    }
+
+    /// <summary>Nested struct (inside <see cref="ExampleGrowth"/>).</summary>
+    [MessagePackObject(true)]
+    public struct ExampleRange
+    {
+        public float Min;
+        public float Max;
+    }
+
+    /// <summary>
     /// MasterMemory validation (IValidatable). The debugger reads the Exists() calls to offer a jump from
     /// StartSkillId to the skill, and AutoRebuild reports overrides that break them (e.g. StartSkillId = 99).
     /// </summary>
@@ -82,6 +103,7 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
         public float MoveSpeed { get; init; }
         public ExampleElement Element { get; init; }
         public int StartSkillId { get; init; }
+        public ExampleGrowth Growth { get; init; }
 
         void IValidatable<ExampleCharacterMaster>.Validate(IValidator<ExampleCharacterMaster> validator)
         {

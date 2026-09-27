@@ -13,8 +13,8 @@ using UnityEditor.UnityLinker;
 namespace Nesh.MasterMemoryDebugger.Editor
 {
     /// <summary>
-    /// Development builds only: keeps every member of the <c>[MemoryTable]</c> records and of the generated
-    /// MemoryDatabase / ImmutableBuilder from managed code stripping, because the debugger reads and sets them through
+    /// Development builds only: keeps every member of the <c>[MemoryTable]</c> records, of the nested objects they hold
+    /// and of the generated MemoryDatabase / ImmutableBuilder from managed code stripping, because the debugger reads and sets them through
     /// reflection (and calls Diff / Build / Validate for <see cref="MasterMemoryDebugRebuild"/>).
     /// Release builds are not affected. Unity ignores link.xml files inside packages, so the file is generated here.
     /// </summary>
@@ -39,14 +39,46 @@ namespace Nesh.MasterMemoryDebugger.Editor
             return path;
         }
 
-        /// <summary>Records, generated databases and builders; generic definitions are skipped.</summary>
+        /// <summary>Records, their nested objects, generated databases and builders; generic definitions are skipped.</summary>
         internal static List<Type> CollectTypes()
         {
             var types = new HashSet<Type>();
-            types.UnionWith(TypeCache.GetTypesWithAttribute<MemoryTableAttribute>());
+            var records = TypeCache.GetTypesWithAttribute<MemoryTableAttribute>();
+            types.UnionWith(records);
+            types.UnionWith(CollectNestedObjectTypes(records));
             types.UnionWith(TypeCache.GetTypesDerivedFrom<MemoryDatabaseBase>());
             types.UnionWith(TypeCache.GetTypesDerivedFrom<ImmutableBuilderBase>());
             return types.Where(x => !x.IsGenericTypeDefinition && !x.IsAbstract).ToList();
+        }
+
+        /// <summary>
+        /// Nested object types held by the records (and by those types) that the debugger edits member by member.
+        /// Types of Unity and the .NET libraries and generic types are left out.
+        /// </summary>
+        internal static HashSet<Type> CollectNestedObjectTypes(IEnumerable<Type> recordTypes)
+        {
+            var result = new HashSet<Type>();
+            var pending = new Stack<Type>(recordTypes.Where(x => !x.IsGenericTypeDefinition && !x.IsAbstract));
+            var visited = new HashSet<Type>();
+            while (pending.Count > 0)
+            {
+                var type = pending.Pop();
+                if (!visited.Add(type)) continue;
+                foreach (var field in MasterDataReflectionCache.Get(type).Fields)
+                {
+                    if (!field.IsObject || field.ValueType.IsGenericType || IsLibraryType(field.ValueType)) continue;
+                    result.Add(field.ValueType);
+                    pending.Push(field.ValueType);
+                }
+            }
+            return result;
+        }
+
+        static bool IsLibraryType(Type type)
+        {
+            var name = type.Assembly.GetName().Name;
+            return name == "mscorlib" || name == "netstandard" || name.StartsWith("System", StringComparison.Ordinal)
+                || name.StartsWith("UnityEngine", StringComparison.Ordinal) || name.StartsWith("Unity.", StringComparison.Ordinal);
         }
 
         internal static string CreateLinkXml(IEnumerable<Type> types)

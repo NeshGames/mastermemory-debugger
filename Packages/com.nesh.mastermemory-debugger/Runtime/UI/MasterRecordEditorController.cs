@@ -6,7 +6,7 @@ namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
     /// Record inspector. Edits happen on a clone ("working copy"); Apply Override stores the clone.
-    /// Primary / secondary keys and complex members are always read-only.
+    /// Primary / secondary keys and complex members other than lists and nested objects are always read-only.
     /// </summary>
     internal sealed class MasterRecordEditorController : IDisposable
     {
@@ -25,6 +25,8 @@ namespace Nesh.MasterMemoryDebugger
         readonly Button revertButton;
         readonly Button resetButton;
         readonly Button copyJsonButton;
+        readonly Button duplicateButton;
+        readonly Button deleteButton;
         readonly Action<string, bool> setStatus;
         readonly List<FieldRow> rows = new List<FieldRow>();
 
@@ -44,6 +46,8 @@ namespace Nesh.MasterMemoryDebugger
             Button revertButton,
             Button resetButton,
             Button copyJsonButton,
+            Button duplicateButton,
+            Button deleteButton,
             Action<string, bool> setStatus)
         {
             this.titleLabel = titleLabel;
@@ -53,12 +57,16 @@ namespace Nesh.MasterMemoryDebugger
             this.revertButton = revertButton;
             this.resetButton = resetButton;
             this.copyJsonButton = copyJsonButton;
+            this.duplicateButton = duplicateButton;
+            this.deleteButton = deleteButton;
             this.setStatus = setStatus;
 
             applyButton.clicked += OnApplyClicked;
             revertButton.clicked += Revert;
             resetButton.clicked += ResetRecord;
             copyJsonButton.clicked += CopyJson;
+            duplicateButton.clicked += OnDuplicateClicked;
+            deleteButton.clicked += DeleteRecord;
             Show(null);
         }
 
@@ -69,6 +77,9 @@ namespace Nesh.MasterMemoryDebugger
 
         /// <summary>Show was clicked in Referenced by: the reference and the value of this record it points at.</summary>
         public event Action<MasterMemoryReference, object> ReferencingRequested;
+
+        /// <summary>Duplicate was clicked: the shown record.</summary>
+        public event Action<MasterMemoryRecordDescriptor> DuplicateRequested;
 
         public bool IsDirty => isDirty;
 
@@ -81,6 +92,8 @@ namespace Nesh.MasterMemoryDebugger
             revertButton.clicked -= Revert;
             resetButton.clicked -= ResetRecord;
             copyJsonButton.clicked -= CopyJson;
+            duplicateButton.clicked -= OnDuplicateClicked;
+            deleteButton.clicked -= DeleteRecord;
         }
 
         public void Show(MasterMemoryRecordDescriptor newRecord)
@@ -114,6 +127,8 @@ namespace Nesh.MasterMemoryDebugger
             container.Clear();
             rows.Clear();
             isDirty = false;
+            // an added record whose override is gone (Undo, Delete, Reset All) no longer exists
+            if (record != null && record.Current == null) record = null;
 
             if (record == null)
             {
@@ -128,9 +143,16 @@ namespace Nesh.MasterMemoryDebugger
             }
 
             var settings = MasterMemoryDebuggerSettings.Current;
-            var editable = settings.AllowEditing;
+            // a deleted record is shown read-only; Restore brings it back
+            var editable = settings.AllowEditing && !record.IsDeleted;
             workingCopy = editable ? MasterDataCloneUtility.Clone(record.Current) : record.Current;
             RefreshTitle();
+            if (record.IsDeleted)
+            {
+                var hint = new Label("Deleted: a rebuilt database (AutoRebuild) leaves this record out; TryGetOverride still returns the original. Restore brings it back.");
+                hint.AddToClassList("mm-debugger__hint");
+                container.Add(hint);
+            }
 
             foreach (var field in record.Table.TypeDescriptor.Fields)
             {
@@ -156,7 +178,13 @@ namespace Nesh.MasterMemoryDebugger
             nameContainer.Add(row.NameLabel);
             RefreshLabel(row);
             if (field.IsPrimaryKey) nameContainer.Add(CreateBadge("PK", "mm-debugger__badge--pk", "Primary key (read-only)"));
-            if (field.IsSecondaryKey) nameContainer.Add(CreateBadge("SK", "mm-debugger__badge--sk", "Secondary key (read-only: MasterMemory indexes are not updated by overrides)"));
+            var editKey = record.IsAdded && MasterFieldDrawerFactory.CanEditAddedKey(field);
+            if (field.IsSecondaryKey)
+            {
+                nameContainer.Add(CreateBadge("SK", "mm-debugger__badge--sk", editKey
+                    ? "Secondary key (editable for an added record: a rebuilt database indexes it)"
+                    : "Secondary key (read-only: MasterMemory indexes are not updated by overrides)"));
+            }
             if (!field.IsKey && !field.CanEdit) nameContainer.Add(CreateBadge("RO", "mm-debugger__badge--ro", "Read-only type"));
             var spacer = new VisualElement();
             spacer.AddToClassList("mm-debugger__spacer");
@@ -183,9 +211,9 @@ namespace Nesh.MasterMemoryDebugger
 
             var value = field.GetValue(workingCopy);
             VisualElement editor;
-            if (editable && field.CanEdit)
+            if (editable && (field.CanEdit || editKey))
             {
-                editor = MasterFieldDrawerFactory.CreateEditor(field, value, newValue => OnFieldChanged(row, newValue));
+                editor = MasterFieldDrawerFactory.CreateEditor(field, value, newValue => OnFieldChanged(row, newValue), allowKey: editKey);
             }
             else
             {
@@ -283,7 +311,8 @@ namespace Nesh.MasterMemoryDebugger
         {
             try
             {
-                row.Field.SetValue(workingCopy, newValue);
+                if (row.Field.CanEdit) row.Field.SetValue(workingCopy, newValue);
+                else row.Field.SetValueUnchecked(workingCopy, newValue);
             }
             catch (Exception e)
             {
@@ -303,8 +332,9 @@ namespace Nesh.MasterMemoryDebugger
         void RefreshOriginalMarker(FieldRow row)
         {
             var field = row.Field;
-            var originalValue = field.GetValue(record.Original);
-            var changed = !field.IsKey && !MasterDataValueUtility.AreEqual(originalValue, field.GetValue(workingCopy));
+            // an added record has no original to compare with
+            var originalValue = record.IsAdded ? null : field.GetValue(record.Original);
+            var changed = !record.IsAdded && !field.IsKey && !MasterDataValueUtility.AreEqual(originalValue, field.GetValue(workingCopy));
             row.Root.EnableInClassList("mm-debugger__field--modified", changed);
             row.OriginalLabel.text = changed ? "Original: " + MasterDataValueUtility.Format(originalValue) : string.Empty;
         }
@@ -314,21 +344,36 @@ namespace Nesh.MasterMemoryDebugger
             var settings = MasterMemoryDebuggerSettings.Current;
             var hasRecord = record != null;
             var isOverridden = hasRecord && record.IsModified;
+            var isAdded = hasRecord && record.IsAdded;
+            var isDeleted = hasRecord && record.IsDeleted;
+            var editing = settings.AllowEditing ? DisplayStyle.Flex : DisplayStyle.None;
 
             applyButton.SetEnabled(hasRecord && settings.AllowEditing && isDirty);
             copyJsonButton.SetEnabled(hasRecord);
             revertButton.SetEnabled(hasRecord && isDirty);
-            resetButton.SetEnabled(isOverridden);
-            applyButton.style.display = settings.AllowEditing ? DisplayStyle.Flex : DisplayStyle.None;
-            revertButton.style.display = settings.AllowEditing ? DisplayStyle.Flex : DisplayStyle.None;
+            // an added record is removed with Delete
+            resetButton.SetEnabled(isOverridden && !isAdded);
+            resetButton.text = isDeleted ? "Restore" : "Reset";
+            resetButton.tooltip = isDeleted ? "Restore the deleted record" : isAdded ? "An added record has no original: Delete removes it" : "Remove the override of this record";
+            duplicateButton.SetEnabled(hasRecord && !isDeleted && MasterMemoryRecordFactory.CanAdd(record.Table, out _));
+            deleteButton.SetEnabled(hasRecord && !isDeleted);
+            deleteButton.tooltip = isAdded ? "Remove the added record" : "Delete the record: a rebuilt database leaves it out (Restore brings it back)";
+            applyButton.style.display = editing;
+            revertButton.style.display = editing;
+            duplicateButton.style.display = editing;
+            deleteButton.style.display = editing;
 
             var state = !hasRecord ? string.Empty
+                : isDeleted ? "Deleted"
                 : isDirty ? "Unapplied edits"
+                : isAdded ? "Added"
                 : isOverridden ? "Overridden"
                 : "Original";
             stateLabel.text = state;
             stateLabel.EnableInClassList("mm-debugger__record-state--dirty", isDirty);
-            stateLabel.EnableInClassList("mm-debugger__record-state--modified", !isDirty && isOverridden);
+            stateLabel.EnableInClassList("mm-debugger__record-state--modified", !isDirty && isOverridden && !isAdded && !isDeleted);
+            stateLabel.EnableInClassList("mm-debugger__record-state--added", !isDirty && isAdded);
+            stateLabel.EnableInClassList("mm-debugger__record-state--deleted", isDeleted);
         }
 
         void OnApplyClicked() => TryApply();
@@ -362,7 +407,7 @@ namespace Nesh.MasterMemoryDebugger
             try
             {
                 using var step = MasterMemoryDebugHistory.Record($"Apply {table.TableName} {record.KeyText}");
-                if (DiffersFromOriginal(workingCopy))
+                if (record.IsAdded || DiffersFromOriginal(workingCopy))
                 {
                     store.Set(table.RecordType, record.PrimaryKey, workingCopy);
                     MasterMemoryChangeLog.Applied(table, record.PrimaryKey, before, workingCopy);
@@ -419,18 +464,55 @@ namespace Nesh.MasterMemoryDebugger
             setStatus("Edits reverted.", false);
         }
 
+        void OnDuplicateClicked()
+        {
+            if (record != null) DuplicateRequested?.Invoke(record);
+        }
+
+        /// <summary>Deletes the original record, or removes an added one. One undo step.</summary>
+        void DeleteRecord()
+        {
+            if (record == null || record.IsDeleted) return;
+            var table = record.Table;
+            var before = record.Current;
+            var wasAdded = record.IsAdded;
+            isWritingStore = true;
+            try
+            {
+                using var step = MasterMemoryDebugHistory.Record($"Delete {table.TableName} {record.KeyText}");
+                if (wasAdded)
+                {
+                    MasterMemoryDebugRuntime.Store.Remove(table.RecordType, record.PrimaryKey);
+                    MasterMemoryChangeLog.RecordChanged(table, record.PrimaryKey, before, "removed (it was added)");
+                    setStatus($"Added record removed: {table.TableName} {record.KeyText}", false);
+                }
+                else
+                {
+                    MasterMemoryDebugRuntime.Store.Delete(table.RecordType, record.PrimaryKey);
+                    MasterMemoryChangeLog.Deleted(table, record.PrimaryKey, record.Original);
+                    setStatus($"Record deleted: {table.TableName} {record.KeyText} (Restore brings it back)", false);
+                }
+            }
+            finally
+            {
+                isWritingStore = false;
+            }
+            Rebuild();
+        }
+
         void ResetRecord()
         {
             if (record == null) return;
             var before = record.Current;
+            var wasDeleted = record.IsDeleted;
             isWritingStore = true;
             try
             {
-                using var step = MasterMemoryDebugHistory.Record($"Reset {record.Table.TableName} {record.KeyText}");
+                using var step = MasterMemoryDebugHistory.Record($"{(wasDeleted ? "Restore" : "Reset")} {record.Table.TableName} {record.KeyText}");
                 if (MasterMemoryDebugRuntime.Store.Remove(record.Table.RecordType, record.PrimaryKey))
                 {
-                    MasterMemoryChangeLog.Removed(record.Table, record.PrimaryKey, before, record.Original, "reset");
-                    setStatus($"Override reset: {record.Table.TableName} {record.KeyText}", false);
+                    MasterMemoryChangeLog.Removed(record.Table, record.PrimaryKey, before, record.Original, wasDeleted ? "removed: record restored" : "reset");
+                    setStatus($"{(wasDeleted ? "Record restored" : "Override reset")}: {record.Table.TableName} {record.KeyText}", false);
                 }
             }
             finally

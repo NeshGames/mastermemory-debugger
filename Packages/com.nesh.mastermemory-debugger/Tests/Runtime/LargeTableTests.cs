@@ -78,6 +78,9 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var columns = MasterRecordListController.CreateColumns(table);
             Measure("auto fit columns", () => MasterGridLayout.AutoFit(columns, snapshot));
             Measure("copy rows", () => MasterRecordListController.BuildTsv(columns, snapshot));
+            var found = Measure("find in every table", () => MasterMemoryGlobalSearch.Find("Skill 4999"));
+            Assert.AreEqual(11, found.TotalHits, "Skill 4999 and Skill 49990 … 49999");
+            Measure("find whole value", () => MasterMemoryGlobalSearch.Find("104999", wholeValue: true));
 
             var damage = table.TypeDescriptor.Fields.Single(x => x.Name == "Damage");
             var edit = Measure("batch edit (all records)", () =>

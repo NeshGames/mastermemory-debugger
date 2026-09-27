@@ -20,18 +20,16 @@ namespace Nesh.MasterMemoryDebugger
                     var changes = new List<object>(record.Changes.Count);
                     foreach (var change in record.Changes)
                     {
-                        changes.Add(new MasterDataJsonObject
-                        {
-                            { "field", change.Field },
-                            { "original", change.Original },
-                            { "value", change.Value },
-                        });
+                        var changeJson = new MasterDataJsonObject { { "field", change.Field } };
+                        if (change.HasOriginal) changeJson.Add("original", change.Original);
+                        changeJson.Add("value", change.Value);
+                        changes.Add(changeJson);
                     }
-                    records.Add(new MasterDataJsonObject
-                    {
-                        { "primaryKey", record.PrimaryKey ?? new MasterDataJsonObject() },
-                        { "changes", changes },
-                    });
+                    var recordJson = new MasterDataJsonObject { { "primaryKey", record.PrimaryKey ?? new MasterDataJsonObject() } };
+                    if (record.Added) recordJson.Add("added", true);
+                    if (record.Deleted) recordJson.Add("deleted", true);
+                    recordJson.Add("changes", changes);
+                    records.Add(recordJson);
                 }
                 tables.Add(new MasterDataJsonObject
                 {
@@ -80,7 +78,10 @@ namespace Nesh.MasterMemoryDebugger
                     {
                         PrimaryKey = recordObject["primaryKey"] as MasterDataJsonObject
                             ?? throw new FormatException("Record 'primaryKey' must be a JSON object."),
+                        Added = GetBool(recordObject, "added"),
+                        Deleted = GetBool(recordObject, "deleted"),
                     };
+                    if (record.Added && record.Deleted) throw new FormatException("A record can not be both added and deleted.");
                     foreach (var changeJson in GetArray(recordObject, "changes"))
                     {
                         var changeObject = AsObject(changeJson, "change");
@@ -120,6 +121,16 @@ namespace Nesh.MasterMemoryDebugger
                 case string s: return s;
                 case MasterDataJsonNumber n: return n.Raw;
                 default: throw new FormatException($"'{key}' must be a string.");
+            }
+        }
+
+        static bool GetBool(MasterDataJsonObject obj, string key)
+        {
+            switch (obj[key])
+            {
+                case null: return false;
+                case bool b: return b;
+                default: throw new FormatException($"'{key}' must be true or false.");
             }
         }
 

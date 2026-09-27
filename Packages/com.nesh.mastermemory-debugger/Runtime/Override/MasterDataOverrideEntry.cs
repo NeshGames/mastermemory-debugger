@@ -11,7 +11,13 @@ namespace Nesh.MasterMemoryDebugger
 
         public MasterDataOverrideKey Key { get; }
 
-        /// <summary>The overriding record. Never an instance owned by the MasterMemory database.</summary>
+        /// <summary>
+        /// The overriding record, never an instance owned by the MasterMemory database; <see cref="MasterDataOverrideStore.Deleted"/>
+        /// for a deleted record.
+        /// </summary>
         public object Value { get; }
+
+        /// <summary>True when the entry deletes the record (<see cref="IMasterDataOverrideStore.Delete"/>).</summary>
+        public bool IsDeleted => MasterDataOverrideStore.IsDeletedValue(Value);
     }
 }

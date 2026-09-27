@@ -64,17 +64,41 @@ namespace Nesh.MasterMemoryDebugger
             return getDisplayName?.Invoke(record);
         }
 
-        /// <summary>Takes a snapshot of the current records (original + override state).</summary>
+        /// <summary>
+        /// Takes a snapshot of the records: the originals (deleted ones included, see
+        /// <see cref="MasterMemoryRecordDescriptor.IsDeleted"/>), then the records added as overrides, by key.
+        /// </summary>
         public List<MasterMemoryRecordDescriptor> CreateRecordSnapshot()
         {
             var list = new List<MasterMemoryRecordDescriptor>();
             var records = GetAllRecords();
-            if (records == null) return list;
-            foreach (var record in records)
+            if (records != null)
             {
-                if (record == null) continue;
-                list.Add(new MasterMemoryRecordDescriptor(this, record, GetPrimaryKey(record)));
+                foreach (var record in records)
+                {
+                    if (record == null) continue;
+                    list.Add(new MasterMemoryRecordDescriptor(this, record, GetPrimaryKey(record)));
+                }
             }
+
+            var store = MasterMemoryDebugRuntime.Store;
+            if (store.CountOf(RecordType) == 0) return list;
+            HashSet<object> originalKeys = null;
+            List<MasterDataOverrideEntry> added = null;
+            foreach (var entry in store.GetEntries(RecordType))
+            {
+                if (entry.IsDeleted) continue;
+                if (originalKeys == null)
+                {
+                    originalKeys = new HashSet<object>();
+                    foreach (var record in list) originalKeys.Add(record.PrimaryKey);
+                }
+                if (originalKeys.Contains(entry.Key.PrimaryKey)) continue;
+                (added ??= new List<MasterDataOverrideEntry>()).Add(entry);
+            }
+            if (added == null) return list;
+            added.Sort((a, b) => MasterMemoryChangeSummary.CompareKeys(a.Key.PrimaryKey, b.Key.PrimaryKey));
+            foreach (var entry in added) list.Add(new MasterMemoryRecordDescriptor(this, null, entry.Key.PrimaryKey));
             return list;
         }
 

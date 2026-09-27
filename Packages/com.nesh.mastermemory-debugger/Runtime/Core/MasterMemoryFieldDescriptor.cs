@@ -6,7 +6,11 @@ namespace Nesh.MasterMemoryDebugger
     /// <summary>How a member value is displayed / edited.</summary>
     public enum MasterDataValueKind
     {
-        /// <summary>Arrays, lists, dictionaries, nested objects and other unsupported types. Always read-only.</summary>
+        /// <summary>
+        /// Arrays, lists, dictionaries, nested objects and other types without a value editor. Lists of simple values
+        /// (<see cref="MasterMemoryFieldDescriptor.IsList"/>) and nested objects (<see cref="MasterMemoryFieldDescriptor.IsObject"/>)
+        /// are edited as a whole; everything else is read-only.
+        /// </summary>
         Complex = 0,
         String,
         Boolean,
@@ -34,6 +38,9 @@ namespace Nesh.MasterMemoryDebugger
     {
         readonly Func<object, object> getter;
         readonly Action<object, object> setter;
+
+        // 0 = not evaluated yet, 1 = false, 2 = true (evaluated lazily: nested types may refer to their own type)
+        int isObject;
 
         internal MasterMemoryFieldDescriptor(
             MemberInfo member,
@@ -64,7 +71,6 @@ namespace Nesh.MasterMemoryDebugger
                 ElementType = elementType;
                 ElementKind = MasterDataValueUtility.GetKind(elementType);
             }
-            CanEdit = !IsPrimaryKey && !IsSecondaryKey && setter != null && (Kind != MasterDataValueKind.Complex || IsList);
         }
 
         public string Name { get; }
@@ -90,8 +96,30 @@ namespace Nesh.MasterMemoryDebugger
 
         public bool IsKey => IsPrimaryKey || IsSecondaryKey;
 
-        /// <summary>True when the member is a non-key member of a supported simple type, or a list of them, with a usable setter.</summary>
-        public bool CanEdit { get; }
+        /// <summary>
+        /// True when the member is a non-key member with a usable setter of a supported simple type, a list of them or a
+        /// nested object (<see cref="IsObject"/>).
+        /// </summary>
+        public bool CanEdit => !IsKey && setter != null && (Kind != MasterDataValueKind.Complex || IsList || IsObject);
+
+        /// <summary>True when the member can be written (a setter, an init accessor, a backing field or a public field).</summary>
+        public bool HasSetter => setter != null;
+
+        /// <summary>
+        /// True for a nested class or struct whose members are edited one by one (see <see cref="MasterDataValueUtility.IsEditableObject"/>).
+        /// Every edit replaces the nested object with a changed copy; patches store it as a JSON object of its editable members.
+        /// </summary>
+        public bool IsObject
+        {
+            get
+            {
+                if (isObject == 0)
+                {
+                    isObject = ElementType == null && Kind == MasterDataValueKind.Complex && MasterDataValueUtility.IsEditableObject(ValueType) ? 2 : 1;
+                }
+                return isObject == 2;
+            }
+        }
 
         /// <summary>
         /// Element type of an array / List / list interface of simple values (editable, copied on every edit); otherwise null.
@@ -121,6 +149,16 @@ namespace Nesh.MasterMemoryDebugger
         public void SetValue(object editableCopy, object value)
         {
             if (!CanEdit) throw new InvalidOperationException($"Field '{Name}' is read-only.");
+            setter(editableCopy, value);
+        }
+
+        /// <summary>
+        /// Writes any member with a setter, keys included: used to give a new record (added in the debugger) its key.
+        /// Never call this on a record instance owned by the MasterMemory database.
+        /// </summary>
+        internal void SetValueUnchecked(object editableCopy, object value)
+        {
+            if (setter == null) throw new InvalidOperationException($"Field '{Name}' can not be written.");
             setter(editableCopy, value);
         }
 

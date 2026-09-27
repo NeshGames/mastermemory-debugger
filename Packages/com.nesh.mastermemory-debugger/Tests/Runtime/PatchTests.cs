@@ -173,7 +173,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
-        public void Apply_UnknownRecord_ShouldNotAddRecords()
+        public void Apply_UnknownRecordWithoutAdded_ShouldNotAddRecords()
         {
             const string json = @"{
   ""formatVersion"": 1,
@@ -205,7 +205,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.AreEqual(1002, skill.Id, "primary key can not be patched");
             Assert.AreEqual(1, skill.Category, "secondary key can not be patched");
 
-            Assert.IsTrue(result.Warnings.Any(x => x.Contains("9999") && x.Contains("can not be added")));
+            Assert.IsTrue(result.Warnings.Any(x => x.Contains("9999") && x.Contains("does not exist")));
             Assert.IsTrue(result.Warnings.Any(x => x.Contains("'Id' is read-only")));
             Assert.IsTrue(result.Warnings.Any(x => x.Contains("'Category' is read-only")));
             Assert.IsTrue(result.Warnings.Any(x => x.Contains("'Missing' does not exist")));

@@ -8,8 +8,8 @@ namespace Nesh.MasterMemoryDebugger
     /// <summary>
     /// Creates editable copies of records so that instances owned by the MasterMemory database are never modified.
     /// Order: registered clone provider, then a shallow member-wise clone.
-    /// The shallow clone is sufficient because only simple value members can be edited;
-    /// complex members (arrays, lists, nested objects) are read-only and may be shared with the original.
+    /// The shallow clone is sufficient because members are only replaced, never modified in place: edited lists and
+    /// nested objects are new instances (copy-on-write), the others are read-only and may be shared with the original.
     /// </summary>
     public static class MasterDataCloneUtility
     {

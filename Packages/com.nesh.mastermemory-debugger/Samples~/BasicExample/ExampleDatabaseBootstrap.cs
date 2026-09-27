@@ -51,9 +51,9 @@ namespace Nesh.MasterMemoryDebugger.Samples.BasicExample
 
             var characters = new[]
             {
-                new ExampleCharacterMaster { Id = 1, Name = "Knight", Hp = 1200, Attack = 80, Defense = 60, MoveSpeed = 1.0f, Element = ExampleElement.None, StartSkillId = 1005 },
-                new ExampleCharacterMaster { Id = 2, Name = "Mage", Hp = 700, Attack = 140, Defense = 25, MoveSpeed = 1.1f, Element = ExampleElement.Fire, StartSkillId = 1001 },
-                new ExampleCharacterMaster { Id = 3, Name = "Archer", Hp = 850, Attack = 110, Defense = 35, MoveSpeed = 1.3f, Element = ExampleElement.Thunder, StartSkillId = 1004 },
+                new ExampleCharacterMaster { Id = 1, Name = "Knight", Hp = 1200, Attack = 80, Defense = 60, MoveSpeed = 1.0f, Element = ExampleElement.None, StartSkillId = 1005, Growth = new ExampleGrowth { HpPerLevel = 60, AttackPerLevel = 3, CritRate = 0.05f, DamageRange = new ExampleRange { Min = 0.9f, Max = 1.1f } } },
+                new ExampleCharacterMaster { Id = 2, Name = "Mage", Hp = 700, Attack = 140, Defense = 25, MoveSpeed = 1.1f, Element = ExampleElement.Fire, StartSkillId = 1001, Growth = new ExampleGrowth { HpPerLevel = 30, AttackPerLevel = 6, CritRate = 0.1f, DamageRange = new ExampleRange { Min = 0.8f, Max = 1.3f } } },
+                new ExampleCharacterMaster { Id = 3, Name = "Archer", Hp = 850, Attack = 110, Defense = 35, MoveSpeed = 1.3f, Element = ExampleElement.Thunder, StartSkillId = 1004, Growth = new ExampleGrowth { HpPerLevel = 40, AttackPerLevel = 5, CritRate = 0.2f, DamageRange = new ExampleRange { Min = 1f, Max = 1.2f } } },
             };
 
             var effects = new[]

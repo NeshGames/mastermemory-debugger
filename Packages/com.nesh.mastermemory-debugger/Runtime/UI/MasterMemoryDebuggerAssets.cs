@@ -13,8 +13,10 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>Resources path of the copies made for a Development Build.</summary>
         public const string ResourcesFolder = "MasterMemoryDebugger/";
 
-        public const string LayoutName = "MasterMemoryDebugger";
-        public const string StyleName = "MasterMemoryDebugger";
+        // Resources names of the copies. They must differ: the UXML also holds a (nearly empty) inline StyleSheet, which
+        // Resources.Load<StyleSheet> returned instead of the USS when both had the same name, so builds lost the styles.
+        public const string LayoutName = "MasterMemoryDebuggerLayout";
+        public const string StyleName = "MasterMemoryDebuggerStyle";
         public const string ThemeName = "MasterMemoryDebuggerTheme";
 
         // .meta GUIDs of Runtime/UI/Layout: found wherever the package is (Packages/, a local path, Assets/)

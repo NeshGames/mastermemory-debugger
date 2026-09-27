@@ -2,6 +2,25 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.10.0] - 2026-09-27
+
+### Added
+
+- Find tab: finds a value in every registered table: the current values (overrides included) of every member, list elements, members of nested objects and dictionary keys / values, compared as the shown text (case insensitive; Whole value for exact matches such as IDs). Hits are grouped by table and record; Open jumps to the record. `MasterMemoryGlobalSearch.Find`.
+- Inspector: the members of nested objects and structs (a class or struct with writable public members, held by a record) are edited one by one, up to 4 levels; every edit replaces the object with a changed copy. Patches store the value as a JSON object of its editable members and read it into a copy of the original value, so members a patch does not contain keep their values. `MasterMemoryFieldDescriptor.IsObject` / `HasSetter`, `MasterDataValueUtility.IsEditableObject`, `FromJson(json, type, baseValue)`.
+- Sample: `ExampleCharacterMaster.Growth` (a nested class with a nested struct).
+- Add, duplicate and delete records: **+ New…** (search toolbar), **Duplicate…** and **Delete** (inspector) with a primary key dialog. An added record exists as an override without an original (`TryGetOverride` returns it); a deleted one is a store entry that a rebuilt database leaves out (`RemoveXxx(keys)`), while `TryGetOverride` / `Resolve` keep returning the original: check `MasterMemoryDebugRuntime.IsDeleted` to honor it. Restore / Reset brings a deleted record back; Undo covers all of it. The grid marks added (+) and deleted (×) records; Changes, patches (format version 2: `"added"` / `"deleted"`; patches without them stay version 1), Copy / Paste TSV, Find and remote editing (protocol version 3) include them. `IMasterDataOverrideStore.Delete` / `IsDeleted`, `MasterMemoryRecordFactory`, `MasterDataOverrideEntry.IsDeleted`, `GetDeletedKeys`.
+
+### Changed
+
+- Nested objects are compared member by member (`MasterDataValueUtility.AreEqual`) and shown as `{Member: value, …}` in the grid, Changes, the Console log and TSV, unless the type has its own `ToString`.
+- Development Builds also keep the nested object types of the records from managed code stripping.
+
+### Fixed
+
+- Development Builds: the UI assets copied into `Assets/MasterMemoryDebuggerBuild/Resources` got the package's minimal `.meta` files, which Unity 6.6 rejects ("contains a <unknown> object at version 1, below the supported minimum (2)"), so the build showed a broken debugger. Only the files are copied now; Unity imports them with new `.meta` files.
+- Development Builds: the debugger had other colors and styles than in the Editor. The copies of the UXML and the USS had the same Resources name, and loading the style sheet could return the UXML's inline style sheet instead of the USS; the copies have distinct names now. A missing style sheet or theme is reported in the log.
+
 ## [0.9.0] - 2026-09-27
 
 ### Added

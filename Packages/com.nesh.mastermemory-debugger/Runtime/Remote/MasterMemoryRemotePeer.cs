@@ -70,18 +70,30 @@ namespace Nesh.MasterMemoryDebugger
         {
             if (applyingRemote) return;
             if (!MasterMemoryDebugRegistry.TryGetTable(key.RecordType, out var table)) return;
+            var kind = after == null ? MasterMemoryRemoteProtocol.ChangeKind.Remove
+                : MasterDataOverrideStore.IsDeletedValue(after) ? MasterMemoryRemoteProtocol.ChangeKind.Delete
+                : MasterMemoryRemoteProtocol.ChangeKind.Set;
             byte[] record;
             try
             {
-                // a removal sends the removed override: the other side reads the key from it
-                record = Serialize(table.RecordType, after ?? before);
+                // a removal or a deletion sends a record with the key (the removed override, or the original record):
+                // the other side reads the key from it
+                record = Serialize(table.RecordType, RecordWithKey(table, key, kind == MasterMemoryRemoteProtocol.ChangeKind.Remove ? before : after));
             }
             catch (Exception e)
             {
                 MasterMemoryDebugLog.Warning($"Remote: {table.TableName} {MasterDataValueUtility.FormatKey(key.PrimaryKey)} could not be sent: {(e.InnerException ?? e).Message}");
                 return;
             }
-            lock (pendingGate) pending.Add(new MasterMemoryRemoteProtocol.Change { IsSet = after != null, TableName = table.TableName, Record = record });
+            lock (pendingGate) pending.Add(new MasterMemoryRemoteProtocol.Change { Kind = kind, TableName = table.TableName, Record = record });
+        }
+
+        /// <summary><paramref name="value"/>, or the original record when it is the deletion marker.</summary>
+        internal static object RecordWithKey(MasterMemoryTableDescriptor table, MasterDataOverrideKey key, object value)
+        {
+            if (value != null && !MasterDataOverrideStore.IsDeletedValue(value)) return value;
+            if (table.TryFindOriginal(key.PrimaryKey, out var original)) return original;
+            throw new InvalidOperationException("the original record of the deletion was not found");
         }
 
         /// <summary>Applies changes of the other side in one override batch (not sent back, not an undo step).</summary>
@@ -105,8 +117,18 @@ namespace Nesh.MasterMemoryDebugger
                         {
                             var record = Deserialize(table.RecordType, change.Record);
                             var key = table.GetPrimaryKey(record);
-                            if (change.IsSet) store.Set(table.RecordType, key, record);
-                            else store.Remove(table.RecordType, key);
+                            switch (change.Kind)
+                            {
+                                case MasterMemoryRemoteProtocol.ChangeKind.Set:
+                                    store.Set(table.RecordType, key, record);
+                                    break;
+                                case MasterMemoryRemoteProtocol.ChangeKind.Delete:
+                                    store.Delete(table.RecordType, key);
+                                    break;
+                                default:
+                                    store.Remove(table.RecordType, key);
+                                    break;
+                            }
                         }
                         catch (Exception e)
                         {

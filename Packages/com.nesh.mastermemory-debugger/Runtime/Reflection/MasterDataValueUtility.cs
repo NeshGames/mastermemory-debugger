@@ -13,6 +13,11 @@ namespace Nesh.MasterMemoryDebugger
     {
         const int MaxPreviewItems = 8;
 
+        /// <summary>Nesting depth up to which nested objects are formatted, compared and converted to JSON.</summary>
+        public const int MaxObjectDepth = 8;
+
+        static readonly Dictionary<Type, bool> s_editableObjects = new Dictionary<Type, bool>();
+
         public static MasterDataValueKind GetKind(Type type)
         {
             if (type == typeof(string)) return MasterDataValueKind.String;
@@ -93,10 +98,70 @@ namespace Nesh.MasterMemoryDebugger
             return Activator.CreateInstance(elementType);
         }
 
+        // ------------------------------------------------------------------ nested objects
+
+        /// <summary>
+        /// True for a class or struct that is edited member by member when a record holds it: not a simple value, not a
+        /// collection, not abstract, not a UnityEngine.Object, with at least one writable public member
+        /// (see <see cref="MasterMemoryFieldDescriptor.HasSetter"/>). Types like DateTime, decimal or Guid have none.
+        /// </summary>
+        public static bool IsEditableObject(Type type)
+        {
+            if (type == null) return false;
+            lock (s_editableObjects)
+            {
+                if (s_editableObjects.TryGetValue(type, out var cached)) return cached;
+            }
+
+            var result = IsObjectCandidate(type);
+            if (result)
+            {
+                result = false;
+                foreach (var member in MasterDataReflectionCache.Get(type).Fields)
+                {
+                    if (member.HasSetter)
+                    {
+                        result = true;
+                        break;
+                    }
+                }
+            }
+            lock (s_editableObjects) s_editableObjects[type] = result;
+            return result;
+        }
+
+        static bool IsObjectCandidate(Type type)
+        {
+            if (type.IsPrimitive || type.IsEnum || type.IsPointer || type.IsByRef || type.IsArray) return false;
+            if (type.IsInterface || type.IsAbstract || type.ContainsGenericParameters) return false;
+            if (type == typeof(object) || type == typeof(string) || type == typeof(decimal)) return false;
+            if (Nullable.GetUnderlyingType(type) != null || GetKind(type) != MasterDataValueKind.Complex) return false;
+            if (typeof(IEnumerable).IsAssignableFrom(type)) return false;
+            if (typeof(Delegate).IsAssignableFrom(type) || typeof(UnityEngine.Object).IsAssignableFrom(type)) return false;
+            return true;
+        }
+
+        /// <summary>Members of a nested object written to patches, compared and formatted: the writable ones.</summary>
+        static IEnumerable<MasterMemoryFieldDescriptor> GetObjectMembers(Type type)
+        {
+            foreach (var member in MasterDataReflectionCache.Get(type).Fields)
+            {
+                if (member.HasSetter) yield return member;
+            }
+        }
+
+        static bool OverridesToString(Type type)
+        {
+            var method = type.GetMethod(nameof(ToString), Type.EmptyTypes);
+            return method != null && method.DeclaringType != typeof(object) && method.DeclaringType != typeof(ValueType);
+        }
+
         // ------------------------------------------------------------------ display
 
         /// <summary>Human readable text of any value. Collections are previewed.</summary>
-        public static string Format(object value)
+        public static string Format(object value) => Format(value, 0);
+
+        static string Format(object value, int depth)
         {
             switch (value)
             {
@@ -114,8 +179,25 @@ namespace Nesh.MasterMemoryDebugger
                 case IDictionary dictionary: return FormatDictionary(dictionary);
                 case IEnumerable enumerable: return FormatEnumerable(enumerable);
                 case IFormattable formattable: return formattable.ToString(null, CultureInfo.InvariantCulture);
-                default: return value.ToString();
+                default:
+                    var type = value.GetType();
+                    return IsEditableObject(type) && !OverridesToString(type) ? FormatObject(value, depth) : value.ToString();
             }
+        }
+
+        /// <summary>"{Attack: 10, Defense: 5}": the writable members of a nested object.</summary>
+        static string FormatObject(object value, int depth)
+        {
+            if (depth >= MaxObjectDepth) return "{...}";
+            var sb = new StringBuilder("{");
+            var first = true;
+            foreach (var member in GetObjectMembers(value.GetType()))
+            {
+                if (!first) sb.Append(", ");
+                first = false;
+                sb.Append(member.Name).Append(": ").Append(Format(member.GetValue(value), depth + 1));
+            }
+            return sb.Append('}').ToString();
         }
 
         /// <summary>Text of a primary key. Composite keys are shown as "(a, b)".</summary>
@@ -168,18 +250,34 @@ namespace Nesh.MasterMemoryDebugger
 
         // ------------------------------------------------------------------ equality
 
-        /// <summary>Value equality. Collections (other than strings) are compared element by element.</summary>
-        public static bool AreEqual(object a, object b)
+        /// <summary>
+        /// Value equality. Collections (other than strings) are compared element by element, nested objects
+        /// (<see cref="IsEditableObject"/>) of the same type member by member.
+        /// </summary>
+        public static bool AreEqual(object a, object b) => AreEqual(a, b, 0);
+
+        static bool AreEqual(object a, object b, int depth)
         {
             if (ReferenceEquals(a, b)) return true;
             if (a == null || b == null) return false;
             if (a.Equals(b)) return true;
             if (a is string || b is string) return false;
-            if (a is IEnumerable left && b is IEnumerable right) return SequenceEqual(left, right);
+            if (depth >= MaxObjectDepth) return false;
+            if (a is IEnumerable left && b is IEnumerable right) return SequenceEqual(left, right, depth);
+            var type = a.GetType();
+            if (type.IsPrimitive || type.IsEnum) return false;
+            if (type == b.GetType() && IsEditableObject(type))
+            {
+                foreach (var member in GetObjectMembers(type))
+                {
+                    if (!AreEqual(member.GetValue(a), member.GetValue(b), depth + 1)) return false;
+                }
+                return true;
+            }
             return false;
         }
 
-        static bool SequenceEqual(IEnumerable left, IEnumerable right)
+        static bool SequenceEqual(IEnumerable left, IEnumerable right, int depth)
         {
             var l = left.GetEnumerator();
             var r = right.GetEnumerator();
@@ -189,14 +287,19 @@ namespace Nesh.MasterMemoryDebugger
                 var hasRight = r.MoveNext();
                 if (hasLeft != hasRight) return false;
                 if (!hasLeft) return true;
-                if (!AreEqual(l.Current, r.Current)) return false;
+                if (!AreEqual(l.Current, r.Current, depth + 1)) return false;
             }
         }
 
         // ------------------------------------------------------------------ json
 
-        /// <summary>Converts a simple value, or a list of simple values, to a JSON value. Other complex values are not supported.</summary>
-        public static object ToJson(object value)
+        /// <summary>
+        /// Converts a simple value, a list of simple values or a nested object (a JSON object of its editable members) to a
+        /// JSON value. Other complex values are not supported.
+        /// </summary>
+        public static object ToJson(object value) => ToJson(value, 0);
+
+        static object ToJson(object value, int depth)
         {
             switch (value)
             {
@@ -207,7 +310,7 @@ namespace Nesh.MasterMemoryDebugger
                 case IList list when TryGetEditableListElement(value.GetType(), out _):
                 {
                     var json = new List<object>(list.Count);
-                    foreach (var item in list) json.Add(ToJson(item));
+                    foreach (var item in list) json.Add(ToJson(item, depth + 1));
                     return json;
                 }
                 case Enum e: return e.ToString();
@@ -233,12 +336,28 @@ namespace Nesh.MasterMemoryDebugger
                 case double _:
                     return value;
                 default:
+                    if (IsEditableObject(value.GetType()) && depth < MaxObjectDepth)
+                    {
+                        var json = new MasterDataJsonObject();
+                        foreach (var member in MasterDataReflectionCache.Get(value.GetType()).Fields)
+                        {
+                            if (member.CanEdit) json.Add(member.Name, ToJson(member.GetValue(value), depth + 1));
+                        }
+                        return json;
+                    }
                     throw new NotSupportedException($"Type {value.GetType().FullName} can not be converted to a patch value.");
             }
         }
 
         /// <summary>Converts a JSON value to a value of the member type (supports <see cref="Nullable{T}"/>).</summary>
-        public static object FromJson(object json, Type type)
+        public static object FromJson(object json, Type type) => FromJson(json, type, null);
+
+        /// <summary>
+        /// Converts a JSON value to a value of the member type. A nested object is read into a copy of
+        /// <paramref name="baseValue"/> (usually the original value), so members the JSON does not contain (read-only ones
+        /// included) keep their values; without a base a new instance is created.
+        /// </summary>
+        public static object FromJson(object json, Type type, object baseValue)
         {
             var underlying = Nullable.GetUnderlyingType(type);
             if (json == null)
@@ -307,8 +426,38 @@ namespace Nesh.MasterMemoryDebugger
                     return new Color((float)ParseDouble(o["r"]), (float)ParseDouble(o["g"]), (float)ParseDouble(o["b"]), a);
                 }
                 default:
+                    if (IsEditableObject(type)) return ObjectFromJson(AsObject(json), type, baseValue);
                     throw new NotSupportedException($"Type {type.FullName} can not be read from a patch value.");
             }
+        }
+
+        static object ObjectFromJson(MasterDataJsonObject json, Type type, object baseValue)
+        {
+            object instance;
+            if (baseValue != null && type.IsInstanceOfType(baseValue))
+            {
+                instance = MasterDataCloneUtility.Clone(baseValue);
+            }
+            else
+            {
+                try
+                {
+                    instance = Activator.CreateInstance(type, true);
+                }
+                catch (Exception e) when (e is MissingMethodException || e is MemberAccessException)
+                {
+                    throw new FormatException($"{type.Name} has no parameterless constructor to create it from a patch.");
+                }
+            }
+
+            var descriptor = MasterDataReflectionCache.Get(instance.GetType());
+            foreach (var pair in json)
+            {
+                if (!descriptor.TryGetField(pair.Key, out var member)) throw new FormatException($"{type.Name}.{pair.Key} does not exist.");
+                if (!member.CanEdit) throw new FormatException($"{type.Name}.{pair.Key} is read-only.");
+                member.SetValue(instance, FromJson(pair.Value, member.FieldType, member.GetValue(instance)));
+            }
+            return instance;
         }
 
         public static object ParseEnum(Type enumType, string text)

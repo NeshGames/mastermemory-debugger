@@ -53,10 +53,17 @@ namespace Nesh.MasterMemoryDebugger
             var entries = MasterMemoryChangeSummary.Build();
             var fieldCount = 0;
             var problemCount = 0;
+            var addedCount = 0;
+            var deletedCount = 0;
             foreach (var entry in entries)
             {
-                fieldCount += entry.Changes.Count;
-                if (entry.Status != MasterMemoryChangeStatus.Changed) problemCount++;
+                switch (entry.Status)
+                {
+                    case MasterMemoryChangeStatus.Changed: fieldCount += entry.Changes.Count; break;
+                    case MasterMemoryChangeStatus.Added: addedCount++; break;
+                    case MasterMemoryChangeStatus.Deleted: deletedCount++; break;
+                    default: problemCount++; break;
+                }
                 list.Add(CreateEntry(entry));
             }
 
@@ -68,6 +75,8 @@ namespace Nesh.MasterMemoryDebugger
             }
 
             var summary = $"{entries.Count} records, {fieldCount} fields changed";
+            if (addedCount > 0) summary += $", {addedCount} added";
+            if (deletedCount > 0) summary += $", {deletedCount} deleted";
             if (problemCount > 0) summary += $", {problemCount} need attention";
             summaryLabel.text = summary;
         }
@@ -157,10 +166,20 @@ namespace Nesh.MasterMemoryDebugger
         {
             var root = new VisualElement();
             root.AddToClassList("mm-debugger__change");
-            root.EnableInClassList("mm-debugger__change--problem", entry.Status != MasterMemoryChangeStatus.Changed);
+            var ok = entry.Status == MasterMemoryChangeStatus.Changed || entry.IsAdded || entry.Status == MasterMemoryChangeStatus.Deleted;
+            root.EnableInClassList("mm-debugger__change--problem", !ok);
+            root.EnableInClassList("mm-debugger__change--added", entry.IsAdded);
+            root.EnableInClassList("mm-debugger__change--deleted", entry.Status == MasterMemoryChangeStatus.Deleted);
 
             var header = new VisualElement();
             header.AddToClassList("mm-debugger__change-header");
+            if (entry.IsAdded || entry.IsDeleted)
+            {
+                var badge = new Label(entry.IsAdded ? "ADDED" : "DELETED");
+                badge.AddToClassList("mm-debugger__badge");
+                badge.AddToClassList(entry.IsAdded ? "mm-debugger__badge--added" : "mm-debugger__badge--deleted");
+                header.Add(badge);
+            }
             var title = new Label(entry.TableName);
             title.AddToClassList("mm-debugger__change-table");
             header.Add(title);
@@ -171,13 +190,17 @@ namespace Nesh.MasterMemoryDebugger
             name.AddToClassList("mm-debugger__change-name");
             header.Add(name);
 
-            if (entry.Status == MasterMemoryChangeStatus.Changed)
+            if (ok)
             {
                 var openButton = new Button(() => open(entry.Table, entry.PrimaryKey)) { text = "Open" };
                 openButton.AddToClassList("mm-debugger__button");
                 header.Add(openButton);
             }
-            var resetButton = new Button(() => Reset(entry)) { text = "Reset" };
+            var resetButton = new Button(() => Reset(entry))
+            {
+                text = entry.IsAdded ? "Remove" : entry.IsDeleted ? "Restore" : "Reset",
+                tooltip = entry.IsAdded ? "Remove the added record" : entry.IsDeleted ? "Restore the deleted record" : "Remove the override",
+            };
             resetButton.AddToClassList("mm-debugger__button");
             header.Add(resetButton);
             root.Add(header);
@@ -185,7 +208,13 @@ namespace Nesh.MasterMemoryDebugger
             switch (entry.Status)
             {
                 case MasterMemoryChangeStatus.OriginalMissing:
-                    root.Add(CreateProblem("The original record does not exist (removed from the master data?). Gameplay still receives this override."));
+                    root.Add(CreateProblem("The deleted record does not exist in the master data any more."));
+                    break;
+                case MasterMemoryChangeStatus.Deleted:
+                    root.Add(CreateNote("A rebuilt database (AutoRebuild) leaves this record out; TryGetOverride still returns the original."));
+                    break;
+                case MasterMemoryChangeStatus.Added:
+                    foreach (var change in entry.Changes) root.Add(CreateValue(change));
                     break;
                 case MasterMemoryChangeStatus.TableNotRegistered:
                     root.Add(CreateProblem("The table of this record type is not registered, the original can not be compared."));
@@ -217,6 +246,27 @@ namespace Nesh.MasterMemoryDebugger
             return row;
         }
 
+        /// <summary>A value of an added record: name and value, no original.</summary>
+        static VisualElement CreateValue(MasterDataFieldChange change)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("mm-debugger__change-field");
+            var name = new Label(change.Name);
+            name.AddToClassList("mm-debugger__change-field-name");
+            var value = new Label(MasterDataValueUtility.Format(change.NewValue));
+            value.AddToClassList("mm-debugger__change-new");
+            row.Add(name);
+            row.Add(value);
+            return row;
+        }
+
+        static Label CreateNote(string text)
+        {
+            var label = new Label(text);
+            label.AddToClassList("mm-debugger__change-note");
+            return label;
+        }
+
         static Label CreateProblem(string text)
         {
             var label = new Label(text);
@@ -226,15 +276,22 @@ namespace Nesh.MasterMemoryDebugger
 
         void Reset(MasterMemoryChangeEntry entry)
         {
-            using (MasterMemoryDebugHistory.Record($"Reset {entry.TableName} {entry.KeyText}"))
+            var what = entry.IsAdded ? "Remove" : entry.IsDeleted ? "Restore" : "Reset";
+            using (MasterMemoryDebugHistory.Record($"{what} {entry.TableName} {entry.KeyText}"))
             {
                 if (!MasterMemoryDebugRuntime.Store.Remove(entry.RecordType, entry.PrimaryKey)) return;
             }
-            if (entry.Table != null && entry.Original != null)
+            if (entry.Table != null && entry.IsAdded)
             {
-                MasterMemoryChangeLog.Removed(entry.Table, entry.PrimaryKey, entry.Current, entry.Original, "reset");
+                MasterMemoryChangeLog.RecordChanged(entry.Table, entry.PrimaryKey, entry.Current, "removed (it was added)");
             }
-            setStatus($"Override reset: {entry.TableName} {entry.KeyText}", false);
+            else if (entry.Table != null && entry.Original != null)
+            {
+                MasterMemoryChangeLog.Removed(entry.Table, entry.PrimaryKey, entry.Current, entry.Original, entry.IsDeleted ? "removed: record restored" : "reset");
+            }
+            setStatus(entry.IsAdded ? $"Added record removed: {entry.TableName} {entry.KeyText}"
+                : entry.IsDeleted ? $"Record restored: {entry.TableName} {entry.KeyText}"
+                : $"Override reset: {entry.TableName} {entry.KeyText}", false);
             // the store raises OverridesChanged, which refreshes this view
         }
     }

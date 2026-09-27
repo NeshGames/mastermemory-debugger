@@ -13,8 +13,8 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     internal static class MasterMemoryRemoteProtocol
     {
-        /// <summary>2: validation messages.</summary>
-        public const int Version = 2;
+        /// <summary>2: validation messages. 3: deleted records.</summary>
+        public const int Version = 3;
         public const int MaxFrameBytes = 512 * 1024 * 1024;
 
         public enum MessageType : byte
@@ -25,7 +25,7 @@ namespace Nesh.MasterMemoryDebugger
             Welcome = 2,
             /// <summary>Server → client: the connection is refused (wrong code, busy, other version).</summary>
             Reject = 3,
-            /// <summary>Both ways: overrides set or removed.</summary>
+            /// <summary>Both ways: overrides set or removed, records deleted.</summary>
             Changes = 4,
             /// <summary>Server → client: whether the game validates, and the failures caused by the overrides.</summary>
             ValidationState = 5,
@@ -78,11 +78,30 @@ namespace Nesh.MasterMemoryDebugger
             public List<Change> Overrides = new List<Change>();
         }
 
+        public enum ChangeKind : byte
+        {
+            /// <summary>Remove the override of the record's key (restores a deleted record).</summary>
+            Remove = 0,
+            /// <summary>Set the override to the record (adds it when it has no original).</summary>
+            Set = 1,
+            /// <summary>Delete the original record with the record's key.</summary>
+            Delete = 2,
+        }
+
         public sealed class Change
         {
-            /// <summary>True: set the override to <see cref="Record"/>; false: remove the override of that record's key.</summary>
-            public bool IsSet;
+            public ChangeKind Kind;
+
+            /// <summary>True for <see cref="ChangeKind.Set"/>; setting false means <see cref="ChangeKind.Remove"/>.</summary>
+            public bool IsSet
+            {
+                get => Kind == ChangeKind.Set;
+                set => Kind = value ? ChangeKind.Set : ChangeKind.Remove;
+            }
+
             public string TableName;
+
+            /// <summary>The override for Set; a record with the key (the removed override, or the original) otherwise.</summary>
             public byte[] Record;
         }
 
@@ -265,7 +284,7 @@ namespace Nesh.MasterMemoryDebugger
             w.Write(changes.Count);
             foreach (var change in changes)
             {
-                w.Write(change.IsSet);
+                w.Write((byte)change.Kind);
                 w.Write(change.TableName ?? string.Empty);
                 WriteBytes(w, change.Record);
             }
@@ -275,7 +294,12 @@ namespace Nesh.MasterMemoryDebugger
         {
             var count = ReadCount(r);
             var changes = new List<Change>(count);
-            for (var i = 0; i < count; i++) changes.Add(new Change { IsSet = r.ReadBoolean(), TableName = r.ReadString(), Record = ReadBytes(r) });
+            for (var i = 0; i < count; i++)
+            {
+                var kind = (ChangeKind)r.ReadByte();
+                if (kind > ChangeKind.Delete) throw new InvalidDataException($"Unknown change kind {(byte)kind}.");
+                changes.Add(new Change { Kind = kind, TableName = r.ReadString(), Record = ReadBytes(r) });
+            }
             return changes;
         }
 

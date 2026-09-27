@@ -15,14 +15,23 @@ namespace Nesh.MasterMemoryDebugger
     ///     "records": [{
     ///       "primaryKey": { "Id": 1001 },
     ///       "changes": [{ "field": "Damage", "original": 120, "value": 185 }]
+    ///     }, {
+    ///       "primaryKey": { "Id": 9001 }, "added": true,
+    ///       "changes": [{ "field": "Name", "value": "New Skill" }, { "field": "Damage", "value": 50 }]
+    ///     }, {
+    ///       "primaryKey": { "Id": 1003 }, "deleted": true, "changes": []
     ///     }]
     ///   }]
     /// }
     /// </code>
+    /// Format version 2 adds "added" / "deleted"; patches without them are written as version 1.
     /// </summary>
     public sealed class MasterDataPatch
     {
-        public const int CurrentFormatVersion = 1;
+        public const int CurrentFormatVersion = 2;
+
+        /// <summary>The version of patches that neither add nor delete records (readable by older package versions).</summary>
+        public const int BasicFormatVersion = 1;
 
         public int FormatVersion = CurrentFormatVersion;
         public string MasterVersion;
@@ -61,6 +70,15 @@ namespace Nesh.MasterMemoryDebugger
     {
         /// <summary>Primary key member name → value. Composite keys have several entries.</summary>
         public MasterDataJsonObject PrimaryKey = new MasterDataJsonObject();
+
+        /// <summary>
+        /// The record does not exist in the master data: <see cref="Changes"/> hold its values (without originals), the key
+        /// is <see cref="PrimaryKey"/>.
+        /// </summary>
+        public bool Added;
+
+        /// <summary>The original record is deleted; <see cref="Changes"/> is empty.</summary>
+        public bool Deleted;
 
         public List<MasterDataPatchChange> Changes = new List<MasterDataPatchChange>();
     }

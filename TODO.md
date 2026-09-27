@@ -5,10 +5,8 @@ Planned work that is not scheduled yet. Released changes are in
 
 ## Features
 
-- [ ] Decide: remote record transport as JSON instead of MessagePack (no `SerializerOptions` needed for IL2CPP games;
-      larger and slower, see the comparison of 2026-09-27).
-
-Not planned: remote editing of WebGL builds.
+Not planned: remote editing of WebGL builds; remote record transport as JSON instead of MessagePack (dropped
+2026-09-27: ~16× slower to serialize, +37% size).
 
 ## Verification
 

@@ -62,6 +62,7 @@ namespace Nesh.MasterMemoryDebugger
             panelSettings.name = "MasterMemoryDebuggerPanelSettings";
             panelSettings.hideFlags = HideFlags.DontSave;
             panelSettings.themeStyleSheet = MasterMemoryDebuggerAssets.Theme;
+            if (panelSettings.themeStyleSheet == null) Debug.LogWarning("[MasterMemoryDebugger] The theme (MasterMemoryDebuggerTheme.tss) was not found; controls are not styled.");
             panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
             panelSettings.referenceResolution = new Vector2Int(1600, 900);
             panelSettings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
@@ -81,6 +82,7 @@ namespace Nesh.MasterMemoryDebugger
             var styleRoot = ownedPanelSettings != null && root.panel != null ? root.panel.visualTree : root;
             var style = MasterMemoryDebuggerAssets.Style;
             if (style != null) styleRoot.styleSheets.Add(style);
+            else Debug.LogWarning("[MasterMemoryDebugger] The style sheet (MasterMemoryDebugger.uss) was not found; the debugger is not styled.");
             var font = MasterMemoryDebuggerSettings.Current.Font;
             if (font != null) styleRoot.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(font));
             controller = new MasterMemoryDebuggerController(root, this);

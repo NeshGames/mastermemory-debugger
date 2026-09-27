@@ -76,6 +76,12 @@ of remote editing and 50,000 record timing checks). Run it before every commit.
 
 - `MultiColumnListView` rebuilds on every column change; the record grid is a custom virtualized grid
   (`MasterRecordGrid`) with frozen / scrolled parts.
+- Added records are overrides without an original (`MasterMemoryRecordDescriptor.IsAdded`, `Original` is null); deleted
+  ones are the `MasterDataOverrideStore.Deleted` marker as the store value. `TryGet` never returns the marker (gameplay
+  keeps the original), but `GetEntries` / `EntryChanged` / the history carry it: check `IsDeleted` wherever entry values
+  are used.
+- `MasterMemoryFieldDescriptor.IsObject` (nested object editing) is evaluated lazily: nested types may hold their own
+  type, and evaluating it while the reflection cache builds a descriptor would recurse forever.
 - MasterMemory `Validate()` compiles the `Exists()` expressions for every record and scans the referenced table:
   tens of thousands of records take seconds (much longer in Mono). `AutoRebuild` stops validating after every change
   when a validation takes over a second.
@@ -84,6 +90,6 @@ of remote editing and 50,000 record timing checks). Run it before every commit.
   Development Builds only and deletes it afterwards.
 - Remote editing: records travel as MessagePack (`MasterMemoryDebugRemote.SerializerOptions` for IL2CPP resolvers;
   the server checks each table at start). JSON transport was evaluated (2026-09-27: ~16× slower to serialize, +37%
-  size) and is pending a decision (TODO.md). The tool mirrors the game's tables into its own registry / store, so the
+  size) and dropped: keep MessagePack. The tool mirrors the game's tables into its own registry / store, so the
   whole UI works unchanged; sockets are closed when Play Mode ends.
 - The environment's git proxy refuses tag pushes and branch deletion; the Release workflow creates tags.

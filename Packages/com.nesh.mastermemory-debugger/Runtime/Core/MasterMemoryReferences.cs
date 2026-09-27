@@ -56,6 +56,7 @@ namespace Nesh.MasterMemoryDebugger
                 var records = new List<object>();
                 foreach (var record in table.CreateRecordSnapshot())
                 {
+                    if (record.IsAdded) break;
                     records.Add(record.Original);
                     if (records.Count >= MaxScannedRecords) break;
                 }
@@ -97,7 +98,8 @@ namespace Nesh.MasterMemoryDebugger
 
         /// <summary>
         /// Records of the source table of <paramref name="reference"/> whose member holds <paramref name="value"/>
-        /// (current values, overrides included). Empty when the member is not a direct member of the record.
+        /// (current values, overrides and added records included, deleted records left out). Empty when the member is not a
+        /// direct member of the record.
         /// </summary>
         public static List<MasterMemoryRecordDescriptor> FindReferencing(MasterMemoryReference reference, object value)
         {
@@ -107,7 +109,9 @@ namespace Nesh.MasterMemoryDebugger
             if (!source.TypeDescriptor.TryGetField(reference.SourceMember, out var field)) return result;
             foreach (var record in source.CreateRecordSnapshot())
             {
-                if (SameValue(field.GetValue(record.Current), value)) result.Add(record);
+                var current = record.Current;
+                if (current == null || record.IsDeleted) continue;
+                if (SameValue(field.GetValue(current), value)) result.Add(record);
             }
             return result;
         }
@@ -116,7 +120,8 @@ namespace Nesh.MasterMemoryDebugger
         public static object GetReferencedValue(MasterMemoryReference reference, MasterMemoryRecordDescriptor record)
         {
             if (reference == null || record == null) return null;
-            return record.Table.TypeDescriptor.TryGetField(reference.TargetMember, out var field) ? field.GetValue(record.Current) : null;
+            var current = record.Current;
+            return current != null && record.Table.TypeDescriptor.TryGetField(reference.TargetMember, out var field) ? field.GetValue(current) : null;
         }
 
         // int and long keys of the same value (Exists compares converted values)

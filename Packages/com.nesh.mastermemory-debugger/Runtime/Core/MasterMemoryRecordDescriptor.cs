@@ -3,7 +3,10 @@ using System.Text;
 
 namespace Nesh.MasterMemoryDebugger
 {
-    /// <summary>One original record of a table plus cached text used by the record list and search.</summary>
+    /// <summary>
+    /// One record of a table (an original one, or one added as an override: <see cref="IsAdded"/>) plus cached text used
+    /// by the record list and search.
+    /// </summary>
     public sealed class MasterMemoryRecordDescriptor
     {
         string keyText;
@@ -18,8 +21,14 @@ namespace Nesh.MasterMemoryDebugger
 
         public MasterMemoryTableDescriptor Table { get; }
 
-        /// <summary>The record owned by the MasterMemory database. Never modify it.</summary>
+        /// <summary>The record owned by the MasterMemory database. Never modify it. Null for an added record.</summary>
         public object Original { get; }
+
+        /// <summary>True for a record that only exists as an override (added in the debugger or by a patch).</summary>
+        public bool IsAdded => Original == null;
+
+        /// <summary>True when the original record is deleted (<see cref="IMasterDataOverrideStore.Delete"/>).</summary>
+        public bool IsDeleted => MasterMemoryDebugRuntime.Store.IsDeleted(Table.RecordType, PrimaryKey);
 
         public object PrimaryKey { get; }
 
@@ -27,7 +36,10 @@ namespace Nesh.MasterMemoryDebugger
 
         public bool IsModified => MasterMemoryDebugRuntime.Store.IsOverridden(Table.RecordType, PrimaryKey);
 
-        /// <summary>The override when present, otherwise the original.</summary>
+        /// <summary>
+        /// The override when present, otherwise the original (also for a deleted record). Null for an added record whose
+        /// override was removed since the snapshot was taken.
+        /// </summary>
         public object Current => MasterMemoryDebugRuntime.Store.TryGet(Table.RecordType, PrimaryKey, out var value) ? value : Original;
 
         public string GetDisplayName() => Table.GetDisplayName(Current);
@@ -42,6 +54,7 @@ namespace Nesh.MasterMemoryDebugger
             if (KeyText.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) return true;
 
             var current = Current;
+            if (current == null) return false;
             var displayName = Table.GetDisplayName(current);
             if (displayName != null && displayName.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) return true;
 

@@ -100,6 +100,7 @@ namespace Nesh.MasterMemoryDebugger
             if (conditions.Count == 0) return true;
 
             var current = record.Current;
+            if (current == null) return false;
             foreach (var condition in conditions)
             {
                 if (!Evaluate(condition, condition.Field.GetValue(current))) return false;

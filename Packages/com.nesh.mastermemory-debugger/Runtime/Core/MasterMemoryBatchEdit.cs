@@ -180,6 +180,11 @@ namespace Nesh.MasterMemoryDebugger
                 foreach (var record in records)
                 {
                     var current = record.Current;
+                    if (current == null || record.IsDeleted)
+                    {
+                        result.Unchanged++;
+                        continue;
+                    }
                     var before = field.GetValue(current);
                     if (!TryCompute(field, before, operation, value, out var after, out var error))
                     {
@@ -202,7 +207,8 @@ namespace Nesh.MasterMemoryDebugger
                         AddError(result, $"{record.Table.TableName} {record.KeyText}: {(e.InnerException ?? e).Message}");
                         continue;
                     }
-                    if (MasterDataDiffUtility.GetChanges(record.Original, copy).Count == 0) store.Remove(record.Table.RecordType, record.PrimaryKey);
+                    // an added record keeps its override; a changed one equal to the original loses it
+                    if (!record.IsAdded && MasterDataDiffUtility.GetChanges(record.Original, copy).Count == 0) store.Remove(record.Table.RecordType, record.PrimaryKey);
                     else store.Set(record.Table.RecordType, record.PrimaryKey, copy);
                     result.Changed++;
                 }
