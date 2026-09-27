@@ -347,7 +347,21 @@ namespace Nesh.MasterMemoryDebugger
             foreach (var entry in MasterMemoryDebugRuntime.GetAllOverrides())
             {
                 if (!MasterMemoryDebugRegistry.TryGetTable(entry.Key.RecordType, out var table)) continue;
-                welcome.Overrides.Add(new MasterMemoryRemoteProtocol.Change { IsSet = true, TableName = table.TableName, Record = Serialize(table.RecordType, entry.Value) });
+                object record;
+                try
+                {
+                    record = MasterMemoryRemotePeer.RecordWithKey(table, entry.Key, entry.Value);
+                }
+                catch (InvalidOperationException)
+                {
+                    continue;
+                }
+                welcome.Overrides.Add(new MasterMemoryRemoteProtocol.Change
+                {
+                    Kind = entry.IsDeleted ? MasterMemoryRemoteProtocol.ChangeKind.Delete : MasterMemoryRemoteProtocol.ChangeKind.Set,
+                    TableName = table.TableName,
+                    Record = Serialize(table.RecordType, record),
+                });
             }
             return welcome;
         }

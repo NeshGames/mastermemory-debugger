@@ -1128,6 +1128,54 @@
     border-color: rgb(229, 83, 75);
 }
 
+.mm-debugger__change--added {
+    border-color: rgb(124, 227, 139);
+}
+
+.mm-debugger__change--deleted {
+    border-color: rgb(150, 157, 171);
+}
+
+.mm-debugger .mm-debugger__change-note {
+    padding-left: 16px;
+    color: rgb(170, 176, 190);
+    white-space: normal;
+}
+
+.mm-debugger__badge--added {
+    background-color: rgb(124, 227, 139);
+    margin: 0 6px 0 0;
+}
+
+.mm-debugger__badge--deleted {
+    background-color: rgb(150, 157, 171);
+    margin: 0 6px 0 0;
+}
+
+/* added / deleted records in the grid and the inspector */
+.mm-debugger .mm-debugger__cell--added {
+    color: rgb(124, 227, 139);
+}
+
+.mm-debugger .mm-debugger__cell--deleted {
+    color: rgb(120, 126, 138);
+    -unity-font-style: italic;
+}
+
+.mm-debugger .mm-debugger__record-state--added {
+    color: rgb(22, 24, 29);
+    background-color: rgb(124, 227, 139);
+}
+
+.mm-debugger .mm-debugger__record-state--deleted {
+    color: rgb(22, 24, 29);
+    background-color: rgb(150, 157, 171);
+}
+
+.mm-debugger .mm-debugger__hint--error {
+    color: rgb(255, 120, 110);
+}
+
 .mm-debugger__change-header {
     flex-direction: row;
     align-items: center;

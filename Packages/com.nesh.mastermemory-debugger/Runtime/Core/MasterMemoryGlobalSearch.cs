@@ -52,7 +52,8 @@ namespace Nesh.MasterMemoryDebugger
     }
 
     /// <summary>
-    /// Finds a value in every member of every registered table: the current values (overrides included), list elements,
+    /// Finds a value in every member of every registered table: the current values (overrides and added records included,
+    /// deleted records left out), list elements,
     /// members of nested objects and dictionary keys / values, compared as the text the debugger shows (case insensitive).
     /// </summary>
     public static class MasterMemoryGlobalSearch
@@ -88,9 +89,10 @@ namespace Nesh.MasterMemoryDebugger
                 var before = result.RecordCount;
                 foreach (var record in table.CreateRecordSnapshot())
                 {
+                    var current = record.Current;
+                    if (current == null || record.IsDeleted) continue;
                     context.Record = record;
                     context.RecordMatched = false;
-                    var current = record.Current;
                     foreach (var field in table.TypeDescriptor.Fields)
                     {
                         context.Field = field;

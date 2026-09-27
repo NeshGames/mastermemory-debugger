@@ -8,7 +8,8 @@ namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
     /// Builds a copy of a generated MemoryDatabase with the overrides applied, through MasterMemory's own
-    /// <c>ToImmutableBuilder().Diff(records).Build()</c>. Secondary key / range queries and <c>All</c> of the rebuilt
+    /// <c>ToImmutableBuilder().Diff(records).Build()</c>: changed and added records, and <c>RemoveXxx(keys)</c> for the
+    /// deleted ones. Secondary key / range queries and <c>All</c> of the rebuilt
     /// database see the overrides; the original database is never modified.
     /// <code>
     /// // one line in the project: gameplay reads masterService.Database
@@ -33,6 +34,7 @@ namespace Nesh.MasterMemoryDebugger
             public MethodInfo Build;
             public MethodInfo Validate;
             public Dictionary<Type, MethodInfo> Diff = new Dictionary<Type, MethodInfo>();
+            public Dictionary<Type, MethodInfo> Remove = new Dictionary<Type, MethodInfo>();
         }
 
         static readonly Dictionary<Type, BuilderInfo> s_builders = new Dictionary<Type, BuilderInfo>();
@@ -55,10 +57,12 @@ namespace Nesh.MasterMemoryDebugger
             }
 
             var byType = new Dictionary<Type, List<object>>();
+            var deletedByType = new Dictionary<Type, List<object>>();
             foreach (var entry in MasterMemoryDebugRuntime.GetAllOverrides())
             {
-                if (!byType.TryGetValue(entry.Key.RecordType, out var list)) byType.Add(entry.Key.RecordType, list = new List<object>());
-                list.Add(entry.Value);
+                var target = entry.IsDeleted ? deletedByType : byType;
+                if (!target.TryGetValue(entry.Key.RecordType, out var list)) target.Add(entry.Key.RecordType, list = new List<object>());
+                list.Add(entry.IsDeleted ? entry.Key.PrimaryKey : entry.Value);
             }
 
             var builder = info.ToImmutableBuilder.Invoke(original, null);
@@ -76,6 +80,22 @@ namespace Nesh.MasterMemoryDebugger
                 var array = Array.CreateInstance(pair.Key, pair.Value.Count);
                 for (var i = 0; i < pair.Value.Count; i++) array.SetValue(pair.Value[i], i);
                 diff.Invoke(builder, new object[] { array });
+                applied++;
+            }
+            foreach (var pair in deletedByType)
+            {
+                if (!info.Remove.TryGetValue(pair.Key, out var remove))
+                {
+                    if (s_reportedUnsupported.Add(pair.Key))
+                    {
+                        MasterMemoryDebugLog.Warning($"Rebuild: {original.GetType().Name} has no Remove{pair.Key.Name}(keys); its deleted records are not removed.");
+                    }
+                    continue;
+                }
+                var keyType = remove.GetParameters()[0].ParameterType.GetElementType();
+                var keys = Array.CreateInstance(keyType, pair.Value.Count);
+                for (var i = 0; i < pair.Value.Count; i++) keys.SetValue(pair.Value[i], i);
+                remove.Invoke(builder, new object[] { keys });
                 applied++;
             }
 
@@ -145,6 +165,13 @@ namespace Nesh.MasterMemoryDebugger
                     {
                         info.Diff[parameters[0].ParameterType.GetElementType()] = method;
                     }
+                }
+                // generated per table: RemoveSkillMaster(int[] keys)
+                foreach (var recordType in info.Diff.Keys)
+                {
+                    var remove = builderType.GetMethod("Remove" + recordType.Name, BindingFlags.Public | BindingFlags.Instance);
+                    var parameters = remove?.GetParameters();
+                    if (parameters != null && parameters.Length == 1 && parameters[0].ParameterType.IsArray) info.Remove[recordType] = remove;
                 }
             }
             s_builders.Add(databaseType, info);

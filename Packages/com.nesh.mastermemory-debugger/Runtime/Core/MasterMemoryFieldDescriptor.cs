@@ -152,6 +152,16 @@ namespace Nesh.MasterMemoryDebugger
             setter(editableCopy, value);
         }
 
+        /// <summary>
+        /// Writes any member with a setter, keys included: used to give a new record (added in the debugger) its key.
+        /// Never call this on a record instance owned by the MasterMemory database.
+        /// </summary>
+        internal void SetValueUnchecked(object editableCopy, object value)
+        {
+            if (setter == null) throw new InvalidOperationException($"Field '{Name}' can not be written.");
+            setter(editableCopy, value);
+        }
+
         public override string ToString() => $"{Name} ({FieldType.Name})";
     }
 }

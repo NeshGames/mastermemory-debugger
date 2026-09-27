@@ -86,6 +86,6 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         // Rich text has no escape sequence; a zero width space keeps "<" from starting a tag.
-        static string Escape(string text) => text?.Replace("<", "<​");
+        internal static string Escape(string text) => text?.Replace("<", "<​");
     }
 }

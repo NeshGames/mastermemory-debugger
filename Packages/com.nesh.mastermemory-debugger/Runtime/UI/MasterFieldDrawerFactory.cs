@@ -35,14 +35,15 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>
         /// Editor of an editable member. <paramref name="onChanged"/> receives values already converted to <see cref="MasterMemoryFieldDescriptor.FieldType"/>.
         /// </summary>
-        public static VisualElement CreateEditor(MasterMemoryFieldDescriptor field, object value, Action<object> onChanged)
+        /// <param name="allowKey">Also edit a writable secondary key (the record is added: a rebuilt database indexes it).</param>
+        public static VisualElement CreateEditor(MasterMemoryFieldDescriptor field, object value, Action<object> onChanged, bool allowKey = false)
         {
-            return CreateEditor(field, value, onChanged, 1);
+            return CreateEditor(field, value, onChanged, 1, allowKey);
         }
 
-        static VisualElement CreateEditor(MasterMemoryFieldDescriptor field, object value, Action<object> onChanged, int depth)
+        static VisualElement CreateEditor(MasterMemoryFieldDescriptor field, object value, Action<object> onChanged, int depth, bool allowKey = false)
         {
-            if (!field.CanEdit) return CreateReadOnly(value);
+            if (!field.CanEdit && !(allowKey && CanEditAddedKey(field))) return CreateReadOnly(value);
             if (field.IsList) return CreateListEditor(field, (IList)value, onChanged);
             if (field.IsObject) return CreateObjectEditor(value, onChanged, depth);
             if (field.IsNullable) return CreateNullableEditor(field, value, onChanged);
@@ -131,6 +132,12 @@ namespace Nesh.MasterMemoryDebugger
             Rebuild();
             foldout.Add(body);
             return foldout;
+        }
+
+        /// <summary>A secondary key of a simple type that an added record may change.</summary>
+        public static bool CanEditAddedKey(MasterMemoryFieldDescriptor field)
+        {
+            return field.IsSecondaryKey && !field.IsPrimaryKey && field.HasSetter && field.Kind != MasterDataValueKind.Complex;
         }
 
         /// <summary>

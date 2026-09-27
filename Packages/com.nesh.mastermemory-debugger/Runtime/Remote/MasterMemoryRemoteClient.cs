@@ -257,7 +257,7 @@ namespace Nesh.MasterMemoryDebugger
                         if (!records.TryGetValue(table.TableName, out var byKey))
                         {
                             byKey = new Dictionary<string, object>();
-                            foreach (var descriptor in table.CreateRecordSnapshot()) byKey[descriptor.KeyText] = descriptor.Original;
+                            foreach (var descriptor in table.CreateRecordSnapshot()) byKey[descriptor.KeyText] = descriptor.Original ?? descriptor.Current;
                             records.Add(table.TableName, byKey);
                         }
                         // the tool's copy of the failing record: Open jumps to it

@@ -41,7 +41,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
-        public void ChangeSummary_ShouldFlagMissingOriginalsAndUnregisteredTables()
+        public void ChangeSummary_ShouldReportAddedRecordsAndUnregisteredTables()
         {
             RegisterTestDatabase();
             MasterMemoryDebugRuntime.SetOverride(9999, new TestSkill { Id = 9999, Name = "Ghost" });
@@ -49,7 +49,9 @@ namespace Nesh.MasterMemoryDebugger.Tests
 
             var entries = MasterMemoryChangeSummary.Build();
 
-            Assert.AreEqual(MasterMemoryChangeStatus.OriginalMissing, entries.Single(x => Equals(x.PrimaryKey, 9999)).Status);
+            var added = entries.Single(x => Equals(x.PrimaryKey, 9999));
+            Assert.AreEqual(MasterMemoryChangeStatus.Added, added.Status, "an override without an original adds a record");
+            Assert.IsTrue(added.Changes.Any(x => x.Name == "Name" && (string)x.NewValue == "Ghost"));
             var unregistered = entries.Last();
             Assert.AreEqual(MasterMemoryChangeStatus.TableNotRegistered, unregistered.Status);
             Assert.AreEqual("ManualItem", unregistered.TableName);

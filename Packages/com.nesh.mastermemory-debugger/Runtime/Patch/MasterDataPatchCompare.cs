@@ -122,7 +122,13 @@ namespace Nesh.MasterMemoryDebugger
                 foreach (var record in table.Records)
                 {
                     var key = record.PrimaryKey.ToCanonicalString();
-                    foreach (var change in record.Changes)
+                    var changes = record.Changes;
+                    if (record.Deleted)
+                    {
+                        // a deletion compares like a field
+                        changes = new List<MasterDataPatchChange> { new MasterDataPatchChange { Field = MasterMemoryChangeSummary.DeletedField, Value = true, HasOriginal = false } };
+                    }
+                    foreach (var change in changes)
                     {
                         var entry = new Entry { TableName = table.TableName, Key = key, Change = change, Id = table.TableName + "\n" + key + "\n" + change.Field };
                         // the last entry of a field wins, like when the patch is applied

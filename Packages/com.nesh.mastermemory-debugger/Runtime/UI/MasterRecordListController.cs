@@ -22,6 +22,8 @@ namespace Nesh.MasterMemoryDebugger
         const string NullCellClass = "mm-debugger__cell--null";
         const string KeyCellClass = "mm-debugger__cell--key";
         const string StateCellClass = "mm-debugger__cell--state";
+        const string AddedCellClass = "mm-debugger__cell--added";
+        const string DeletedCellClass = "mm-debugger__cell--deleted";
 
         readonly TextField searchField;
         readonly Toggle modifiedOnlyToggle;
@@ -146,11 +148,51 @@ namespace Nesh.MasterMemoryDebugger
             if (keepKey != null) SelectByKey(keepKey);
         }
 
-        /// <summary>Called when overrides changed: updates values and markers, re-filters when a filter depends on values.</summary>
+        /// <summary>
+        /// Called when overrides changed: takes a new snapshot when records were added or removed, updates values and
+        /// markers, re-filters when a filter depends on values.
+        /// </summary>
         public void OnOverridesChanged()
         {
+            if (table != null && AddedRecordsChanged())
+            {
+                SetTable(table);
+                return;
+            }
             if (ModifiedOnly || !string.IsNullOrWhiteSpace(Query) || grid.SortKey != null) ApplyFilter();
             else grid.RefreshItems();
+        }
+
+        /// <summary>True when the records added as overrides differ from those in the snapshot.</summary>
+        bool AddedRecordsChanged()
+        {
+            var added = new HashSet<object>();
+            HashSet<object> originals = null;
+            foreach (var record in snapshot)
+            {
+                if (record.IsAdded) added.Add(record.PrimaryKey);
+            }
+            var store = MasterMemoryDebugRuntime.Store;
+            if (store.CountOf(table.RecordType) == 0) return added.Count > 0;
+            var count = 0;
+            foreach (var entry in store.GetEntries(table.RecordType))
+            {
+                if (entry.IsDeleted || added.Contains(entry.Key.PrimaryKey))
+                {
+                    if (!entry.IsDeleted) count++;
+                    continue;
+                }
+                if (originals == null)
+                {
+                    originals = new HashSet<object>();
+                    foreach (var record in snapshot)
+                    {
+                        if (!record.IsAdded) originals.Add(record.PrimaryKey);
+                    }
+                }
+                if (!originals.Contains(entry.Key.PrimaryKey)) return true;
+            }
+            return count != added.Count;
         }
 
         public bool SelectByKey(object key)
@@ -258,15 +300,19 @@ namespace Nesh.MasterMemoryDebugger
             var result = new List<MasterGridColumn>();
             if (table == null) return result;
 
-            // state gutter: ● for overridden records
+            // state gutter: ● overridden, + added, × deleted
             result.Add(new MasterGridColumn(ModifiedColumn, "●", 26, (label, record) =>
             {
                 var modified = record.IsModified;
-                label.text = modified ? "●" : string.Empty;
-                label.EnableInClassList(ModifiedCellClass, modified);
+                var added = record.IsAdded;
+                var deleted = modified && !added && record.IsDeleted;
+                label.text = added ? "+" : deleted ? "×" : modified ? "●" : string.Empty;
+                label.EnableInClassList(ModifiedCellClass, modified && !added && !deleted);
+                label.EnableInClassList(AddedCellClass, added);
+                label.EnableInClassList(DeletedCellClass, deleted);
             })
             {
-                Tooltip = "Overridden",
+                Tooltip = "● overridden   + added   × deleted",
                 CellClass = StateCellClass,
                 Locked = true,
                 DefaultFrozen = true,
@@ -305,16 +351,23 @@ namespace Nesh.MasterMemoryDebugger
             var title = MasterMemoryDebugLocalization.GetFieldLabel(table, field) + suffix;
             return new MasterGridColumn(field.Name, title, field.IsSimpleValue ? (isNumber ? 90 : 130) : 160, (label, record) =>
             {
-                var value = field.GetValue(record.Current);
+                var current = record.Current;
+                var value = current == null ? null : field.GetValue(current);
                 label.text = value == null ? "NULL" : MasterDataValueUtility.Format(value);
                 label.EnableInClassList(NullCellClass, value == null);
-                label.EnableInClassList(ModifiedCellClass, record.IsModified && !MasterDataValueUtility.AreEqual(value, field.GetValue(record.Original)));
+                var modified = record.IsModified;
+                var added = record.IsAdded;
+                var deleted = modified && !added && record.IsDeleted;
+                label.EnableInClassList(ModifiedCellClass, modified && !added && !deleted && !MasterDataValueUtility.AreEqual(value, field.GetValue(record.Original)));
+                label.EnableInClassList(AddedCellClass, added);
+                label.EnableInClassList(DeletedCellClass, deleted);
             })
             {
                 Tooltip = MasterMemoryDebugLocalization.GetFieldTooltip(table, field),
                 Text = record =>
                 {
-                    var value = field.GetValue(record.Current);
+                    var current = record.Current;
+                    var value = current == null ? null : field.GetValue(current);
                     return value == null ? "NULL" : MasterDataValueUtility.Format(value);
                 },
                 // numbers are right aligned, like in database viewers
@@ -433,7 +486,7 @@ namespace Nesh.MasterMemoryDebugger
                     break;
                 default:
                     if (!table.TypeDescriptor.TryGetField(columnName, out var field)) return;
-                    selector = x => field.GetValue(x.Current);
+                    selector = x => x.Current == null ? null : field.GetValue(x.Current);
                     break;
             }
 

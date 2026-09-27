@@ -72,6 +72,17 @@ namespace Nesh.MasterMemoryDebugger
             return s_store.IsOverridden<TRecord, TKey>(key);
         }
 
+        /// <summary>
+        /// True when the record was deleted in the debugger. Deletions take effect in a database rebuilt by
+        /// <see cref="MasterMemoryDebugRebuild"/>; <see cref="TryGetOverride{TRecord,TKey}"/> / <see cref="Resolve{TRecord,TKey}"/>
+        /// keep returning the original, so code that reads records by key can check this to honor a deletion.
+        /// </summary>
+        public static bool IsDeleted<TRecord, TKey>(TKey key)
+        {
+            if (!MasterMemoryDebugBuild.IsEnabled) return false;
+            return s_store.IsDeleted<TRecord, TKey>(key);
+        }
+
         public static void ClearAllOverrides()
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return;
@@ -79,19 +90,34 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         /// <summary>
-        /// All overriding records of a type. Useful to rebuild a database in the project:
-        /// <c>builder.Diff(MasterMemoryDebugRuntime.GetOverrides&lt;SkillMaster&gt;())</c>.
+        /// All overriding records of a type (changed and added ones, not the deletions). Useful to rebuild a database in
+        /// the project: <c>builder.Diff(MasterMemoryDebugRuntime.GetOverrides&lt;SkillMaster&gt;())</c>.
         /// </summary>
         public static TRecord[] GetOverrides<TRecord>()
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return Array.Empty<TRecord>();
             var entries = s_store.GetEntries(typeof(TRecord));
-            var result = new TRecord[entries.Count];
-            for (var i = 0; i < entries.Count; i++) result[i] = (TRecord)entries[i].Value;
-            return result;
+            var result = new List<TRecord>(entries.Count);
+            foreach (var entry in entries)
+            {
+                if (!entry.IsDeleted) result.Add((TRecord)entry.Value);
+            }
+            return result.ToArray();
         }
 
-        /// <summary>Snapshot of every override.</summary>
+        /// <summary>Primary keys of the records of a type deleted in the debugger (see <see cref="IsDeleted{TRecord,TKey}"/>).</summary>
+        public static TKey[] GetDeletedKeys<TRecord, TKey>()
+        {
+            if (!MasterMemoryDebugBuild.IsEnabled) return Array.Empty<TKey>();
+            var result = new List<TKey>();
+            foreach (var entry in s_store.GetEntries(typeof(TRecord)))
+            {
+                if (entry.IsDeleted) result.Add((TKey)entry.Key.PrimaryKey);
+            }
+            return result.ToArray();
+        }
+
+        /// <summary>Snapshot of every override, deletions included (<see cref="MasterDataOverrideEntry.IsDeleted"/>).</summary>
         public static List<MasterDataOverrideEntry> GetAllOverrides()
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return new List<MasterDataOverrideEntry>();

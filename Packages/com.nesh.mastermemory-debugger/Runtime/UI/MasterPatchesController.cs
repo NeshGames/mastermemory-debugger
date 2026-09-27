@@ -290,7 +290,7 @@ namespace Nesh.MasterMemoryDebugger
 
                 foreach (var record in table.Records)
                 {
-                    var recordLabel = new Label(record.PrimaryKey.ToCanonicalString());
+                    var recordLabel = new Label(record.PrimaryKey.ToCanonicalString() + (record.Added ? "   added" : record.Deleted ? "   deleted" : string.Empty));
                     recordLabel.AddToClassList("mm-debugger__patches-record");
                     preview.Add(recordLabel);
                     foreach (var change in record.Changes)

@@ -28,6 +28,17 @@ namespace Nesh.MasterMemoryDebugger
             Write($"Override {reason}: {Subject(table, key, original)}", MasterDataDiffUtility.GetChanges(before, original));
         }
 
+        /// <summary>"Record added: …", "Record removed (it was added): …".</summary>
+        public static void RecordChanged(MasterMemoryTableDescriptor table, object key, object record, string what)
+        {
+            Write($"Record {what}: {Subject(table, key, record)}", new List<MasterDataFieldChange>(), noFieldLine: true);
+        }
+
+        public static void Deleted(MasterMemoryTableDescriptor table, object key, object record)
+        {
+            Write($"Record deleted: {Subject(table, key, record)} (a rebuilt database leaves it out; Reset restores it)", new List<MasterDataFieldChange>(), noFieldLine: true);
+        }
+
         public static void ResetAll(int count)
         {
             MasterMemoryDebuggerMessages.Add(MasterMemoryDebuggerMessageType.Change, $"All overrides reset ({count} records)");
@@ -41,8 +52,10 @@ namespace Nesh.MasterMemoryDebugger
         public static void PatchLoaded(string patchName, MasterDataPatchApplyResult result)
         {
             var title = $"Patch \"{patchName}\" loaded: {result.AppliedRecords} records, {result.AppliedFields} fields";
+            if (result.AddedRecords > 0) title += $", {result.AddedRecords} added";
+            if (result.DeletedRecords > 0) title += $", {result.DeletedRecords} deleted";
             var plain = new System.Text.StringBuilder(title);
-            var rich = new System.Text.StringBuilder($"<color=#FFB84C><b>{Prefix}{title}</b></color>");
+            var rich = new System.Text.StringBuilder($"<color=#FFB84C><b>{Prefix}{MasterDataDiffUtility.Escape(title)}</b></color>");
             foreach (var entry in MasterMemoryChangeSummary.Build())
             {
                 if (entry.Status != MasterMemoryChangeStatus.Changed) continue;
@@ -59,8 +72,14 @@ namespace Nesh.MasterMemoryDebugger
             if (ConsoleEnabled) Debug.Log(MasterDataDiffUtility.UseRichText ? rich.ToString() : Prefix + plain);
         }
 
-        static void Write(string title, List<MasterDataFieldChange> changes)
+        static void Write(string title, List<MasterDataFieldChange> changes, bool noFieldLine = false)
         {
+            if (noFieldLine)
+            {
+                MasterMemoryDebuggerMessages.Add(MasterMemoryDebuggerMessageType.Change, title);
+                if (ConsoleEnabled) Debug.Log(MasterDataDiffUtility.UseRichText ? $"<color=#FFB84C><b>{Prefix}{MasterDataDiffUtility.Escape(title)}</b></color>" : Prefix + title);
+                return;
+            }
             MasterMemoryDebuggerMessages.Add(MasterMemoryDebuggerMessageType.Change, MasterDataDiffUtility.Format(title, changes, false));
             if (ConsoleEnabled) Debug.Log(MasterDataDiffUtility.Format(Prefix + title, changes, MasterDataDiffUtility.UseRichText));
         }

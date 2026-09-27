@@ -23,6 +23,10 @@ namespace Nesh.MasterMemoryDebugger
         public string CurrentMasterVersion;
         public int AppliedRecords;
         public int AppliedFields;
+        /// <summary>Records added (included in <see cref="AppliedRecords"/>).</summary>
+        public int AddedRecords;
+        /// <summary>Records deleted (included in <see cref="AppliedRecords"/>).</summary>
+        public int DeletedRecords;
         public readonly List<string> Warnings = new List<string>();
 
         public bool Succeeded => Status == MasterDataPatchApplyStatus.Applied;
@@ -35,7 +39,8 @@ namespace Nesh.MasterMemoryDebugger
 
         /// <summary>
         /// Builds a patch of every override whose record type is registered.
-        /// Only editable fields whose value differs from the original are written.
+        /// Only editable fields whose value differs from the original are written; added records are written with all their
+        /// values, deleted ones with their key.
         /// </summary>
         public static MasterDataPatch CreatePatch(List<string> warnings = null)
         {
@@ -71,9 +76,16 @@ namespace Nesh.MasterMemoryDebugger
 
                 foreach (var entry in entries)
                 {
-                    if (!originals.TryGetValue(entry.Key.PrimaryKey, out var original))
+                    var hasOriginal = originals.TryGetValue(entry.Key.PrimaryKey, out var original);
+                    if (entry.IsDeleted)
                     {
-                        warnings?.Add($"{table.TableName} {MasterDataValueUtility.FormatKey(entry.Key.PrimaryKey)}: original record not found, skipped.");
+                        if (hasOriginal) patchTable.Records.Add(new MasterDataPatchRecord { PrimaryKey = CreatePrimaryKeyJson(table, original), Deleted = true });
+                        else warnings?.Add($"{table.TableName} {MasterDataValueUtility.FormatKey(entry.Key.PrimaryKey)}: deleted record not found in the master data, skipped.");
+                        continue;
+                    }
+                    if (!hasOriginal)
+                    {
+                        patchTable.Records.Add(CreateAddedRecord(table, entry.Value, warnings));
                         continue;
                     }
                     var record = CreatePatchRecord(table, original, entry.Value, warnings);
@@ -87,7 +99,37 @@ namespace Nesh.MasterMemoryDebugger
             {
                 warnings?.Add($"Overrides of {type.FullName} were skipped because the table is not registered.");
             }
+            patch.FormatVersion = MasterDataPatch.BasicFormatVersion;
+            foreach (var table in patch.Tables)
+            {
+                foreach (var record in table.Records)
+                {
+                    if (record.Added || record.Deleted) patch.FormatVersion = MasterDataPatch.CurrentFormatVersion;
+                }
+            }
             return patch;
+        }
+
+        /// <summary>A record that only exists as an override: every writable non primary key member, without originals.</summary>
+        public static MasterDataPatchRecord CreateAddedRecord(MasterMemoryTableDescriptor table, object record, List<string> warnings = null)
+        {
+            var result = new MasterDataPatchRecord { PrimaryKey = CreatePrimaryKeyJson(table, record), Added = true };
+            foreach (var field in table.TypeDescriptor.Fields)
+            {
+                if (field.IsPrimaryKey || !field.HasSetter) continue;
+                object json;
+                try
+                {
+                    json = MasterDataValueUtility.ToJson(field.GetValue(record));
+                }
+                catch (NotSupportedException)
+                {
+                    warnings?.Add($"{table.TableName} {result.PrimaryKey.ToCanonicalString()} (added): field '{field.Name}' can not be exported; it gets its default value when the patch is applied.");
+                    continue;
+                }
+                result.Changes.Add(new MasterDataPatchChange { Field = field.Name, Value = json, HasOriginal = false });
+            }
+            return result;
         }
 
         public static string CreatePatchJson(List<string> warnings = null)
@@ -259,10 +301,32 @@ namespace Nesh.MasterMemoryDebugger
                     continue;
                 }
 
-                if (!originals.TryGetValue(keyText, out var original))
+                var hasOriginal = originals.TryGetValue(keyText, out var original);
+                if (patchRecord.Deleted)
                 {
-                    result.Warnings.Add($"{table.TableName} {keyText}: record does not exist (records can not be added), skipped.");
+                    if (!hasOriginal)
+                    {
+                        result.Warnings.Add($"{table.TableName} {keyText}: the deleted record does not exist, skipped.");
+                        continue;
+                    }
+                    store.Delete(table.RecordType, table.GetPrimaryKey(original));
+                    result.AppliedRecords++;
+                    result.DeletedRecords++;
                     continue;
+                }
+                if (!hasOriginal)
+                {
+                    if (!patchRecord.Added)
+                    {
+                        result.Warnings.Add($"{table.TableName} {keyText}: record does not exist, skipped.");
+                        continue;
+                    }
+                    ApplyAddedRecord(patchRecord, table, keyText, result);
+                    continue;
+                }
+                if (patchRecord.Added)
+                {
+                    result.Warnings.Add($"{table.TableName} {keyText}: the added record exists in the master data now; its values are applied as changes.");
                 }
 
                 var copy = MasterDataCloneUtility.Clone(original);
@@ -310,6 +374,55 @@ namespace Nesh.MasterMemoryDebugger
                     result.AppliedFields += applied;
                 }
             }
+        }
+
+        static void ApplyAddedRecord(MasterDataPatchRecord patchRecord, MasterMemoryTableDescriptor table, string keyText, MasterDataPatchApplyResult result)
+        {
+            if (!MasterMemoryRecordFactory.CanAdd(table, out var reason))
+            {
+                result.Warnings.Add($"{table.TableName} {keyText}: the added record is skipped ({reason})");
+                return;
+            }
+
+            object record;
+            try
+            {
+                record = MasterMemoryRecordFactory.CreateDefault(table);
+                foreach (var field in table.TypeDescriptor.PrimaryKeyFields)
+                {
+                    field.SetValueUnchecked(record, MasterDataValueUtility.FromJson(patchRecord.PrimaryKey[field.Name], field.FieldType));
+                }
+            }
+            catch (Exception e)
+            {
+                result.Warnings.Add($"{table.TableName} {keyText}: the added record can not be created ({(e.InnerException ?? e).Message}), skipped.");
+                return;
+            }
+
+            var applied = 0;
+            foreach (var change in patchRecord.Changes)
+            {
+                // an added record also sets its secondary keys (a rebuilt database indexes them)
+                if (!table.TypeDescriptor.TryGetField(change.Field, out var field) || field.IsPrimaryKey || !field.HasSetter)
+                {
+                    result.Warnings.Add($"{table.TableName} {keyText} (added): field '{change.Field}' does not exist or can not be written, skipped.");
+                    continue;
+                }
+                try
+                {
+                    field.SetValueUnchecked(record, MasterDataValueUtility.FromJson(change.Value, field.FieldType, field.GetValue(record)));
+                    applied++;
+                }
+                catch (Exception e)
+                {
+                    result.Warnings.Add($"{table.TableName} {keyText} (added): field '{change.Field}' has an invalid value ({(e.InnerException ?? e).Message}), skipped.");
+                }
+            }
+
+            MasterMemoryDebugRuntime.Store.Set(table.RecordType, table.GetPrimaryKey(record), record);
+            result.AppliedRecords++;
+            result.AddedRecords++;
+            result.AppliedFields += applied;
         }
 
         static object TryFromJson(object json, Type type, object baseValue, out bool ok)

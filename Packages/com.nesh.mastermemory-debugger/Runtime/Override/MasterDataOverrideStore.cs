@@ -6,9 +6,20 @@ namespace Nesh.MasterMemoryDebugger
     /// <summary>
     /// Thread-safe in-memory override store.
     /// Lookups for record types without overrides return immediately without boxing the key.
+    /// An override whose key has no original record adds a record; <see cref="Deleted"/> as the value deletes one.
     /// </summary>
     public sealed class MasterDataOverrideStore : IMasterDataOverrideStore
     {
+        sealed class DeletedMarker
+        {
+            public override string ToString() => "(deleted)";
+        }
+
+        /// <summary>The value of a deleted record in <see cref="GetEntries"/> and in the undo history.</summary>
+        public static readonly object Deleted = new DeletedMarker();
+
+        public static bool IsDeletedValue(object value) => ReferenceEquals(value, Deleted);
+
         readonly Dictionary<MasterDataOverrideKey, object> overrides = new Dictionary<MasterDataOverrideKey, object>();
         readonly Dictionary<Type, int> countByType = new Dictionary<Type, int>();
         readonly object gate = new object();
@@ -19,7 +30,7 @@ namespace Nesh.MasterMemoryDebugger
 
         /// <summary>
         /// Raised for every changed record, before <see cref="Changed"/>: the key, the previous override (null when there
-        /// was none) and the new one (null when removed). Used by the undo history.
+        /// was none) and the new one (null when removed); <see cref="Deleted"/> for a deletion. Used by the undo history.
         /// </summary>
         internal event Action<MasterDataOverrideKey, object, object> EntryChanged;
 
@@ -38,7 +49,8 @@ namespace Nesh.MasterMemoryDebugger
             lock (gate)
             {
                 if (key != null && countByType.ContainsKey(typeof(TRecord))
-                    && overrides.TryGetValue(new MasterDataOverrideKey(typeof(TRecord), key), out var boxed))
+                    && overrides.TryGetValue(new MasterDataOverrideKey(typeof(TRecord), key), out var boxed)
+                    && !IsDeletedValue(boxed))
                 {
                     value = (TRecord)boxed;
                     return true;
@@ -61,27 +73,49 @@ namespace Nesh.MasterMemoryDebugger
             }
         }
 
+        public bool IsDeleted<TRecord, TKey>(TKey key)
+        {
+            lock (gate)
+            {
+                return key != null && countByType.ContainsKey(typeof(TRecord))
+                    && overrides.TryGetValue(new MasterDataOverrideKey(typeof(TRecord), key), out var value) && IsDeletedValue(value);
+            }
+        }
+
         // ------------------------------------------------------------------ non generic
 
+        /// <summary>The overriding record; false when there is none or the record is deleted.</summary>
         public bool TryGet(Type recordType, object key, out object value)
         {
             lock (gate)
             {
-                if (key != null && countByType.ContainsKey(recordType))
+                if (key != null && countByType.ContainsKey(recordType)
+                    && overrides.TryGetValue(new MasterDataOverrideKey(recordType, key), out value) && !IsDeletedValue(value))
                 {
-                    return overrides.TryGetValue(new MasterDataOverrideKey(recordType, key), out value);
+                    return true;
                 }
             }
             value = null;
             return false;
         }
 
+        public void Delete(Type recordType, object key) => Set(recordType, key, Deleted);
+
+        public bool IsDeleted(Type recordType, object key)
+        {
+            lock (gate)
+            {
+                return key != null && countByType.ContainsKey(recordType)
+                    && overrides.TryGetValue(new MasterDataOverrideKey(recordType, key), out var value) && IsDeletedValue(value);
+            }
+        }
+
         public void Set(Type recordType, object key, object value)
         {
             if (recordType == null) throw new ArgumentNullException(nameof(recordType));
             if (key == null) throw new ArgumentNullException(nameof(key));
-            if (value == null) throw new ArgumentNullException(nameof(value), "Use Remove to delete an override. Records can not be deleted.");
-            if (!recordType.IsInstanceOfType(value))
+            if (value == null) throw new ArgumentNullException(nameof(value), "Use Remove to remove an override, Delete to delete a record.");
+            if (!IsDeletedValue(value) && !recordType.IsInstanceOfType(value))
             {
                 throw new ArgumentException($"Value type {value.GetType().FullName} is not assignable to {recordType.FullName}.", nameof(value));
             }
