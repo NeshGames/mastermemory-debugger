@@ -30,13 +30,18 @@
     color: rgb(226, 229, 235);
 }
 
-/* remote editor tool: the whole window, no margins */
+/* remote editor tool: the whole window, no margins; the strip at the bottom keeps the UI clear of the
+   "Development Build" text Unity draws in the bottom right corner of Development Builds */
+.mm-debugger--tool {
+    background-color: rgb(16, 17, 21);
+}
+
 .mm-debugger--tool .mm-debugger__window {
     left: 0;
     top: 0;
     right: 0;
-    bottom: 0;
-    border-width: 0;
+    bottom: 26px;
+    border-width: 0 0 1px 0;
     border-radius: 0;
     background-color: rgb(22, 24, 29);
 }
@@ -1233,7 +1238,27 @@
 }
 
 .mm-debugger__remote-games {
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom-width: 1px;
+    border-color: rgb(58, 63, 75);
+}
+
+.mm-debugger__remote-games-header {
+    flex-direction: row;
+    align-items: center;
+}
+
+.mm-debugger .mm-debugger__remote-games-title {
+    -unity-font-style: bold;
+    color: rgb(160, 168, 184);
+}
+
+.mm-debugger .mm-debugger__remote-games-state {
+    white-space: normal;
+    color: rgb(150, 157, 171);
+    font-size: 11px;
+    margin: 2px 0 4px 0;
 }
 
 .mm-debugger .mm-debugger__remote-game {

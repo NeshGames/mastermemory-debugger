@@ -65,24 +65,25 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>Games answering on the local network; clicking one fills the address and port.</summary>
         static VisualElement CreateGameList(TextField hostField, TextField portField)
         {
+            // title and Search on one line, the search state (may be long) wraps below, then the games
             var root = new VisualElement();
             root.AddToClassList("mm-debugger__remote-games");
             var header = new VisualElement();
-            header.AddToClassList("mm-debugger__remote-info");
+            header.AddToClassList("mm-debugger__remote-games-header");
             var title = new Label("Games on the network");
-            title.AddToClassList("mm-debugger__remote-info-name");
+            title.AddToClassList("mm-debugger__remote-games-title");
             header.Add(title);
-            var state = new Label();
-            state.AddToClassList("mm-debugger__hint");
-            header.Add(state);
             var spacer = new VisualElement();
             spacer.AddToClassList("mm-debugger__spacer");
             header.Add(spacer);
-            var list = new VisualElement();
             var searchButton = new Button { text = "Search" };
             searchButton.AddToClassList("mm-debugger__button");
             header.Add(searchButton);
+            var state = new Label();
+            state.AddToClassList("mm-debugger__remote-games-state");
+            var list = new VisualElement();
             root.Add(header);
+            root.Add(state);
             root.Add(list);
 
             void Search()
@@ -96,7 +97,9 @@ namespace Nesh.MasterMemoryDebugger
                     if (!search.IsDone) return;
                     searchButton.SetEnabled(true);
                     var games = search.Games;
-                    state.text = games.Count == 0 ? "none found (the game must have remote editing started; some networks block broadcasts)" : string.Empty;
+                    state.text = games.Count == 0
+                        ? "None found. The game must have remote editing started; some networks (guest Wi-Fi, VPN) block the search, then enter the address below."
+                        : $"{games.Count} found: click one to use its address.";
                     list.Clear();
                     foreach (var game in games)
                     {
