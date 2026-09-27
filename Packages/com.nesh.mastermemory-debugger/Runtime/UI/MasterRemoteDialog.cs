@@ -28,6 +28,7 @@ namespace Nesh.MasterMemoryDebugger
             var hostField = new TextField("Game address") { value = ReadPref(HostPrefsKey, "127.0.0.1"), tooltip = "IP address of the device running the game (shown in its Remote dialog). 127.0.0.1 for a game on this PC, or an Android device over USB after adb forward tcp:PORT tcp:PORT." };
             var portField = new TextField("Port") { value = ReadPref(PortPrefsKey, MasterMemoryDebugRemote.DefaultPort.ToString(CultureInfo.InvariantCulture)) };
             var codeField = new TextField("Pairing code") { tooltip = "Shown in the game's Remote dialog and log." };
+            content.Add(CreateGameList(hostField, portField));
             content.Add(hostField);
             content.Add(portField);
             content.Add(codeField);
@@ -59,6 +60,75 @@ namespace Nesh.MasterMemoryDebugger
                 content,
                 connected ? new[] { cancel, disconnect, connect } : new[] { cancel, connect });
             codeField.schedule.Execute(() => codeField.Focus());
+        }
+
+        /// <summary>Games answering on the local network; clicking one fills the address and port.</summary>
+        static VisualElement CreateGameList(TextField hostField, TextField portField)
+        {
+            // title and Search on one line, the search state (may be long) wraps below, then the games
+            var root = new VisualElement();
+            root.AddToClassList("mm-debugger__remote-games");
+            var header = new VisualElement();
+            header.AddToClassList("mm-debugger__remote-games-header");
+            var title = new Label("Games on the network");
+            title.AddToClassList("mm-debugger__remote-games-title");
+            header.Add(title);
+            var spacer = new VisualElement();
+            spacer.AddToClassList("mm-debugger__spacer");
+            header.Add(spacer);
+            var searchButton = new Button { text = "Search" };
+            searchButton.AddToClassList("mm-debugger__button");
+            header.Add(searchButton);
+            var state = new Label();
+            state.AddToClassList("mm-debugger__remote-games-state");
+            var list = new VisualElement();
+            root.Add(header);
+            root.Add(state);
+            root.Add(list);
+
+            void Search()
+            {
+                list.Clear();
+                state.text = "searching…";
+                searchButton.SetEnabled(false);
+                var search = new MasterMemoryRemoteDiscovery.Search(1000);
+                root.schedule.Execute(() =>
+                {
+                    if (!search.IsDone) return;
+                    searchButton.SetEnabled(true);
+                    var games = search.Games;
+                    state.text = games.Count == 0
+                        ? "None found. The game must have remote editing started; some networks (guest Wi-Fi, VPN) block the search, then enter the address below."
+                        : $"{games.Count} found: click one to use its address.";
+                    list.Clear();
+                    foreach (var game in games)
+                    {
+                        var found = game;
+                        var button = new Button(() =>
+                        {
+                            hostField.value = found.Address;
+                            portField.value = found.Port.ToString(CultureInfo.InvariantCulture);
+                        })
+                        {
+                            text = found.ToString(),
+                            tooltip = "Use this game's address and port (the pairing code is still needed)",
+                        };
+                        button.AddToClassList("mm-debugger__button");
+                        button.AddToClassList("mm-debugger__remote-game");
+                        list.Add(button);
+                    }
+                    // one game: select it right away
+                    if (games.Count == 1)
+                    {
+                        hostField.value = games[0].Address;
+                        portField.value = games[0].Port.ToString(CultureInfo.InvariantCulture);
+                    }
+                }).Every(100).Until(() => search.IsDone);
+            }
+
+            searchButton.clicked += Search;
+            Search();
+            return root;
         }
 
         // ------------------------------------------------------------------ game

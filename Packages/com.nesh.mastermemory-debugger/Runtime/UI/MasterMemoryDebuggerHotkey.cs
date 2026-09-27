@@ -25,6 +25,8 @@ namespace Nesh.MasterMemoryDebugger
             if (!MasterMemoryDebugBuild.IsEnabled || s_instance != null) return;
             var settings = MasterMemoryDebuggerSettings.Current;
             if (!settings.Enabled || (settings.ToggleKey == KeyCode.None && settings.TouchToggleFingers == 0)) return;
+            // a build without the UI (remote server only) has nothing to toggle
+            if (!MasterMemoryDebuggerAssets.IsUIIncluded) return;
 
             var gameObject = new GameObject("MasterMemoryDebuggerHotkey");
             gameObject.hideFlags = HideFlags.HideInHierarchy | HideFlags.DontSave;
@@ -42,7 +44,8 @@ namespace Nesh.MasterMemoryDebugger
         {
             var settings = MasterMemoryDebuggerSettings.Current;
             var touchToggle = touchGesture.Update(GetTouchCount(), settings.TouchToggleFingers, settings.TouchToggleSeconds, Time.unscaledTime);
-            if (WasTogglePressed() || touchToggle) RuntimeMasterMemoryDebugger.Toggle();
+            // the remote editor tool is the debugger: it is never closed
+            if ((WasTogglePressed() || touchToggle) && !MasterMemoryDebugRemote.IsToolMode) RuntimeMasterMemoryDebugger.Toggle();
         }
 
         static int GetTouchCount()

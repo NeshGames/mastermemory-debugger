@@ -39,6 +39,24 @@ namespace Nesh.MasterMemoryDebugger
 
         static MasterMemoryRemotePeer s_peer;
         static MasterMemoryRemoteRunner s_runner;
+        static readonly System.Diagnostics.Stopwatch s_clock = System.Diagnostics.Stopwatch.StartNew();
+        // tool: retrying the last game after the connection was lost
+        static bool s_reconnecting;
+        static double s_retryAt = -1;
+        static int s_attempt;
+
+        /// <summary>Seconds between reconnection attempts.</summary>
+        internal static double ReconnectDelaySeconds = 3;
+
+        /// <summary>
+        /// Tool: when the connection to the game is lost (the game restarted, Wi-Fi dropped), connect again to the same address
+        /// with the same code every few seconds, until it works, the game refuses or <see cref="Stop"/> is called.
+        /// With a fixed pairing code (Remote Pairing Code setting) a restarted game is found again automatically.
+        /// </summary>
+        public static bool AutoReconnect { get; set; } = true;
+
+        /// <summary>Tool: the connection was lost and is being retried.</summary>
+        public static bool IsReconnecting => s_reconnecting;
 
         /// <summary>Raised on the main thread when <see cref="State"/> or <see cref="Status"/> changed.</summary>
         public static event Action Changed;
@@ -67,7 +85,19 @@ namespace Nesh.MasterMemoryDebugger
 
         public static MasterMemoryRemoteState State => s_peer?.State ?? MasterMemoryRemoteState.Off;
 
-        public static string Status => s_peer?.Status ?? (IsToolMode ? "Not connected." : "Remote editing is off.");
+        public static string Status
+        {
+            get
+            {
+                var status = s_peer?.Status ?? (IsToolMode ? "Not connected." : "Remote editing is off.");
+                if (s_reconnecting && s_retryAt >= 0)
+                {
+                    var seconds = Math.Max(0, (int)Math.Ceiling(s_retryAt - s_clock.Elapsed.TotalSeconds));
+                    status += $"  Reconnecting in {seconds} s (attempt {s_attempt + 1})…";
+                }
+                return status;
+            }
+        }
 
         public static bool IsServerRunning => s_peer is MasterMemoryRemoteServer;
 
@@ -109,9 +139,52 @@ namespace Nesh.MasterMemoryDebugger
             SetPeer(new MasterMemoryRemoteClient(host.Trim(), port, pairingCode?.Trim() ?? string.Empty));
         }
 
+        /// <summary>Tool: schedules and makes the reconnection attempts (called by <see cref="Pump"/>).</summary>
+        static void UpdateReconnect()
+        {
+            if (!(s_peer is MasterMemoryRemoteClient client)) return;
+            if (client.State == MasterMemoryRemoteState.Connected)
+            {
+                s_reconnecting = false;
+                s_retryAt = -1;
+                s_attempt = 0;
+                return;
+            }
+            if (client.State != MasterMemoryRemoteState.Failed) return;
+            if (!AutoReconnect || client.WasRefused || !(client.HasConnected || s_reconnecting))
+            {
+                s_reconnecting = false;
+                s_retryAt = -1;
+                return;
+            }
+
+            var now = s_clock.Elapsed.TotalSeconds;
+            if (!s_reconnecting || s_retryAt < 0)
+            {
+                s_reconnecting = true;
+                s_retryAt = now + ReconnectDelaySeconds;
+                RaiseChanged();
+                return;
+            }
+            if (now < s_retryAt) return;
+
+            s_attempt++;
+            s_retryAt = -1;
+            var host = client.Host;
+            var port = client.Port;
+            var code = client.PairingCode;
+            client.Changed -= RaiseChanged;
+            client.Dispose();
+            s_peer = null;
+            SetPeer(new MasterMemoryRemoteClient(host, port, code));
+        }
+
         /// <summary>Stops the server or closes the connection. The tool keeps the tables it received.</summary>
         public static void Stop()
         {
+            s_reconnecting = false;
+            s_retryAt = -1;
+            s_attempt = 0;
             if (s_peer == null) return;
             var peer = s_peer;
             s_peer = null;
@@ -158,7 +231,11 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         /// <summary>Called every frame (by a hidden runner object; tests call it directly).</summary>
-        internal static void Pump() => s_peer?.Pump();
+        internal static void Pump()
+        {
+            s_peer?.Pump();
+            UpdateReconnect();
+        }
 
         static void SetPeer(MasterMemoryRemotePeer peer)
         {

@@ -10,7 +10,8 @@ namespace Nesh.MasterMemoryDebugger.Editor
     static class MasterMemoryDebuggerSettingsProvider
     {
         public const string SettingsPath = "Project/MasterMemory Debugger";
-        const string DefaultAssetFolder = "Assets/MasterMemoryDebugger/Resources";
+        // not a Resources folder: the build processor copies the asset into Development Builds only
+        const string DefaultAssetFolder = "Assets/MasterMemoryDebugger";
         const string DefaultAssetPath = DefaultAssetFolder + "/" + MasterMemoryDebuggerSettings.ResourcesPath + ".asset";
 
         [SettingsProvider]
@@ -27,7 +28,7 @@ namespace Nesh.MasterMemoryDebugger.Editor
             };
         }
 
-        /// <summary>Finds the settings asset. It must live in a Resources folder to be loaded at runtime.</summary>
+        /// <summary>Finds the settings asset (anywhere in the project).</summary>
         public static MasterMemoryDebuggerSettings FindSettingsAsset()
         {
             var guids = AssetDatabase.FindAssets("t:" + nameof(MasterMemoryDebuggerSettings));
@@ -70,8 +71,8 @@ namespace Nesh.MasterMemoryDebugger.Editor
             if (settings == null)
             {
                 root.Add(new HelpBox(
-                    "No settings asset. Default values are used. " +
-                    "Create one to change the settings (it is stored in a Resources folder so the runtime can load it).",
+                    "No settings asset. Default values are used. Create one to change the settings " +
+                    "(" + DefaultAssetPath + "; Development Builds get a copy, release builds do not contain it).",
                     HelpBoxMessageType.Info));
                 root.Add(new Button(() =>
                 {
@@ -85,15 +86,23 @@ namespace Nesh.MasterMemoryDebugger.Editor
             }
 
             var path = AssetDatabase.GetAssetPath(settings);
-            if (!path.Contains("/Resources/"))
+            if (path.Contains("/Resources/"))
             {
-                root.Add(new HelpBox($"'{path}' is not in a Resources folder, so the runtime can not load it.", HelpBoxMessageType.Warning));
-            }
-            else if (!path.EndsWith("/Resources/" + MasterMemoryDebuggerSettings.ResourcesPath + ".asset"))
-            {
+                // older versions created the asset in a Resources folder: every build, release too, contained it
                 root.Add(new HelpBox(
-                    $"The runtime loads Resources/{MasterMemoryDebuggerSettings.ResourcesPath}. Rename or move '{path}'.",
+                    $"'{path}' is in a Resources folder, so release builds contain it and what it references (font, PanelSettings). " +
+                    "Move it out: Development Builds get a copy automatically.",
                     HelpBoxMessageType.Warning));
+                root.Add(new Button(() =>
+                {
+                    EnsureFolder(DefaultAssetFolder);
+                    var error = AssetDatabase.MoveAsset(path, AssetDatabase.GenerateUniqueAssetPath(DefaultAssetPath));
+                    if (!string.IsNullOrEmpty(error)) Debug.LogError("[MasterMemoryDebugger] " + error);
+                    Build(root);
+                })
+                {
+                    text = "Move out of Resources",
+                });
             }
 
             root.Add(new InspectorElement(new SerializedObject(settings)));

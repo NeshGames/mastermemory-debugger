@@ -9,7 +9,7 @@ namespace Nesh.MasterMemoryDebugger.Editor.Tests
         [Test]
         public void Layout_ShouldContainEveryElementUsedByTheController()
         {
-            var layout = Resources.Load<VisualTreeAsset>(MasterMemoryDebuggerDocument.LayoutResourcePath);
+            var layout = MasterMemoryDebuggerAssets.Layout;
             Assert.IsNotNull(layout, "MasterMemoryDebugger.uxml");
             var root = layout.CloneTree();
 
@@ -26,8 +26,9 @@ namespace Nesh.MasterMemoryDebugger.Editor.Tests
         [Test]
         public void StyleAndTheme_ShouldLoad()
         {
-            Assert.IsNotNull(Resources.Load<StyleSheet>(MasterMemoryDebuggerDocument.StyleResourcePath), "MasterMemoryDebugger.uss");
-            Assert.IsNotNull(Resources.Load<ThemeStyleSheet>(MasterMemoryDebuggerDocument.ThemeResourcePath), "MasterMemoryDebuggerTheme.tss");
+            Assert.IsNotNull(MasterMemoryDebuggerAssets.Style, "MasterMemoryDebugger.uss");
+            Assert.IsNotNull(MasterMemoryDebuggerAssets.Theme, "MasterMemoryDebuggerTheme.tss");
+            Assert.IsTrue(MasterMemoryDebuggerAssets.IsUIIncluded);
         }
 
         [Test]

@@ -2,6 +2,25 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.9.0] - 2026-09-27
+
+### Added
+
+- Remote editor tool: the Validation tab shows the game's `Validate()` results. The game pushes whether it validates and the number of failures caused by the overrides (tab title), and validates when the tab asks; Open jumps to the tool's copy of the record. The game needs `AutoRebuild` with validation.
+- Patches tab: Compare… a saved patch with the current overrides or another patch: the fields changed to different values or by one side only, with their original values; Copy TSV. `MasterDataPatchCompare.Compare` / `ToTsv`.
+- `MasterMemoryDebugValidation.IsPending` / `Invalidate()`.
+- Remote editor tool: "Games on the network" lists the game builds waiting for the tool (UDP broadcast on port 7787 answered by the game's remote server: product, device, address, port, master version); clicking one fills the address.
+- Remote editor tool: reconnects automatically (every 3 seconds) to the same game after the connection was lost, until it works, the game refuses or Disconnect is pressed. `MasterMemoryDebugRemote.AutoReconnect` / `IsReconnecting`.
+- Remote server: checks at start (and when tables are registered) that MessagePack can serialize a record of every table, and explains `SerializerOptions` in the Console when it can not.
+- Include Debugger UI setting: Development Builds that only run the remote server leave the UI assets (and the settings' font / PanelSettings) out.
+- `CLAUDE.md`: the layout, conventions and release flow of the repository for Claude Code sessions.
+
+### Changed
+
+- Remote editor tool: the debugger fills the whole window and has no Close button (Esc and the toggle key / gesture do not close it).
+- Remote protocol version 2 (validation messages): update the game and the tool together.
+- The debugger's UI assets (UXML / USS / theme) moved out of the package's Resources folder, and the settings asset is created outside Resources: before, every build (release too) contained them and the font / PanelSettings the settings reference. The Editor loads them directly; a build processor copies them into a temporary `Assets/MasterMemoryDebuggerBuild/Resources` for Development Builds only. The settings page offers to move an existing settings asset out of Resources.
+
 ## [0.8.0] - 2026-09-26
 
 ### Added

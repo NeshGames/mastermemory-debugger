@@ -5,9 +5,10 @@ Planned work that is not scheduled yet. Released changes are in
 
 ## Features
 
-- [ ] Remote editing of WebGL builds (the game would connect out to the tool over WebSocket).
-- [ ] Validation tab in the remote editor tool (run Validate in the game and send the results).
-- [ ] Compare two saved patches, or a patch with the current overrides (Patches tab).
+- [ ] Decide: remote record transport as JSON instead of MessagePack (no `SerializerOptions` needed for IL2CPP games;
+      larger and slower, see the comparison of 2026-09-27).
+
+Not planned: remote editing of WebGL builds.
 
 ## Verification
 

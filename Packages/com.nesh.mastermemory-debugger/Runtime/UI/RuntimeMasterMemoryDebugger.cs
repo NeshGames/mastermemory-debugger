@@ -36,6 +36,12 @@ namespace Nesh.MasterMemoryDebugger
             {
                 s_document = MasterMemoryDebuggerDocument.Create();
             }
+            catch (MissingReferenceException e)
+            {
+                MasterMemoryDebugLog.Warning(e.Message);
+                s_document = null;
+                return false;
+            }
             catch (Exception e)
             {
                 MasterMemoryDebugLog.Error("Failed to open the runtime debugger: " + e);

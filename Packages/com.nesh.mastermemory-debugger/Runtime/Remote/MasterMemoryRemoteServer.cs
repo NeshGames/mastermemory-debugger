@@ -19,6 +19,9 @@ namespace Nesh.MasterMemoryDebugger
         readonly List<MasterMemoryRemoteConnection> closing = new List<MasterMemoryRemoteConnection>();
         MasterMemoryRemoteConnection waitingForHello;
         volatile bool stopped;
+        bool validationChanged;
+        readonly HashSet<Type> checkedTypes = new HashSet<Type>();
+        readonly MasterMemoryRemoteDiscovery.Responder discovery;
         string lastError;
 
         public MasterMemoryRemoteServer(int port, string pairingCode)
@@ -29,6 +32,18 @@ namespace Nesh.MasterMemoryDebugger
             Port = ((IPEndPoint)listener.LocalEndpoint).Port;
             acceptThread = new Thread(AcceptLoop) { IsBackground = true, Name = "MasterMemoryRemote accept" };
             acceptThread.Start();
+            // tables are often registered after the server starts (Settings > Remote Server starts it after the first scene loads)
+            MasterMemoryDebugRegistry.TablesChanged += OnTablesChanged;
+            CheckSerialization();
+
+            try
+            {
+                discovery = new MasterMemoryRemoteDiscovery.Responder(Port, UnityEngine.Application.productName, UnityEngine.SystemInfo.deviceName, MasterMemoryDebugRegistry.GetMasterVersion());
+            }
+            catch (SocketException e)
+            {
+                MasterMemoryDebugLog.Warning($"Remote: LAN discovery is not available (UDP port {MasterMemoryRemoteDiscovery.Port}: {e.Message}); enter the address in the tool.");
+            }
         }
 
         public int Port { get; }
@@ -62,6 +77,7 @@ namespace Nesh.MasterMemoryDebugger
                 {
                     MasterMemoryDebugLog.Warning("Remote: " + (Connection.CloseReason ?? "the tool disconnected."));
                     lastError = null;
+                    MasterMemoryDebugValidation.Changed -= OnValidationChanged;
                     StopSyncing();
                     Connection.Dispose();
                     Connection = null;
@@ -70,6 +86,7 @@ namespace Nesh.MasterMemoryDebugger
                 else
                 {
                     Flush();
+                    if (validationChanged) SendValidationState();
                 }
             }
             closing.RemoveAll(x => x.IsClosed);
@@ -86,6 +103,9 @@ namespace Nesh.MasterMemoryDebugger
             {
                 // already stopped
             }
+            MasterMemoryDebugValidation.Changed -= OnValidationChanged;
+            MasterMemoryDebugRegistry.TablesChanged -= OnTablesChanged;
+            discovery?.Dispose();
             waitingForHello?.Dispose();
             foreach (var connection in closing) connection.Dispose();
             while (accepted.TryDequeue(out var client)) client.Close();
@@ -171,6 +191,8 @@ namespace Nesh.MasterMemoryDebugger
             lastError = null;
             connection.Send(welcome);
             StartSyncing();
+            MasterMemoryDebugValidation.Changed += OnValidationChanged;
+            SendValidationState();
             MasterMemoryDebugLog.Warning($"Remote: the tool at {connection.RemoteAddress} connected.");
             RaiseChanged();
         }
@@ -179,9 +201,14 @@ namespace Nesh.MasterMemoryDebugger
         {
             try
             {
-                if (MasterMemoryRemoteProtocol.GetType(payload) == MasterMemoryRemoteProtocol.MessageType.Changes)
+                switch (MasterMemoryRemoteProtocol.GetType(payload))
                 {
-                    ApplyRemote(MasterMemoryRemoteProtocol.DecodeChanges(payload));
+                    case MasterMemoryRemoteProtocol.MessageType.Changes:
+                        ApplyRemote(MasterMemoryRemoteProtocol.DecodeChanges(payload));
+                        break;
+                    case MasterMemoryRemoteProtocol.MessageType.ValidateRequest:
+                        Connection.Send(MasterMemoryRemoteProtocol.Encode(Validate()));
+                        break;
                 }
             }
             catch (Exception e)
@@ -195,6 +222,95 @@ namespace Nesh.MasterMemoryDebugger
             connection.Send(MasterMemoryRemoteProtocol.EncodeReject(reason));
             connection.CloseAfterSending();
             closing.Add(connection);
+        }
+
+        void OnTablesChanged()
+        {
+            CheckSerialization();
+            discovery?.SetInfo(Port, UnityEngine.Application.productName, UnityEngine.SystemInfo.deviceName, MasterMemoryDebugRegistry.GetMasterVersion());
+        }
+
+        /// <summary>
+        /// Serializes one record of every newly registered table, so that a missing MessagePack resolver (IL2CPP) is reported
+        /// when the game starts rather than when the tool connects.
+        /// </summary>
+        void CheckSerialization()
+        {
+            var problems = new List<string>();
+            foreach (var table in MasterMemoryDebugRegistry.Tables)
+            {
+                if (!checkedTypes.Add(table.RecordType)) continue;
+                var problem = CheckSerialization(table);
+                if (problem != null) problems.Add(problem);
+            }
+            if (problems.Count == 0) return;
+            MasterMemoryDebugLog.Error(
+                "Remote: records can not be serialized with MessagePack, so the remote editor tool can not connect:\n  " + string.Join("\n  ", problems) +
+                "\nSet MasterMemoryDebugRemote.SerializerOptions to the MessagePack options the game uses to load its MemoryDatabase " +
+                "(with IL2CPP: the options with the generated resolvers, e.g. MessagePackSerializerOptions.Standard.WithResolver(StaticCompositeResolver.Instance)), " +
+                "before StartServer or before the tables are registered. The remote editor tool must use the same options.");
+        }
+
+        /// <summary>Null when a record of <paramref name="table"/> survives a MessagePack round trip, otherwise the problem.</summary>
+        internal static string CheckSerialization(MasterMemoryTableDescriptor table)
+        {
+            object record = null;
+            try
+            {
+                foreach (var item in table.GetAllRecords())
+                {
+                    if (item == null) continue;
+                    record = item;
+                    break;
+                }
+                if (record == null) return null;
+                Deserialize(table.RecordType, Serialize(table.RecordType, record));
+                return null;
+            }
+            catch (Exception e)
+            {
+                return $"{table.TableName} ({table.RecordType.FullName}): {(e.InnerException ?? e).Message}";
+            }
+        }
+
+        // raised by rebuilds; sent once per Pump
+        void OnValidationChanged() => validationChanged = true;
+
+        void SendValidationState()
+        {
+            validationChanged = false;
+            Connection?.Send(MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.ValidationState
+            {
+                IsAvailable = MasterMemoryDebugValidation.IsAvailable,
+                NewFailureCount = MasterMemoryDebugValidation.NewFailureCount,
+            }));
+        }
+
+        /// <summary>Runs the game's validation for the tool; records are identified by table name and key text.</summary>
+        internal static List<MasterMemoryRemoteProtocol.Failure> Validate()
+        {
+            var result = new List<MasterMemoryRemoteProtocol.Failure>();
+            foreach (var failure in MasterMemoryDebugValidation.Run())
+            {
+                var item = new MasterMemoryRemoteProtocol.Failure { TableName = failure.RecordType?.Name ?? "?", Key = string.Empty, Message = failure.Message, IsNew = failure.IsNew };
+                if (failure.RecordType != null && MasterMemoryDebugRegistry.TryGetTable(failure.RecordType, out var table))
+                {
+                    item.TableName = table.TableName;
+                    if (failure.Record != null && table.RecordType.IsInstanceOfType(failure.Record))
+                    {
+                        try
+                        {
+                            item.Key = MasterDataValueUtility.FormatKey(table.GetPrimaryKey(failure.Record));
+                        }
+                        catch (Exception)
+                        {
+                            // no key: shown without Open
+                        }
+                    }
+                }
+                result.Add(item);
+            }
+            return result;
         }
 
         /// <summary>Every registered table with its original records, and the current overrides.</summary>

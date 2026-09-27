@@ -40,7 +40,16 @@ namespace Nesh.MasterMemoryDebugger
             /// <summary>New failures found by the last rebuild, without validating again.</summary>
             int NewFailureCount { get; }
 
+            /// <summary>False when the source can not validate (remote editor tool: the game does not validate).</summary>
+            bool IsAvailable { get; }
+
+            /// <summary>Results are being computed elsewhere (the game); <see cref="Changed"/> is raised when they arrive.</summary>
+            bool IsPending { get; }
+
             void Collect(List<MasterMemoryValidationFailure> failures);
+
+            /// <summary>The next <see cref="Collect"/> validates again (Validate button).</summary>
+            void Invalidate();
         }
 
         static readonly List<ISource> s_sources = new List<ISource>();
@@ -49,7 +58,30 @@ namespace Nesh.MasterMemoryDebugger
         public static event Action Changed;
 
         /// <summary>False when no database is validated (AutoRebuild is not used, or validate: false).</summary>
-        public static bool IsAvailable => s_sources.Count > 0;
+        public static bool IsAvailable
+        {
+            get
+            {
+                foreach (var source in s_sources) if (source.IsAvailable) return true;
+                return false;
+            }
+        }
+
+        /// <summary>Remote editor tool: the game is validating; the results arrive with <see cref="Changed"/>.</summary>
+        public static bool IsPending
+        {
+            get
+            {
+                foreach (var source in s_sources) if (source.IsPending) return true;
+                return false;
+            }
+        }
+
+        /// <summary>Makes the next <see cref="Run"/> validate again instead of using the results of the last rebuild.</summary>
+        public static void Invalidate()
+        {
+            foreach (var source in s_sources.ToArray()) source.Invalidate();
+        }
 
         /// <summary>Failures caused by the overrides, as found by the last rebuilds (cheap, no validation is run).</summary>
         public static int NewFailureCount

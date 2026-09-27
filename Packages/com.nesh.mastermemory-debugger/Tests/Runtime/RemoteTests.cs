@@ -30,6 +30,8 @@ namespace Nesh.MasterMemoryDebugger.Tests
         {
             MasterMemoryDebugRemote.Stop();
             MasterMemoryDebugRemote.SerializerOptions = null;
+            MasterMemoryDebugRemote.AutoReconnect = true;
+            MasterMemoryDebugRemote.ReconnectDelaySeconds = 3;
             MasterMemoryDebugRemote.IsToolMode = false;
             rawClient?.Close();
             rawServer?.Stop();
@@ -50,6 +52,16 @@ namespace Nesh.MasterMemoryDebugger.Tests
         {
             PumpUntil(() => stream.DataAvailable, what);
             return MasterMemoryRemoteProtocol.ReadFrame(stream);
+        }
+
+        /// <summary>The next message of <paramref name="type"/>, skipping others.</summary>
+        static byte[] ReceiveOf(NetworkStream stream, MasterMemoryRemoteProtocol.MessageType type)
+        {
+            while (true)
+            {
+                var payload = Receive(stream, type.ToString());
+                if (MasterMemoryRemoteProtocol.GetType(payload) == type) return payload;
+            }
         }
 
         static byte[] Pack<T>(T record) => MasterMemoryRemotePeer.Serialize(typeof(T), record);
@@ -102,7 +114,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             // game edits → tool
             MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 777 });
             MasterMemoryDebugRuntime.RemoveOverride<TestSkill, int>(1002);
-            var changes = MasterMemoryRemoteProtocol.DecodeChanges(Receive(stream, "the game's changes"));
+            var changes = MasterMemoryRemoteProtocol.DecodeChanges(ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.Changes));
             Assert.AreEqual(2, changes.Count);
             Assert.IsTrue(changes[0].IsSet);
             Assert.AreEqual(777, ((TestSkill)MasterMemoryRemotePeer.Deserialize(typeof(TestSkill), changes[0].Record)).Damage);
@@ -118,7 +130,11 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugRuntime.Store.TryGet(typeof(TestEnemyLevel), (2, 1), out var enemy);
             Assert.AreEqual(9, ((TestEnemyLevel)enemy).Hp);
             MasterMemoryDebugRemote.Pump();
-            Assert.IsFalse(stream.DataAvailable, "changes of the tool are not echoed");
+            while (stream.DataAvailable)
+            {
+                // the rebuild-less test game has no validation; only validation states may follow
+                Assert.AreEqual(MasterMemoryRemoteProtocol.MessageType.ValidationState, MasterMemoryRemoteProtocol.GetType(MasterMemoryRemoteProtocol.ReadFrame(stream)), "changes of the tool are not echoed");
+            }
         }
 
         [Test]
@@ -221,6 +237,173 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.AreEqual("a", read.Tables[0].DisplayNames[0]);
             Assert.IsTrue(read.Overrides[0].IsSet);
             Assert.Throws<System.IO.InvalidDataException>(() => MasterMemoryRemoteProtocol.DecodeHello(MasterMemoryRemoteProtocol.EncodeReject("no")));
+        }
+
+        [Test]
+        public void Server_ShouldValidateForTheTool()
+        {
+            RegisterTestDatabase();
+            using (MasterMemoryDebugRebuild.AutoRebuild(Database, _ => { }))
+            {
+                MasterMemoryDebugRemote.StartServer(0, "1");
+                var stream = ConnectRaw("1");
+                ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.Welcome);
+                var state = MasterMemoryRemoteProtocol.DecodeValidationState(ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.ValidationState));
+                Assert.IsTrue(state.IsAvailable);
+                Assert.AreEqual(0, state.NewFailureCount);
+
+                MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { SummonEnemyId = 99 });
+                state = MasterMemoryRemoteProtocol.DecodeValidationState(ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.ValidationState));
+                Assert.AreEqual(1, state.NewFailureCount, "pushed after the rebuild");
+
+                MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.EncodeValidateRequest());
+                var failures = MasterMemoryRemoteProtocol.DecodeValidateResult(ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.ValidateResult));
+                Assert.AreEqual(1, failures.Count);
+                Assert.AreEqual(nameof(TestSkill), failures[0].TableName);
+                Assert.AreEqual("1001", failures[0].Key);
+                Assert.IsTrue(failures[0].IsNew);
+                StringAssert.Contains("SummonEnemyId", failures[0].Message);
+            }
+        }
+
+        [Test]
+        public void Client_ShouldShowTheGamesValidation()
+        {
+            RegisterTestDatabase();
+            var welcome = MasterMemoryRemoteServer.CreateWelcome();
+            MasterMemoryDebugRegistry.ClearTables();
+            MasterMemoryDebugRemote.IsToolMode = true;
+
+            rawServer = new TcpListener(IPAddress.Loopback, 0);
+            rawServer.Start();
+            MasterMemoryDebugRemote.Connect("127.0.0.1", ((IPEndPoint)rawServer.LocalEndpoint).Port, "1");
+            PumpUntil(() => rawServer.Pending(), "the connection");
+            var game = rawServer.AcceptTcpClient().GetStream();
+            ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.Hello);
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(welcome));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected, "the tables");
+            Assert.IsFalse(MasterMemoryDebugValidation.IsAvailable, "until the game says it validates");
+
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.ValidationState { IsAvailable = true, NewFailureCount = 1 }));
+            PumpUntil(() => MasterMemoryDebugValidation.IsAvailable, "the validation state");
+            Assert.AreEqual(1, MasterMemoryDebugValidation.NewFailureCount);
+
+            // the tab asks the game, then shows its results
+            Assert.IsEmpty(MasterMemoryDebugValidation.Run());
+            Assert.IsTrue(MasterMemoryDebugValidation.IsPending);
+            ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.ValidateRequest);
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(new System.Collections.Generic.List<MasterMemoryRemoteProtocol.Failure>
+            {
+                new MasterMemoryRemoteProtocol.Failure { TableName = nameof(TestSkill), Key = "1001", Message = "Exists failed", IsNew = true },
+            }));
+            PumpUntil(() => !MasterMemoryDebugValidation.IsPending, "the results");
+            var failures = MasterMemoryDebugValidation.Run();
+            Assert.AreEqual(1, failures.Count);
+            Assert.AreEqual(typeof(TestSkill), failures[0].RecordType);
+            Assert.AreEqual(1001, Table<TestSkill>().GetPrimaryKey(failures[0].Record), "Open jumps to the tool's copy of the record");
+            MasterMemoryDebugRemote.Pump();
+            Assert.IsFalse(game.DataAvailable, "no new request until the results are stale");
+
+            MasterMemoryDebugRemote.Stop();
+            Assert.IsFalse(MasterMemoryDebugValidation.IsAvailable);
+        }
+
+        [Test]
+        public void SerializationCheck_ShouldReportTablesMessagePackCanNotWrite()
+        {
+            RegisterTestDatabase();
+            Assert.IsNull(MasterMemoryRemoteServer.CheckSerialization(Table<TestSkill>()), "contractless options can write the test records");
+
+            // the standard resolver needs [MessagePackObject], which the test records do not have
+            MasterMemoryDebugRemote.SerializerOptions = MessagePackSerializerOptions.Standard;
+            var problem = MasterMemoryRemoteServer.CheckSerialization(Table<TestSkill>());
+            Assert.IsNotNull(problem);
+            StringAssert.StartsWith(nameof(TestSkill), problem);
+        }
+
+        [Test]
+        public void Client_ShouldReconnectWhenTheGameComesBack()
+        {
+            MasterMemoryDebugRemote.ReconnectDelaySeconds = 0.05;
+            RegisterTestDatabase();
+            var welcome = MasterMemoryRemoteServer.CreateWelcome();
+            MasterMemoryDebugRegistry.ClearTables();
+            MasterMemoryDebugRemote.IsToolMode = true;
+
+            rawServer = new TcpListener(IPAddress.Loopback, 0);
+            rawServer.Start();
+            MasterMemoryDebugRemote.Connect("127.0.0.1", ((IPEndPoint)rawServer.LocalEndpoint).Port, "7");
+
+            // first game
+            PumpUntil(() => rawServer.Pending(), "the connection");
+            var game = rawServer.AcceptTcpClient().GetStream();
+            ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.Hello);
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(welcome));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected, "the tables");
+
+            // the game restarts: the tool comes back with the same code
+            game.Close();
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Failed, "the disconnect");
+            PumpUntil(() => rawServer.Pending(), "the reconnection");
+            var restarted = rawServer.AcceptTcpClient().GetStream();
+            Assert.AreEqual("7", MasterMemoryRemoteProtocol.DecodeHello(ReceiveOf(restarted, MasterMemoryRemoteProtocol.MessageType.Hello)).Code);
+            MasterMemoryRemoteProtocol.WriteFrame(restarted, MasterMemoryRemoteProtocol.Encode(welcome));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected, "the tables again");
+        }
+
+        [Test]
+        public void Client_ShouldNotRetryARefusal()
+        {
+            MasterMemoryDebugRemote.ReconnectDelaySeconds = 0.01;
+            rawServer = new TcpListener(IPAddress.Loopback, 0);
+            rawServer.Start();
+            MasterMemoryDebugRemote.IsToolMode = true;
+            MasterMemoryDebugRemote.Connect("127.0.0.1", ((IPEndPoint)rawServer.LocalEndpoint).Port, "wrong");
+            PumpUntil(() => rawServer.Pending(), "the connection");
+            var game = rawServer.AcceptTcpClient().GetStream();
+            ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.Hello);
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.EncodeReject("Wrong pairing code."));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Failed, "the refusal");
+
+            for (var i = 0; i < 20; i++)
+            {
+                MasterMemoryDebugRemote.Pump();
+                System.Threading.Thread.Sleep(5);
+            }
+            Assert.IsFalse(rawServer.Pending(), "no retry after a refusal");
+            StringAssert.DoesNotContain("Reconnecting", MasterMemoryDebugRemote.Status);
+        }
+
+        [Test]
+        public void Discovery_ShouldFindTheGameOnThisPC()
+        {
+            var udp = new UdpClient(0);
+            var port = ((IPEndPoint)udp.Client.LocalEndPoint).Port;
+            udp.Close();
+            var previous = MasterMemoryRemoteDiscovery.Port;
+            MasterMemoryRemoteDiscovery.Port = port;
+            try
+            {
+                RegisterTestDatabase();
+                MasterMemoryDebugRemote.StartServer(0, "1");
+                var search = new MasterMemoryRemoteDiscovery.Search(1500);
+                PumpUntil(() => search.IsDone || search.Games.Count > 0, "the answer");
+                while (!search.IsDone) System.Threading.Thread.Sleep(10);
+
+                var game = search.Games.Single();
+                Assert.AreEqual("127.0.0.1", game.Address);
+                Assert.AreEqual(MasterMemoryDebugRemote.ServerPort, game.Port);
+                Assert.AreEqual("Harness", game.ProductName);
+
+                MasterMemoryDebugRemote.Stop();
+                var none = new MasterMemoryRemoteDiscovery.Search(200);
+                while (!none.IsDone) System.Threading.Thread.Sleep(10);
+                Assert.IsEmpty(none.Games, "a stopped server does not answer");
+            }
+            finally
+            {
+                MasterMemoryRemoteDiscovery.Port = previous;
+            }
         }
     }
 }

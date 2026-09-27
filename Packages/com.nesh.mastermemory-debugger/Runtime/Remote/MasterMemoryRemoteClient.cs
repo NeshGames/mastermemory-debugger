@@ -19,6 +19,7 @@ namespace Nesh.MasterMemoryDebugger
         MasterMemoryRemoteState state = MasterMemoryRemoteState.Connecting;
         string status;
         volatile bool disposed;
+        readonly ValidationSource validation;
 
         public MasterMemoryRemoteClient(string host, int port, string pairingCode)
         {
@@ -26,10 +27,19 @@ namespace Nesh.MasterMemoryDebugger
             Port = port;
             code = pairingCode;
             status = $"Connecting to {host}:{port}…";
+            validation = new ValidationSource(this);
             new Thread(() => ConnectInBackground(host, port)) { IsBackground = true, Name = "MasterMemoryRemote connect" }.Start();
         }
 
         public string Host { get; }
+
+        /// <summary>The tables were received: the connection worked (a reconnect is worth trying when it is lost).</summary>
+        public bool HasConnected { get; private set; }
+
+        /// <summary>The game refused the connection (wrong code, another tool, other version): retrying does not help.</summary>
+        public bool WasRefused { get; private set; }
+
+        public string PairingCode => code;
 
         public int Port { get; }
 
@@ -66,6 +76,7 @@ namespace Nesh.MasterMemoryDebugger
             if (Connection.IsClosed)
             {
                 var reason = Connection.CloseReason ?? "The game closed the connection.";
+                MasterMemoryDebugValidation.Remove(validation);
                 StopSyncing();
                 Connection.Dispose();
                 Connection = null;
@@ -78,6 +89,7 @@ namespace Nesh.MasterMemoryDebugger
         public override void Dispose()
         {
             disposed = true;
+            MasterMemoryDebugValidation.Remove(validation);
             lock (this)
             {
                 connected?.Close();
@@ -121,12 +133,19 @@ namespace Nesh.MasterMemoryDebugger
                         ApplyWelcome(MasterMemoryRemoteProtocol.DecodeWelcome(payload));
                         break;
                     case MasterMemoryRemoteProtocol.MessageType.Reject:
+                        WasRefused = true;
                         SetState(MasterMemoryRemoteState.Failed, "Refused by the game: " + MasterMemoryRemoteProtocol.DecodeReject(payload));
                         Connection.Dispose();
                         Connection = null;
                         break;
                     case MasterMemoryRemoteProtocol.MessageType.Changes:
                         ApplyRemote(MasterMemoryRemoteProtocol.DecodeChanges(payload));
+                        break;
+                    case MasterMemoryRemoteProtocol.MessageType.ValidationState:
+                        validation.OnState(MasterMemoryRemoteProtocol.DecodeValidationState(payload));
+                        break;
+                    case MasterMemoryRemoteProtocol.MessageType.ValidateResult:
+                        validation.OnResult(MasterMemoryRemoteProtocol.DecodeValidateResult(payload));
                         break;
                 }
             }
@@ -179,7 +198,9 @@ namespace Nesh.MasterMemoryDebugger
             StartSyncing();
             ApplyRemote(welcome.Overrides, replaceAll: true);
             MasterMemoryDebugHistory.Clear();
+            MasterMemoryDebugValidation.Add(validation);
 
+            HasConnected = true;
             var text = $"Connected to {Host}:{Port}: {welcome.Tables.Count - skipped.Count} tables, master {masterVersion}";
             if (skipped.Count > 0)
             {
@@ -187,6 +208,80 @@ namespace Nesh.MasterMemoryDebugger
                 text += $" ({skipped.Count} tables skipped, see Console)";
             }
             SetState(MasterMemoryRemoteState.Connected, text);
+        }
+
+        void RequestValidation() => Connection?.Send(MasterMemoryRemoteProtocol.EncodeValidateRequest());
+
+        /// <summary>
+        /// The Validation tab of the tool shows the game's Validate() results: the game pushes whether it validates and the
+        /// failures caused by the overrides; the full list is requested when the tab needs it.
+        /// </summary>
+        sealed class ValidationSource : MasterMemoryDebugValidation.ISource
+        {
+            readonly MasterMemoryRemoteClient client;
+            List<MasterMemoryRemoteProtocol.Failure> results = new List<MasterMemoryRemoteProtocol.Failure>();
+            bool available;
+            int newFailureCount;
+            bool stale = true;
+            bool pending;
+
+            public ValidationSource(MasterMemoryRemoteClient client)
+            {
+                this.client = client;
+            }
+
+            public int NewFailureCount => newFailureCount;
+
+            public bool IsAvailable => available;
+
+            public bool IsPending => pending;
+
+            public void Invalidate() => stale = true;
+
+            public void Collect(List<MasterMemoryValidationFailure> failures)
+            {
+                if (!available) return;
+                if (stale && !pending)
+                {
+                    pending = true;
+                    client.RequestValidation();
+                }
+                var records = new Dictionary<string, Dictionary<string, object>>();
+                foreach (var failure in results)
+                {
+                    Type recordType = null;
+                    object record = null;
+                    if (MasterMemoryDebugRegistry.TryGetTable(failure.TableName, out var table))
+                    {
+                        recordType = table.RecordType;
+                        if (!records.TryGetValue(table.TableName, out var byKey))
+                        {
+                            byKey = new Dictionary<string, object>();
+                            foreach (var descriptor in table.CreateRecordSnapshot()) byKey[descriptor.KeyText] = descriptor.Original;
+                            records.Add(table.TableName, byKey);
+                        }
+                        // the tool's copy of the failing record: Open jumps to it
+                        if (failure.Key.Length > 0) byKey.TryGetValue(failure.Key, out record);
+                    }
+                    failures.Add(new MasterMemoryValidationFailure(recordType, failure.Message, record, failure.IsNew));
+                }
+            }
+
+            public void OnState(MasterMemoryRemoteProtocol.ValidationState state)
+            {
+                available = state.IsAvailable;
+                newFailureCount = state.NewFailureCount;
+                stale = true;
+                MasterMemoryDebugValidation.NotifyChanged();
+            }
+
+            public void OnResult(List<MasterMemoryRemoteProtocol.Failure> failures)
+            {
+                results = failures;
+                pending = false;
+                stale = false;
+                MasterMemoryDebugValidation.NotifyChanged();
+            }
         }
 
         void SetState(MasterMemoryRemoteState newState, string newStatus)

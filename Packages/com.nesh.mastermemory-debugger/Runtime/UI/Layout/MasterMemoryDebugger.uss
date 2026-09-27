@@ -30,6 +30,22 @@
     color: rgb(226, 229, 235);
 }
 
+/* remote editor tool: the whole window, no margins; the strip at the bottom keeps the UI clear of the
+   "Development Build" text Unity draws in the bottom right corner of Development Builds */
+.mm-debugger--tool {
+    background-color: rgb(16, 17, 21);
+}
+
+.mm-debugger--tool .mm-debugger__window {
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 26px;
+    border-width: 0 0 1px 0;
+    border-radius: 0;
+    background-color: rgb(22, 24, 29);
+}
+
 .mm-debugger__spacer {
     flex-grow: 1;
 }
@@ -1174,6 +1190,19 @@
     color: rgb(150, 157, 171);
 }
 
+/* ------------------------------------------------------------------ patch comparison */
+
+.mm-debugger .mm-debugger__compare-a {
+    color: rgb(150, 190, 255);
+    -unity-font-style: bold;
+}
+
+.mm-debugger .mm-debugger__compare-b {
+    color: rgb(124, 227, 139);
+    -unity-font-style: bold;
+    margin-right: 12px;
+}
+
 /* ------------------------------------------------------------------ remote editing */
 
 .mm-debugger .mm-debugger__remote--connected {
@@ -1206,6 +1235,35 @@
     font-size: 20px;
     color: rgb(255, 210, 127);
     letter-spacing: 4px;
+}
+
+.mm-debugger__remote-games {
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom-width: 1px;
+    border-color: rgb(58, 63, 75);
+}
+
+.mm-debugger__remote-games-header {
+    flex-direction: row;
+    align-items: center;
+}
+
+.mm-debugger .mm-debugger__remote-games-title {
+    -unity-font-style: bold;
+    color: rgb(160, 168, 184);
+}
+
+.mm-debugger .mm-debugger__remote-games-state {
+    white-space: normal;
+    color: rgb(150, 157, 171);
+    font-size: 11px;
+    margin: 2px 0 4px 0;
+}
+
+.mm-debugger .mm-debugger__remote-game {
+    -unity-text-align: middle-left;
+    margin: 1px 0;
 }
 
 .mm-debugger .mm-debugger__remote-status {

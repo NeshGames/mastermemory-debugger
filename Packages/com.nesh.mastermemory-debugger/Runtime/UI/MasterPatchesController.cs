@@ -119,6 +119,7 @@ namespace Nesh.MasterMemoryDebugger
                 AddSelectionButton("Apply", "Replace every current override with this patch", () => ApplySelected(replace: true), primary: true);
                 AddSelectionButton("Merge", "Apply this patch on top of the current overrides", () => ApplySelected(replace: false));
             }
+            AddSelectionButton("Compare…", "Compare this patch with the current overrides or another patch", CompareSelected);
             if (allowSave)
             {
                 AddSelectionButton("Overwrite", "Replace this patch with the current overrides", ConfirmOverwriteSelected);
@@ -515,6 +516,100 @@ namespace Nesh.MasterMemoryDebugger
                     MasterMemoryChangeLog.ResetAll(count);
                     setStatus($"{count} overrides reset.", false);
                 }, isDanger: true));
+        }
+
+        // ------------------------------------------------------------------ compare
+
+        const string CurrentOverridesChoice = "Current overrides";
+
+        void CompareSelected()
+        {
+            var entry = selected;
+            if (entry?.Patch == null) return;
+            var choices = new List<string> { CurrentOverridesChoice };
+            foreach (var other in entries)
+            {
+                if (other != entry && other.Patch != null) choices.Add(other.Name);
+            }
+            var target = new DropdownField("Compare with", choices, 0);
+            dialog.Show(
+                "Compare patch",
+                $"Lists the fields that \"{entry.Name}\" and the other side change differently.",
+                target,
+                new MasterMemoryDebuggerDialog.DialogButton("Cancel", null),
+                new MasterMemoryDebuggerDialog.DialogButton("Compare", () =>
+                {
+                    var name = target.value;
+                    var other = name == CurrentOverridesChoice ? MasterDataPatchService.CreatePatch() : entries.Find(x => x.Name == name)?.Patch;
+                    ShowComparison(entry.Name, entry.Patch, name, other);
+                }, isPrimary: true));
+        }
+
+        void ShowComparison(string nameA, MasterDataPatch a, string nameB, MasterDataPatch b)
+        {
+            const int MaxLines = 300;
+            var differences = MasterDataPatchCompare.Compare(a, b);
+            var content = new ScrollView(ScrollViewMode.Vertical);
+            content.AddToClassList("mm-debugger__import-preview");
+
+            int onlyA = 0, onlyB = 0, different = 0;
+            string lastRecord = null;
+            foreach (var difference in differences)
+            {
+                switch (difference.Kind)
+                {
+                    case MasterDataPatchDifferenceKind.OnlyInA: onlyA++; break;
+                    case MasterDataPatchDifferenceKind.OnlyInB: onlyB++; break;
+                    default: different++; break;
+                }
+                if (content.childCount >= MaxLines) continue;
+
+                var record = difference.TableName + "  " + difference.Key;
+                if (record != lastRecord)
+                {
+                    lastRecord = record;
+                    var recordLabel = new Label(record);
+                    recordLabel.AddToClassList("mm-debugger__patches-record");
+                    content.Add(recordLabel);
+                }
+                var line = new VisualElement();
+                line.AddToClassList("mm-debugger__change-field");
+                line.Add(CreateCell(difference.Field, "mm-debugger__change-field-name"));
+                line.Add(CreateCell(difference.Kind == MasterDataPatchDifferenceKind.OnlyInB ? "—" : MasterDataPatchCompare.Format(difference.ValueA), "mm-debugger__compare-a"));
+                line.Add(CreateCell("|", "mm-debugger__change-arrow"));
+                line.Add(CreateCell(difference.Kind == MasterDataPatchDifferenceKind.OnlyInA ? "—" : MasterDataPatchCompare.Format(difference.ValueB), "mm-debugger__compare-b"));
+                if (difference.HasOriginal) line.Add(CreateCell("original " + MasterDataPatchCompare.Format(difference.Original), "mm-debugger__change-old"));
+                content.Add(line);
+            }
+            if (content.childCount >= MaxLines) content.Add(new Label("… see Copy TSV for the whole list"));
+
+            var summary = differences.Count == 0
+                ? $"\"{nameA}\" and {Quote(nameB)} change the same fields to the same values."
+                : $"{nameA} | {nameB}:  {different} different values, {onlyA} only in {nameA}, {onlyB} only in {nameB}.";
+            if (differences.Count == 0)
+            {
+                dialog.Show("Compare patch", summary, new MasterMemoryDebuggerDialog.DialogButton("Close", null));
+                return;
+            }
+            dialog.Show(
+                "Compare patch",
+                summary,
+                content,
+                new MasterMemoryDebuggerDialog.DialogButton("Close", null),
+                new MasterMemoryDebuggerDialog.DialogButton("Copy TSV", () =>
+                {
+                    var result = MasterDataPatchExporter.CopyToClipboard(MasterDataPatchCompare.ToTsv(differences, nameA, nameB), "compare.tsv", "text/tab-separated-values");
+                    setStatus($"Comparison of {nameA} and {nameB}: {result.Message}", !result.Succeeded);
+                }));
+        }
+
+        static string Quote(string name) => name == CurrentOverridesChoice ? "the current overrides" : $"\"{name}\"";
+
+        static Label CreateCell(string text, string className)
+        {
+            var label = new Label(text);
+            label.AddToClassList(className);
+            return label;
         }
 
         // ------------------------------------------------------------------ import

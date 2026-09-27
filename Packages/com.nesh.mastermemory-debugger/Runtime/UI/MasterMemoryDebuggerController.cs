@@ -158,6 +158,10 @@ namespace Nesh.MasterMemoryDebugger
 
             SetVisible(root, "mm-batch-edit", settings.AllowEditing);
             SetVisible(root, "mm-remote", MasterMemoryDebugRemote.IsSupported);
+            // the remote editor tool fills its window and has nothing to close to
+            var isTool = MasterMemoryDebugRemote.IsToolMode;
+            root.EnableInClassList("mm-debugger--tool", isTool);
+            SetVisible(root, "mm-close", !isTool);
             SetVisible(root, "mm-changes-paste", settings.AllowEditing);
 
             var canScale = host.OwnedPanelSettings != null;
@@ -507,7 +511,9 @@ namespace Nesh.MasterMemoryDebugger
         void OnRemoteChanged()
         {
             var state = MasterMemoryDebugRemote.State;
-            if (state != remoteState && (state == MasterMemoryRemoteState.Connected || state == MasterMemoryRemoteState.Failed))
+            // one message when the connection is lost, not one per reconnection attempt
+            var retrying = MasterMemoryDebugRemote.IsReconnecting && state != MasterMemoryRemoteState.Connected;
+            if (state != remoteState && !retrying && (state == MasterMemoryRemoteState.Connected || state == MasterMemoryRemoteState.Failed))
             {
                 SetStatus("Remote: " + MasterMemoryDebugRemote.Status, state == MasterMemoryRemoteState.Failed);
             }
@@ -606,7 +612,7 @@ namespace Nesh.MasterMemoryDebugger
                     if (dialog.IsVisible) dialog.Cancel();
                     else if (searchCompletion.IsOpen) searchCompletion.Close();
                     else if (recordList.IsColumnsPopupOpen) recordList.CloseColumnsPopup();
-                    else RuntimeMasterMemoryDebugger.Close();
+                    else if (!MasterMemoryDebugRemote.IsToolMode) RuntimeMasterMemoryDebugger.Close();
                     evt.StopPropagation();
                     break;
                 case KeyCode.Return:

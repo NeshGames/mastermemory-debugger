@@ -41,6 +41,10 @@ namespace UnityEditor
         public static string CreateFolder(string parent, string newFolderName) => "";
         public static string GetAssetPath(UnityEngine.Object o) => "";
         public static void Refresh() { }
+        public static bool CopyAsset(string path, string newPath) => true;
+        public static bool DeleteAsset(string path) => true;
+        public static string MoveAsset(string oldPath, string newPath) => "";
+        public static string GenerateUniqueAssetPath(string path) => path;
     }
     public static class EditorGUIUtility { public static void PingObject(UnityEngine.Object o) { } }
     public static class EditorUtility
@@ -50,9 +54,10 @@ namespace UnityEditor
         public static string OpenFilePanel(string title, string directory, string extension) => "";
         public static void RevealInFinder(string path) { }
         public static string SaveFolderPanel(string title, string folder, string defaultName) => "";
+        public static void SetDirty(UnityEngine.Object target) { }
     }
     public enum PlayModeStateChange { EnteredEditMode, ExitingEditMode, EnteredPlayMode, ExitingPlayMode }
-    public static class EditorApplication { public static bool isPlaying => false; public static event Action<PlayModeStateChange> playModeStateChanged; }
+    public static class EditorApplication { public static bool isPlaying => false; public static event Action<PlayModeStateChange> playModeStateChanged; public delegate void CallbackFunction(); public static CallbackFunction delayCall; }
     public static class AssemblyReloadEvents { public delegate void AssemblyReloadCallback(); public static event AssemblyReloadCallback beforeAssemblyReload; }
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)] public sealed class MenuItem : Attribute
     {
@@ -77,6 +82,8 @@ namespace UnityEditor
 namespace UnityEditor.Build
 {
     public interface IOrderedCallback { int callbackOrder { get; } }
+    public interface IPreprocessBuildWithReport : IOrderedCallback { void OnPreprocessBuild(UnityEditor.Build.Reporting.BuildReport report); }
+    public interface IPostprocessBuildWithReport : IOrderedCallback { void OnPostprocessBuild(UnityEditor.Build.Reporting.BuildReport report); }
     public interface IUnityLinkerProcessor : IOrderedCallback { string GenerateAdditionalLinkXmlFile(UnityEditor.Build.Reporting.BuildReport report, UnityEditor.UnityLinker.UnityLinkerBuildPipelineData data); }
 }
 namespace UnityEditor.Build.Reporting
@@ -108,7 +115,8 @@ namespace UnityEditor
         public BuildTarget target { get; set; }
         public BuildOptions options { get; set; }
     }
-    public static class BuildPipeline { public static UnityEditor.Build.Reporting.BuildReport BuildPlayer(BuildPlayerOptions options) => null; }
+    public static class BuildPipeline { public static UnityEditor.Build.Reporting.BuildReport BuildPlayer(BuildPlayerOptions options) => null; public static bool isBuildingPlayer => false; }
+    [AttributeUsage(AttributeTargets.Method)] public sealed class InitializeOnLoadMethodAttribute : Attribute { }
     public static class PlayerSettings
     {
         public static string productName { get; set; }
