@@ -84,6 +84,6 @@ of remote editing and 50,000 record timing checks). Run it before every commit.
   Development Builds only and deletes it afterwards.
 - Remote editing: records travel as MessagePack (`MasterMemoryDebugRemote.SerializerOptions` for IL2CPP resolvers;
   the server checks each table at start). JSON transport was evaluated (2026-09-27: ~16× slower to serialize, +37%
-  size) and is pending a decision (TODO.md). The tool mirrors the game's tables into its own registry / store, so the
+  size) and dropped: keep MessagePack. The tool mirrors the game's tables into its own registry / store, so the
   whole UI works unchanged; sockets are closed when Play Mode ends.
 - The environment's git proxy refuses tag pushes and branch deletion; the Release workflow creates tags.
