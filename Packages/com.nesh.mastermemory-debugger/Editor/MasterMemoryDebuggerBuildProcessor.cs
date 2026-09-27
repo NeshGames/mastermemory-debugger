@@ -39,6 +39,9 @@ namespace Nesh.MasterMemoryDebugger.Editor
                 Copy(MasterMemoryDebuggerAssets.LayoutGuid, MasterMemoryDebuggerAssets.LayoutName, ".uxml");
                 Copy(MasterMemoryDebuggerAssets.StyleGuid, MasterMemoryDebuggerAssets.StyleName, ".uss");
                 Copy(MasterMemoryDebuggerAssets.ThemeGuid, MasterMemoryDebuggerAssets.ThemeName, ".tss");
+                Copy(MasterMemoryDebuggerAssets.UiEnglishGuid, MasterMemoryDebuggerAssets.UiEnglishName, ".json");
+                Copy(MasterMemoryDebuggerAssets.UiChineseGuid, MasterMemoryDebuggerAssets.UiChineseName, ".json");
+                Copy(MasterMemoryDebuggerAssets.UiJapaneseGuid, MasterMemoryDebuggerAssets.UiJapaneseName, ".json");
             }
             if (settings != null) CopySettings(settings, includeUI);
             AssetDatabase.SaveAssets();

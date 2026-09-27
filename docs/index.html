@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10151e">
+  <meta name="description" content="MasterMemory Remote Editor Build：從建置、配對到遠端調整主資料的完整操作教學與實際介面截圖。">
+  <title>Remote Editor Build 操作教學 · MasterMemory Runtime Debugger</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要內容</a>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="#top" aria-label="返回頁首"><span class="brand-mark">MM</span><span>MasterMemory <strong>Remote Editor</strong></span></a>
+      <nav aria-label="主要導覽">
+        <a href="#features">功能</a><a href="#setup">建置</a><a href="#connect">連線</a><a href="#language">語言</a><a href="search.html">搜尋教學</a><a href="#workspace">操作介面</a>
+      </nav>
+      <a class="header-github" href="https://github.com/NeshGames/mastermemory-debugger" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap" id="top">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="pulse"></span> Unity Editor / Development Build 專用</div>
+        <h1>在桌面上，<br><em>直接檢查與調整</em><br>遊戲的 MasterMemory 資料。</h1>
+        <p>Remote Editor 是從你的 Unity 專案建置的桌面工具。連上執行中的遊戲後，可以搜尋資料表、調整執行時數值、檢查變更、驗證關聯，並把結果存成 Patch。</p>
+        <div class="hero-actions"><a class="button primary" href="#setup">開始操作教學 <span>→</span></a><a class="button subtle" href="https://github.com/NeshGames/mastermemory-debugger/blob/main/Packages/com.nesh.mastermemory-debugger/REMOTE_EDITOR_GUIDE.md" target="_blank" rel="noopener noreferrer">閱讀 Markdown 版 ↗</a></div>
+        <p class="hero-note">畫面擷取自範例遊戲與實際 Remote Editor 工具模式。操作只建立 Runtime Override，不會改寫原始 MemoryDatabase。</p>
+      </div>
+      <figure class="hero-visual screenshot" data-caption="繁體中文 Remote Editor：操作介面已翻譯，資料表和欄位仍為程式名稱">
+        <img src="assets/remote-zh-tw.png" alt="繁體中文 Remote Editor 已連線畫面，操作文字為中文，資料表和欄位保持程式名稱" width="1600" height="900" fetchpriority="high">
+        <figcaption><span class="live-dot"></span> 真實操作畫面 <span class="caption-end">點圖放大 ↗</span></figcaption>
+      </figure>
+    </section>
+
+    <section class="section band" id="features">
+      <div class="wrap">
+        <div class="section-heading"><span class="kicker">01 / 工具用途</span><h2>測試時需要的主資料操作，集中在一個視窗。</h2><p>工具與遊戲使用同一版本的 Record 型別。修改會同步到正在執行的遊戲；遊戲端的 Override 也會回傳給工具。</p></div>
+        <div class="feature-grid">
+          <article class="feature"><span class="feature-icon">▦</span><h3>瀏覽與搜尋</h3><p>依 Table 查看 Record、排序與篩選；Find 可跨表搜尋欄位、List 和巢狀物件。</p></article>
+          <article class="feature"><span class="feature-icon">✎</span><h3>即時調整</h3><p>從 Inspector 修改欄位，批次 Set / Add / Multiply，或新增、複製、刪除 Record。支援 Undo / Redo。</p></article>
+          <article class="feature"><span class="feature-icon">⇄</span><h3>檢查與交接</h3><p>Changes 比對原值與新值；複製或貼回 TSV，方便和試算表流程銜接。</p></article>
+          <article class="feature"><span class="feature-icon">◇</span><h3>Patch 與驗證</h3><p>保存、套用、合併與比較 JSON Patch；遊戲有啟用 AutoRebuild 時可查看 Validate 結果。</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section wrap" id="setup">
+      <div class="section-heading"><span class="kicker">02 / 建置準備</span><h2>先讓遊戲能接受遠端連線，再建置桌面工具。</h2><p>第一次試用建議匯入 Package Manager 的 <strong>Basic Example</strong>，用範例場景驗證整條流程。</p></div>
+      <div class="steps">
+        <article class="step"><div class="step-index">01</div><div><h3>準備遊戲端</h3><p>安裝 MasterMemory 3.x 與本 Package，註冊 Table，並讓 Gameplay 經由 <code>TryGetOverride</code> / <code>Resolve</code> 或 <code>AutoRebuild</code> 讀取調整值。在 <strong>Project Settings → MasterMemory Debugger</strong> 開啟 <strong>Remote Server</strong>，或由程式呼叫 <code>StartServer()</code>。</p><p class="aside">遊戲 Build 必須勾選 <strong>Development Build</strong>。只需要遠端伺服器時，可關閉 Include Debugger UI；此時建議設定固定配對碼。</p></div></article>
+        <article class="step"><div class="step-index">02</div><div><h3>建立桌面工具</h3><p>在<strong>同一份遊戲專案</strong>執行 <span class="menu-path">Tools → MasterMemory Debugger → Remote Editing → Build Remote Editor Tool…</span>，指定輸出資料夾。選單會建立工具場景，並建置目前 Editor 平台的桌面 Development Build。</p><p class="aside">工具使用獨立的 Product Name、可調整視窗與 Mono；建置後會還原原本的 Player Settings。分發 Windows 版本時請保留整個輸出資料夾。</p></div></article>
+        <article class="step"><div class="step-index">03</div><div><h3>先用範例確認</h3><p>匯入 <strong>Basic Example</strong>，執行 <span class="menu-path">Create Example Game Scene</span> 並進入 Play Mode。Console 會顯示配對碼。開啟工具後可連 <code>127.0.0.1:7788</code>，輸入該配對碼完成首次連線。</p></div></article>
+      </div>
+      <div class="requirements"><span class="label">連線條件</span><span>TCP <strong>7788</strong>（預設）</span><span>UDP <strong>7787</strong>（搜尋）</span><span>一次一個工具</span><span>相同 Record / 協定版本</span></div>
+    </section>
+
+    <section class="section band" id="connect"><div class="wrap split-section">
+      <div class="split-copy"><span class="kicker">03 / 配對連線</span><h2>找到遊戲，輸入配對碼。</h2><ol class="numbered"><li>啟動遊戲端 Remote Server，記下 IP、Port 與六位數配對碼。</li><li>啟動桌面工具；連線對話框會自動出現。</li><li>點選 <strong>Games on the network</strong> 找到的遊戲，或手動輸入 IP 與 Port。</li><li>輸入配對碼，按 <strong>Connect</strong>；Table 清單出現即代表連線完成。</li></ol><p class="callout">搜尋不到遊戲時，試著手動輸入 IP。訪客 Wi-Fi、VPN 或防火牆可能擋住 UDP 搜尋；Android 經 USB 可使用 <code>adb forward tcp:7788 tcp:7788</code>，讓工具連 <code>127.0.0.1</code>。</p></div>
+      <figure class="screenshot media-card" data-caption="Remote Editor 的配對畫面"><img src="assets/remote-connect.png" alt="Remote Editor 連線對話框，有區域網路搜尋、IP、Port 與配對碼欄位" width="1600" height="900" loading="lazy"><figcaption>連線對話框 <span>點圖放大 ↗</span></figcaption></figure>
+    </div></section>
+
+    <section class="section wrap" id="language">
+      <div class="section-heading"><span class="kicker">04 / 介面語言</span><h2>切換繁體中文或日文，查詢名稱保持一致。</h2><p>在工具右上角選擇 <strong>English</strong>、<strong>繁體中文</strong> 或 <strong>日本語</strong>。選項會保存於 PlayerPrefs。語言只改變按鈕、提示、狀態與對話框；Table 與欄位仍用程式名稱，因此 <code>Attack&gt;=100</code> 在每種語言都能直接使用。</p></div>
+      <div class="language-shots"><figure class="screenshot" data-caption="繁體中文工具介面，資料表與欄位維持程式名稱"><img src="assets/remote-zh-tw.png" alt="繁體中文操作介面，資料表及欄位名稱仍為程式名稱" width="1600" height="900" loading="lazy"><figcaption>繁體中文 <span>點圖放大 ↗</span></figcaption></figure><figure class="screenshot" data-caption="日文工具介面，資料表與欄位維持程式名稱"><img src="assets/remote-ja.png" alt="日文操作介面，資料表及欄位名稱仍為程式名稱" width="1600" height="900" loading="lazy"><figcaption>日本語 <span>點圖放大 ↗</span></figcaption></figure></div>
+      <p class="language-note">介面文案由各語言 JSON 提供：<a href="https://github.com/NeshGames/mastermemory-debugger/tree/main/Packages/com.nesh.mastermemory-debugger/Runtime/UI/Localization">檢視翻譯檔 ↗</a></p>
+    </section>
+    <section class="section wrap" id="workspace">
+      <div class="section-heading"><span class="kicker">05 / 操作介面</span><h2>從找到 Record，到保存調整結果。</h2><p>以下截圖取自工具連上範例遊戲後的真實介面。點選頁籤查看對應畫面與操作重點。</p></div>
+      <div class="showcase" id="showcase">
+        <div class="showcase-tabs" role="tablist" aria-label="操作畫面"><button role="tab" aria-selected="true" data-shot="data">Data / Inspector</button><button role="tab" aria-selected="false" data-shot="override">Override</button><button role="tab" aria-selected="false" data-shot="changes">Changes</button><button role="tab" aria-selected="false" data-shot="patches">Patches</button></div>
+        <div class="showcase-layout"><div class="showcase-copy"><span id="shot-count" class="shot-count">01 / 04</span><h3 id="shot-title">選擇資料表與 Record</h3><p id="shot-text">左側選 Table，中間搜尋、排序並選擇 Record，右側 Inspector 查看欄位。PrimaryKey 與 SecondaryKey 會保持唯讀。</p><ul id="shot-points"><li>可釘選常用 Table</li><li>搜尋條件可依欄位縮小結果</li><li>Inspector 顯示 Record 全部可檢查欄位</li></ul></div><figure class="screenshot showcase-image" data-caption="資料表與 Inspector"><img id="shot-image" src="assets/remote-zh-tw.png" alt="Remote Editor 資料表與 Inspector" width="1600" height="900" loading="lazy"><figcaption id="shot-caption">連線後的 Data 畫面 <span>點圖放大 ↗</span></figcaption></figure></div>
+      </div>
+      <p class="search-guide-link"><strong>想深入了解搜尋？</strong> <a href="search.html">查看自動完成、條件查詢與跨表 Find 的圖文教學 →</a></p>
+      <div class="workflow-note"><strong>建議操作順序</strong><span>找 Record</span><b>→</b><span>修改並 Apply</span><b>→</b><span>在 Changes 檢查</span><b>→</b><span>保存 / 匯出 Patch</span></div>
+    </section>
+
+    <section class="section band" id="safety"><div class="wrap limits-grid"><div><span class="kicker">06 / 資料與使用界線</span><h2>讓測試改動可以回溯。</h2><p>原始 <code>MemoryDatabase</code> 不會被工具直接改寫。變更位於 Runtime Override；Patch 保存在<strong>工具所在電腦</strong>，可匯出 JSON 交接，或用 TSV 回填主資料來源。</p></div><div class="limit-list"><div><strong>遊戲查詢</strong><span>只有接入 Override 讀取路徑，Gameplay 才會使用新值；SecondaryKey、Range、All 查詢可考慮 AutoRebuild。</span></div><div><strong>版本相容</strong><span>Record 型別或序列化設定改變後，重新建置工具；不同遠端協定版本無法配對。</span></div><div><strong>使用環境</strong><span>僅供 Editor / Development Build。WebGL 不支援 socket；通訊未加密，請在可信任的開發網路使用。</span></div></div></div></section>
+
+    <section class="section wrap" id="faq"><div class="section-heading"><span class="kicker">07 / 常見問題</span><h2>連不上、看不到，先從這裡檢查。</h2></div><div class="faq-list">
+      <details><summary>搜尋不到遊戲？</summary><p>確認遊戲已啟動 Remote Server。區域網路搜尋使用 UDP 7787；訪客 Wi-Fi、VPN 或防火牆可能擋住廣播。可直接輸入遊戲 IP 與 TCP Port（預設 7788）。</p></details>
+      <details><summary>配對失敗或連線被拒絕？</summary><p>核對配對碼、IP 與 Port；確認遊戲仍在 Editor / Development Build，且沒有其他工具已連線。配對碼錯誤或已有工具時不會自動重試。</p></details>
+      <details><summary>工具改值後遊戲沒有反應？</summary><p>檢查 Gameplay 是否經過 TryGetOverride / Resolve。SecondaryKey、Range 和 All 查詢不會直接讀取 Override；使用 AutoRebuild 時還要確保遊戲改讀重建後的 database。</p></details>
+      <details><summary>Patch 在遊戲裝置上找不到？</summary><p>工具的 Patch 存在桌面工具自己的 Application.persistentDataPath，不在遊戲裝置上。請在 Patches 頁籤匯出 JSON，再交給其他人或主資料回填流程。</p></details>
+      <details><summary>IL2CPP 無法傳送 Record？</summary><p>遊戲端與工具端都應使用對應的 MessagePack SerializerOptions。遊戲端需包含 MasterMemory 與專案的 resolver；序列化失敗時查看遊戲 Console 的說明。</p></details>
+    </div></section>
+  </main>
+
+  <footer class="site-footer"><div class="wrap footer-inner"><div><strong>MasterMemory Runtime Debugger</strong><p>Remote Editor Build 操作教學 · 繁體中文</p></div><div class="footer-links"><a href="https://github.com/NeshGames/mastermemory-debugger">原始碼</a><a href="https://github.com/NeshGames/mastermemory-debugger/blob/main/Packages/com.nesh.mastermemory-debugger/README.md">套件文件</a><a href="#top">回到頂部 ↑</a></div></div></footer>
+
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="放大的操作截圖" hidden><button class="lightbox-close" type="button" aria-label="關閉圖片">×</button><img id="lightbox-image" src="" alt=""><p id="lightbox-caption"></p></div>
+</body>
+</html>

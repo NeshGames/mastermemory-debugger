@@ -1,0 +1,523 @@
+{
+  "language": "en",
+  "displayName": "English",
+  "strings": [
+    {
+      "key": "MasterMemory Runtime Debugger",
+      "value": "MasterMemory Runtime Debugger"
+    },
+    {
+      "key": "Data",
+      "value": "Data"
+    },
+    {
+      "key": "Changes",
+      "value": "Changes"
+    },
+    {
+      "key": "Patches",
+      "value": "Patches"
+    },
+    {
+      "key": "Find",
+      "value": "Find"
+    },
+    {
+      "key": "Validation",
+      "value": "Validation"
+    },
+    {
+      "key": "Remote",
+      "value": "Remote"
+    },
+    {
+      "key": "Close",
+      "value": "Close"
+    },
+    {
+      "key": "Code names",
+      "value": "Code names"
+    },
+    {
+      "key": "Tables",
+      "value": "Tables"
+    },
+    {
+      "key": "Labels TSV",
+      "value": "Labels TSV"
+    },
+    {
+      "key": "Modified Only",
+      "value": "Modified Only"
+    },
+    {
+      "key": "Columns ▾",
+      "value": "Columns ▾"
+    },
+    {
+      "key": "+ New…",
+      "value": "+ New…"
+    },
+    {
+      "key": "Batch Edit…",
+      "value": "Batch Edit…"
+    },
+    {
+      "key": "Copy",
+      "value": "Copy"
+    },
+    {
+      "key": "Copy JSON",
+      "value": "Copy JSON"
+    },
+    {
+      "key": "Record Inspector",
+      "value": "Record Inspector"
+    },
+    {
+      "key": "Apply",
+      "value": "Apply"
+    },
+    {
+      "key": "Revert",
+      "value": "Revert"
+    },
+    {
+      "key": "Reset",
+      "value": "Reset"
+    },
+    {
+      "key": "Duplicate…",
+      "value": "Duplicate…"
+    },
+    {
+      "key": "Delete",
+      "value": "Delete"
+    },
+    {
+      "key": "Paste TSV…",
+      "value": "Paste TSV…"
+    },
+    {
+      "key": "Copy TSV",
+      "value": "Copy TSV"
+    },
+    {
+      "key": "↶ Undo",
+      "value": "↶ Undo"
+    },
+    {
+      "key": "↷ Redo",
+      "value": "↷ Redo"
+    },
+    {
+      "key": "Log",
+      "value": "Log"
+    },
+    {
+      "key": "Remote editing",
+      "value": "Remote editing"
+    },
+    {
+      "key": "Game address",
+      "value": "Game address"
+    },
+    {
+      "key": "Port",
+      "value": "Port"
+    },
+    {
+      "key": "Pairing code",
+      "value": "Pairing code"
+    },
+    {
+      "key": "Games on the network",
+      "value": "Games on the network"
+    },
+    {
+      "key": "Search",
+      "value": "Search"
+    },
+    {
+      "key": "Connect",
+      "value": "Connect"
+    },
+    {
+      "key": "Disconnect",
+      "value": "Disconnect"
+    },
+    {
+      "key": "Game operations",
+      "value": "Game operations"
+    },
+    {
+      "key": "Addresses",
+      "value": "Addresses"
+    },
+    {
+      "key": "Start",
+      "value": "Start"
+    },
+    {
+      "key": "Stop",
+      "value": "Stop"
+    },
+    {
+      "key": "Saved patches",
+      "value": "Saved patches"
+    },
+    {
+      "key": "Save As…",
+      "value": "Save As…"
+    },
+    {
+      "key": "Import…",
+      "value": "Import…"
+    },
+    {
+      "key": "Export…",
+      "value": "Export…"
+    },
+    {
+      "key": "Import",
+      "value": "Import"
+    },
+    {
+      "key": "Export",
+      "value": "Export"
+    },
+    {
+      "key": "Save",
+      "value": "Save"
+    },
+    {
+      "key": "Load",
+      "value": "Load"
+    },
+    {
+      "key": "Merge",
+      "value": "Merge"
+    },
+    {
+      "key": "Compare",
+      "value": "Compare"
+    },
+    {
+      "key": "Rename",
+      "value": "Rename"
+    },
+    {
+      "key": "Reset All",
+      "value": "Reset All"
+    },
+    {
+      "key": "Force Apply",
+      "value": "Force Apply"
+    },
+    {
+      "key": "Overwrite",
+      "value": "Overwrite"
+    },
+    {
+      "key": "Cancel",
+      "value": "Cancel"
+    },
+    {
+      "key": "Discard",
+      "value": "Discard"
+    },
+    {
+      "key": "No",
+      "value": "No"
+    },
+    {
+      "key": "Yes",
+      "value": "Yes"
+    },
+    {
+      "key": "OK",
+      "value": "OK"
+    },
+    {
+      "key": "Name",
+      "value": "Name"
+    },
+    {
+      "key": "New name",
+      "value": "New name"
+    },
+    {
+      "key": "Patch JSON",
+      "value": "Patch JSON"
+    },
+    {
+      "key": "New only",
+      "value": "New only"
+    },
+    {
+      "key": "Validate",
+      "value": "Validate"
+    },
+    {
+      "key": "Whole value",
+      "value": "Whole value"
+    },
+    {
+      "key": "Open",
+      "value": "Open"
+    },
+    {
+      "key": "Overridden",
+      "value": "Overridden"
+    },
+    {
+      "key": "NEW",
+      "value": "NEW"
+    },
+    {
+      "key": "ADDED",
+      "value": "ADDED"
+    },
+    {
+      "key": "DELETED",
+      "value": "DELETED"
+    },
+    {
+      "key": "Recent searches",
+      "value": "Recent searches"
+    },
+    {
+      "key": "No table selected",
+      "value": "No table selected"
+    },
+    {
+      "key": "Current: no overrides",
+      "value": "Current: no overrides"
+    },
+    {
+      "key": "No saved patches",
+      "value": "No saved patches"
+    },
+    {
+      "key": "Select a patch",
+      "value": "Select a patch"
+    },
+    {
+      "key": "No failures",
+      "value": "No failures"
+    },
+    {
+      "key": "Validating in the game…",
+      "value": "Validating in the game…"
+    },
+    {
+      "key": "Connect to a game to use its operations.",
+      "value": "Connect to a game to use its operations."
+    },
+    {
+      "key": "The game has no available operations.",
+      "value": "The game has no available operations."
+    },
+    {
+      "key": "searching…",
+      "value": "searching…"
+    },
+    {
+      "key": "Select a table to see its records.",
+      "value": "Select a table to see its records."
+    },
+    {
+      "key": "Select a record to inspect it.",
+      "value": "Select a record to inspect it."
+    },
+    {
+      "key": "No changes",
+      "value": "No changes"
+    },
+    {
+      "key": "No results",
+      "value": "No results"
+    },
+    {
+      "key": "No overrides",
+      "value": "No overrides"
+    },
+    {
+      "key": "Select a record.",
+      "value": "Select a record."
+    },
+    {
+      "key": "No overrides. Every value comes from MasterMemory.",
+      "value": "No overrides. Every value comes from MasterMemory."
+    },
+    {
+      "key": "Search text, or conditions like  Damage>100 Element=Fire Name~ice",
+      "value": "Search text, or conditions like  Damage>100 Element=Fire Name~ice"
+    },
+    {
+      "key": "Copy every table and field name as a label template (tab separated) to fill in and load with MasterMemoryDebugLocalization.LoadTsv",
+      "value": "Copy every table and field name as a label template (tab separated) to fill in and load with MasterMemoryDebugLocalization.LoadTsv"
+    },
+    {
+      "key": "Browse and edit tables",
+      "value": "Browse and edit tables"
+    },
+    {
+      "key": "Every changed field across all tables",
+      "value": "Every changed field across all tables"
+    },
+    {
+      "key": "Save, apply, merge, import and export patches",
+      "value": "Save, apply, merge, import and export patches"
+    },
+    {
+      "key": "Find a value in every table",
+      "value": "Find a value in every table"
+    },
+    {
+      "key": "MasterMemory Validate() failures of the rebuilt database",
+      "value": "MasterMemory Validate() failures of the rebuilt database"
+    },
+    {
+      "key": "Remote editing: edit this game from the remote editor tool, or connect the tool to a game",
+      "value": "Remote editing: edit this game from the remote editor tool, or connect the tool to a game"
+    },
+    {
+      "key": "Interface language (table and field names remain code names)",
+      "value": "Interface language (table and field names remain code names)"
+    },
+    {
+      "key": "Space separated terms, all must match.\nText: primary key / name / string members (contains).\nField op Value with = != > >= < <= ~ (contains). Quote values with spaces: Name=\"Ice Blast\". Field=null matches null.\nField names, and enum / bool values after an operator, are suggested while typing: Up / Down select, Tab / Enter accept, Esc closes.",
+      "value": "Space separated terms, all must match.\nText: primary key / name / string members (contains).\nField op Value with = != > >= < <= ~ (contains). Quote values with spaces: Name=\"Ice Blast\". Field=null matches null.\nField names, and enum / bool values after an operator, are suggested while typing: Up / Down select, Tab / Enter accept, Esc closes."
+    },
+    {
+      "key": "Smaller UI",
+      "value": "Smaller UI"
+    },
+    {
+      "key": "Larger UI",
+      "value": "Larger UI"
+    },
+    {
+      "key": "Close (F8)",
+      "value": "Close (F8)"
+    },
+    {
+      "key": "Show, hide and freeze columns",
+      "value": "Show, hide and freeze columns"
+    },
+    {
+      "key": "Add a record with default values (it exists as an override: a rebuilt database and TryGetOverride see it)",
+      "value": "Add a record with default values (it exists as an override: a rebuilt database and TryGetOverride see it)"
+    },
+    {
+      "key": "Set, add to or multiply a field of every record that matches the search (one undo step)",
+      "value": "Set, add to or multiply a field of every record that matches the search (one undo step)"
+    },
+    {
+      "key": "Copy the shown rows and columns as tab separated text (paste into a spreadsheet; WebGL: download)",
+      "value": "Copy the shown rows and columns as tab separated text (paste into a spreadsheet; WebGL: download)"
+    },
+    {
+      "key": "Copy the record as JSON (WebGL: download)",
+      "value": "Copy the record as JSON (WebGL: download)"
+    },
+    {
+      "key": "Apply the edits as an override (Enter)",
+      "value": "Apply the edits as an override (Enter)"
+    },
+    {
+      "key": "Discard the edits that are not applied",
+      "value": "Discard the edits that are not applied"
+    },
+    {
+      "key": "Remove the override of this record",
+      "value": "Remove the override of this record"
+    },
+    {
+      "key": "Add a copy of this record with a new primary key",
+      "value": "Add a copy of this record with a new primary key"
+    },
+    {
+      "key": "Delete the record: a rebuilt database leaves it out (Restore brings it back)",
+      "value": "Delete the record: a rebuilt database leaves it out (Restore brings it back)"
+    },
+    {
+      "key": "Import values edited in a spreadsheet (the Copy TSV format) as overrides, after a preview",
+      "value": "Import values edited in a spreadsheet (the Copy TSV format) as overrides, after a preview"
+    },
+    {
+      "key": "Copy every changed field (table, key, name, field, original, current) as tab separated text, to paste into a spreadsheet (WebGL: download)",
+      "value": "Copy every changed field (table, key, name, field, original, current) as tab separated text, to paste into a spreadsheet (WebGL: download)"
+    },
+    {
+      "key": "Undo (Ctrl+Z)",
+      "value": "Undo (Ctrl+Z)"
+    },
+    {
+      "key": "Redo (Ctrl+Y / Ctrl+Shift+Z)",
+      "value": "Redo (Ctrl+Y / Ctrl+Shift+Z)"
+    },
+    {
+      "key": "Recent messages, warnings and changes",
+      "value": "Recent messages, warnings and changes"
+    },
+    {
+      "key": "IP address of the device running the game (shown in its Remote dialog). 127.0.0.1 for a game on this PC, or an Android device over USB after adb forward tcp:PORT tcp:PORT.",
+      "value": "IP address of the device running the game (shown in its Remote dialog). 127.0.0.1 for a game on this PC, or an Android device over USB after adb forward tcp:PORT tcp:PORT."
+    },
+    {
+      "key": "Shown in the game's Remote dialog and log.",
+      "value": "Shown in the game's Remote dialog and log."
+    },
+    {
+      "key": "Use this game's address and port (the pairing code is still needed)",
+      "value": "Use this game's address and port (the pairing code is still needed)"
+    },
+    {
+      "key": "A value to find in every table: a key, a name, a number… (Enter)",
+      "value": "A value to find in every table: a key, a name, a number… (Enter)"
+    },
+    {
+      "key": "Only values that equal the text (1001 does not find 11001)",
+      "value": "Only values that equal the text (1001 does not find 11001)"
+    },
+    {
+      "key": "Find the text in every member of every table (overrides included)",
+      "value": "Find the text in every member of every table (overrides included)"
+    },
+    {
+      "key": "Only the failures that the original data does not have (caused by the overrides)",
+      "value": "Only the failures that the original data does not have (caused by the overrides)"
+    },
+    {
+      "key": "Run MasterMemory Validate() again (in the game when connected to it)",
+      "value": "Run MasterMemory Validate() again (in the game when connected to it)"
+    },
+    {
+      "key": "The values shown include the override",
+      "value": "The values shown include the override"
+    },
+    {
+      "key": "Remote editor: connect to a game build.",
+      "value": "Remote editor: connect to a game build."
+    },
+    {
+      "key": "Ready.  Enter: Apply   Esc: Close",
+      "value": "Ready.  Enter: Apply   Esc: Close"
+    },
+    {
+      "key": "No table registered. Call MasterMemoryDebugRegistry.RegisterDatabase / RegisterTable.",
+      "value": "No table registered. Call MasterMemoryDebugRegistry.RegisterDatabase / RegisterTable."
+    },
+    {
+      "key": "Deleted: a rebuilt database (AutoRebuild) leaves this record out; TryGetOverride still returns the original. Restore brings it back.",
+      "value": "Deleted: a rebuilt database (AutoRebuild) leaves this record out; TryGetOverride still returns the original. Restore brings it back."
+    },
+    {
+      "key": "1 record",
+      "value": "1 record"
+    }
+  ],
+  "patterns": []
+}
