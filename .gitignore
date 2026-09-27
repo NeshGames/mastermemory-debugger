@@ -42,3 +42,7 @@ Thumbs.db
 !/Tools/Harness/**/*.csproj
 /Tools/Harness/**/bin/
 /Tools/Harness/**/obj/
+
+# Debugger assets copied for a Development Build (deleted after the build)
+/Assets/MasterMemoryDebuggerBuild/
+/Assets/MasterMemoryDebuggerBuild.meta

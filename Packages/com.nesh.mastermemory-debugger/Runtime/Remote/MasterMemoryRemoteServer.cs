@@ -20,6 +20,7 @@ namespace Nesh.MasterMemoryDebugger
         MasterMemoryRemoteConnection waitingForHello;
         volatile bool stopped;
         bool validationChanged;
+        readonly HashSet<Type> checkedTypes = new HashSet<Type>();
         string lastError;
 
         public MasterMemoryRemoteServer(int port, string pairingCode)
@@ -30,6 +31,9 @@ namespace Nesh.MasterMemoryDebugger
             Port = ((IPEndPoint)listener.LocalEndpoint).Port;
             acceptThread = new Thread(AcceptLoop) { IsBackground = true, Name = "MasterMemoryRemote accept" };
             acceptThread.Start();
+            // tables are often registered after the server starts (Settings > Remote Server starts it after the first scene loads)
+            MasterMemoryDebugRegistry.TablesChanged += CheckSerialization;
+            CheckSerialization();
         }
 
         public int Port { get; }
@@ -90,6 +94,7 @@ namespace Nesh.MasterMemoryDebugger
                 // already stopped
             }
             MasterMemoryDebugValidation.Changed -= OnValidationChanged;
+            MasterMemoryDebugRegistry.TablesChanged -= CheckSerialization;
             waitingForHello?.Dispose();
             foreach (var connection in closing) connection.Dispose();
             while (accepted.TryDequeue(out var client)) client.Close();
@@ -206,6 +211,49 @@ namespace Nesh.MasterMemoryDebugger
             connection.Send(MasterMemoryRemoteProtocol.EncodeReject(reason));
             connection.CloseAfterSending();
             closing.Add(connection);
+        }
+
+        /// <summary>
+        /// Serializes one record of every newly registered table, so that a missing MessagePack resolver (IL2CPP) is reported
+        /// when the game starts rather than when the tool connects.
+        /// </summary>
+        void CheckSerialization()
+        {
+            var problems = new List<string>();
+            foreach (var table in MasterMemoryDebugRegistry.Tables)
+            {
+                if (!checkedTypes.Add(table.RecordType)) continue;
+                var problem = CheckSerialization(table);
+                if (problem != null) problems.Add(problem);
+            }
+            if (problems.Count == 0) return;
+            MasterMemoryDebugLog.Error(
+                "Remote: records can not be serialized with MessagePack, so the remote editor tool can not connect:\n  " + string.Join("\n  ", problems) +
+                "\nSet MasterMemoryDebugRemote.SerializerOptions to the MessagePack options the game uses to load its MemoryDatabase " +
+                "(with IL2CPP: the options with the generated resolvers, e.g. MessagePackSerializerOptions.Standard.WithResolver(StaticCompositeResolver.Instance)), " +
+                "before StartServer or before the tables are registered. The remote editor tool must use the same options.");
+        }
+
+        /// <summary>Null when a record of <paramref name="table"/> survives a MessagePack round trip, otherwise the problem.</summary>
+        internal static string CheckSerialization(MasterMemoryTableDescriptor table)
+        {
+            object record = null;
+            try
+            {
+                foreach (var item in table.GetAllRecords())
+                {
+                    if (item == null) continue;
+                    record = item;
+                    break;
+                }
+                if (record == null) return null;
+                Deserialize(table.RecordType, Serialize(table.RecordType, record));
+                return null;
+            }
+            catch (Exception e)
+            {
+                return $"{table.TableName} ({table.RecordType.FullName}): {(e.InnerException ?? e).Message}";
+            }
         }
 
         // raised by rebuilds; sent once per Pump

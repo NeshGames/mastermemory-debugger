@@ -305,5 +305,18 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugRemote.Stop();
             Assert.IsFalse(MasterMemoryDebugValidation.IsAvailable);
         }
+
+        [Test]
+        public void SerializationCheck_ShouldReportTablesMessagePackCanNotWrite()
+        {
+            RegisterTestDatabase();
+            Assert.IsNull(MasterMemoryRemoteServer.CheckSerialization(Table<TestSkill>()), "contractless options can write the test records");
+
+            // the standard resolver needs [MessagePackObject], which the test records do not have
+            MasterMemoryDebugRemote.SerializerOptions = MessagePackSerializerOptions.Standard;
+            var problem = MasterMemoryRemoteServer.CheckSerialization(Table<TestSkill>());
+            Assert.IsNotNull(problem);
+            StringAssert.StartsWith(nameof(TestSkill), problem);
+        }
     }
 }

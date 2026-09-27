@@ -78,6 +78,7 @@ namespace Nesh.MasterMemoryDebugger.Editor
             BuildReport report;
             try
             {
+                MasterMemoryDebuggerBuildProcessor.ForceIncludeUI = true;
                 PlayerSettings.productName = productName + " Remote Editor";
                 PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
                 PlayerSettings.defaultScreenWidth = 1600;
@@ -96,6 +97,7 @@ namespace Nesh.MasterMemoryDebugger.Editor
             }
             finally
             {
+                MasterMemoryDebuggerBuildProcessor.ForceIncludeUI = false;
                 PlayerSettings.productName = productName;
                 PlayerSettings.fullScreenMode = fullScreenMode;
                 PlayerSettings.defaultScreenWidth = width;

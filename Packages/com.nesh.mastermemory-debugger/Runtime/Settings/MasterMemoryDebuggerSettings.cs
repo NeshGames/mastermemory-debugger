@@ -5,10 +5,11 @@ using UnityEngine.UIElements;
 namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
-    /// Project wide settings of the runtime debugger.
-    /// The asset is loaded from <c>Resources/MasterMemoryDebuggerSettings</c>;
-    /// when it does not exist the default values are used.
-    /// Edit it from Project Settings &gt; MasterMemory Debugger.
+    /// Project wide settings of the runtime debugger. Edit it from Project Settings &gt; MasterMemory Debugger.
+    /// The asset is kept outside Resources; the Editor finds it anywhere, and the build processor of the package copies it
+    /// into a temporary Resources folder (<c>Resources/MasterMemoryDebuggerSettings</c>) only for Development Builds, so
+    /// release builds contain neither the asset nor what it references (font, PanelSettings).
+    /// When it does not exist the default values are used.
     /// </summary>
     public sealed class MasterMemoryDebuggerSettings : ScriptableObject
     {
@@ -16,6 +17,10 @@ namespace Nesh.MasterMemoryDebugger
 
         [Tooltip("Enables the runtime debugger UI, the toggle hotkey and patch auto loading.")]
         [SerializeField] bool enabled = true;
+
+        [Tooltip("Development Builds: include the debugger UI (layout, style sheets, font). Turn off for builds that only " +
+                 "run the remote server for the remote editor tool; the debugger can not be opened in them. The Editor always has the UI.")]
+        [SerializeField] bool includeDebuggerUI = true;
 
         [Tooltip("Allows editing non-key fields. When disabled the debugger is a read-only browser.")]
         [SerializeField] bool allowEditing = true;
@@ -69,6 +74,7 @@ namespace Nesh.MasterMemoryDebugger
         [SerializeField] string remotePairingCode = "";
 
         public bool Enabled { get => enabled; set => enabled = value; }
+        public bool IncludeDebuggerUI { get => includeDebuggerUI; set => includeDebuggerUI = value; }
         public bool AllowEditing { get => allowEditing; set => allowEditing = value; }
         public bool AllowPatchSave { get => allowPatchSave; set => allowPatchSave = value; }
         public bool AutoLoadPatch { get => autoLoadPatch; set => autoLoadPatch = value; }
@@ -96,6 +102,15 @@ namespace Nesh.MasterMemoryDebugger
             {
                 if (s_current == null)
                 {
+#if UNITY_EDITOR
+                    // the asset of the project, wherever it is
+                    foreach (var guid in UnityEditor.AssetDatabase.FindAssets("t:" + nameof(MasterMemoryDebuggerSettings)))
+                    {
+                        s_current = UnityEditor.AssetDatabase.LoadAssetAtPath<MasterMemoryDebuggerSettings>(UnityEditor.AssetDatabase.GUIDToAssetPath(guid));
+                        if (s_current != null) break;
+                    }
+                    if (s_current == null)
+#endif
                     s_current = Resources.Load<MasterMemoryDebuggerSettings>(ResourcesPath);
                     if (s_current == null)
                     {

@@ -15,10 +15,6 @@ namespace Nesh.MasterMemoryDebugger
     public sealed class MasterMemoryDebuggerDocument : MonoBehaviour
     {
         public const string GameObjectName = "MasterMemoryRuntimeDebugger";
-        internal const string ResourcesFolder = "MasterMemoryDebugger/";
-        internal const string LayoutResourcePath = ResourcesFolder + "MasterMemoryDebugger";
-        internal const string StyleResourcePath = ResourcesFolder + "MasterMemoryDebugger";
-        internal const string ThemeResourcePath = ResourcesFolder + "MasterMemoryDebuggerTheme";
 
         UIDocument document;
         PanelSettings ownedPanelSettings;
@@ -31,8 +27,12 @@ namespace Nesh.MasterMemoryDebugger
 
         internal static MasterMemoryDebuggerDocument Create()
         {
-            var layout = Resources.Load<VisualTreeAsset>(LayoutResourcePath);
-            if (layout == null) throw new MissingReferenceException("Resources/" + LayoutResourcePath + ".uxml was not found.");
+            var layout = MasterMemoryDebuggerAssets.Layout;
+            if (layout == null)
+            {
+                throw new MissingReferenceException("The debugger UI is not included in this build " +
+                                                    "(Project Settings > MasterMemory Debugger > Include Debugger UI).");
+            }
 
             var settings = MasterMemoryDebuggerSettings.Current;
             var gameObject = new GameObject(GameObjectName);
@@ -61,7 +61,7 @@ namespace Nesh.MasterMemoryDebugger
             var panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
             panelSettings.name = "MasterMemoryDebuggerPanelSettings";
             panelSettings.hideFlags = HideFlags.DontSave;
-            panelSettings.themeStyleSheet = Resources.Load<ThemeStyleSheet>(ThemeResourcePath);
+            panelSettings.themeStyleSheet = MasterMemoryDebuggerAssets.Theme;
             panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
             panelSettings.referenceResolution = new Vector2Int(1600, 900);
             panelSettings.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
@@ -79,7 +79,7 @@ namespace Nesh.MasterMemoryDebugger
             // When the panel belongs to the debugger, style the whole panel so the menus get the dark theme and the font;
             // a panel shared with the game is left untouched.
             var styleRoot = ownedPanelSettings != null && root.panel != null ? root.panel.visualTree : root;
-            var style = Resources.Load<StyleSheet>(StyleResourcePath);
+            var style = MasterMemoryDebuggerAssets.Style;
             if (style != null) styleRoot.styleSheets.Add(style);
             var font = MasterMemoryDebuggerSettings.Current.Font;
             if (font != null) styleRoot.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(font));
