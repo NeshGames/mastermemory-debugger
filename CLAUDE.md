@@ -17,8 +17,11 @@ turns it off).
 - The owner verifies UI and device behavior in Unity (6000.6). Nothing here can run Unity: say what was verified
   (harness) and what still needs a check in Unity (`Tools/Harness/SMOKE_TEST.md`).
 - Avoid over-design: small, direct solutions; propose bigger ones with a cost estimate first.
-- Release flow: work on the session branch, push, wait for the owner's 「推」, then open a PR, wait for CI, squash merge
-  (the Release workflow tags and publishes). Do not open or merge PRs without that.
+- Release flow: work on the session branch, push, wait for the owner's 「推」, then open a PR. `main` is protected by a
+  [ruleset](https://github.com/NeshGames/mastermemory-debugger/rules/24073327): no force pushes or deletion, changes
+  through PRs, and `Build and test (outside Unity)` must pass against the latest `main`. The owner checks the Unity
+  smoke test; squash merge after that and CI pass (the Release workflow tags and publishes). Do not open or merge PRs
+  without the owner's 「推」.
 
 ## Layout
 

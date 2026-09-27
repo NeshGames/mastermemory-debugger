@@ -227,16 +227,160 @@ namespace Nesh.MasterMemoryDebugger.Tests
         [Test]
         public void Protocol_ShouldRoundTrip()
         {
-            var welcome = new MasterMemoryRemoteProtocol.Welcome { Version = 1, MasterVersion = "v", LabelsTsv = "x" };
+            var welcome = new MasterMemoryRemoteProtocol.Welcome { Version = MasterMemoryRemoteProtocol.Version, ServerEpoch = "epoch", MasterVersion = "v", LabelsTsv = "x" };
             welcome.Tables.Add(new MasterMemoryRemoteProtocol.Table { TableName = "T", RecordType = "R", KeyType = "K", Group = "", Records = { new byte[] { 1, 2 } }, DisplayNames = new System.Collections.Generic.List<string> { "a" } });
             welcome.Overrides.Add(new MasterMemoryRemoteProtocol.Change { IsSet = true, TableName = "T", Record = new byte[] { 3 } });
+            welcome.Operations.Add(new MasterMemoryRemoteProtocol.Operation { Id = "refresh", Label = "Refresh", Context = "battle:1", Revision = 7 });
 
             var read = MasterMemoryRemoteProtocol.DecodeWelcome(MasterMemoryRemoteProtocol.Encode(welcome));
             Assert.AreEqual("v", read.MasterVersion);
             CollectionAssert.AreEqual(new byte[] { 1, 2 }, read.Tables[0].Records[0]);
             Assert.AreEqual("a", read.Tables[0].DisplayNames[0]);
             Assert.IsTrue(read.Overrides[0].IsSet);
+            Assert.AreEqual("epoch", read.ServerEpoch);
+            Assert.AreEqual("battle:1", read.Operations[0].Context);
+            var request = new MasterMemoryRemoteProtocol.OperationRequest
+            { RequestId = "req", OperationId = "refresh", Context = "battle:1", Revision = 7 };
+            Assert.AreEqual(7, MasterMemoryRemoteProtocol.DecodeOperationRequest(MasterMemoryRemoteProtocol.Encode(request)).Revision);
+            var result = new MasterMemoryRemoteProtocol.OperationResult
+            { RequestId = "req", Status = (byte)MasterMemoryRemoteOperationStatus.Success, OldSha = "old", NewSha = "new" };
+            Assert.AreEqual("new", MasterMemoryRemoteProtocol.DecodeOperationResult(MasterMemoryRemoteProtocol.Encode(result)).NewSha);
+            Assert.AreEqual("refresh", MasterMemoryRemoteProtocol.DecodeOperations(
+                MasterMemoryRemoteProtocol.EncodeOperations(welcome.Operations))[0].Id);
             Assert.Throws<System.IO.InvalidDataException>(() => MasterMemoryRemoteProtocol.DecodeHello(MasterMemoryRemoteProtocol.EncodeReject("no")));
+        }
+
+        [Test]
+        public void Server_ShouldInvokeAnOperationOnceAndRejectStaleContext()
+        {
+            RegisterTestDatabase();
+            var revision = 1;
+            var calls = 0;
+            using var registration = MasterMemoryDebugRemote.RegisterOperation("refresh", "Refresh battle",
+                () => "battle:1:g1", () => revision, () =>
+                {
+                    calls++;
+                    return new MasterMemoryRemoteOperationResult
+                    { Status = MasterMemoryRemoteOperationStatus.Success, OldSha = "old", NewSha = "new" };
+                });
+            Assert.IsTrue(MasterMemoryDebugRemote.StartServer(0, "123456"));
+            var stream = ConnectRaw("123456");
+            var welcome = MasterMemoryRemoteProtocol.DecodeWelcome(ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.Welcome));
+            Assert.AreEqual("refresh", welcome.Operations[0].Id);
+            Assert.IsNotEmpty(welcome.ServerEpoch);
+            var request = new MasterMemoryRemoteProtocol.OperationRequest
+            { RequestId = "once", OperationId = "refresh", Context = "battle:1:g1", Revision = 1 };
+            MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.Encode(request));
+            var first = MasterMemoryRemoteProtocol.DecodeOperationResult(
+                ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.OperationResult));
+            Assert.AreEqual((byte)MasterMemoryRemoteOperationStatus.Success, first.Status);
+            Assert.AreEqual("old", first.OldSha);
+            Assert.AreEqual(1, calls);
+
+            MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.Encode(request));
+            var duplicate = MasterMemoryRemoteProtocol.DecodeOperationResult(
+                ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.OperationResult));
+            Assert.AreEqual(first.NewSha, duplicate.NewSha);
+            Assert.AreEqual(1, calls);
+
+            revision++;
+            MasterMemoryDebugRemote.NotifyOperationsChanged();
+            var operations = MasterMemoryRemoteProtocol.DecodeOperations(
+                ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.Operations));
+            Assert.AreEqual(2, operations[0].Revision);
+            request.RequestId = "stale";
+            MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.Encode(request));
+            var stale = MasterMemoryRemoteProtocol.DecodeOperationResult(
+                ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.OperationResult));
+            Assert.AreEqual((byte)MasterMemoryRemoteOperationStatus.Stale, stale.Status);
+            Assert.AreEqual(1, calls);
+        }
+
+        [Test]
+        public void Client_ShouldSendTheAdvertisedContextAndReceiveAnOperationResult()
+        {
+            RegisterTestDatabase();
+            var welcome = MasterMemoryRemoteServer.CreateWelcome();
+            welcome.ServerEpoch = "game-epoch";
+            welcome.Operations.Add(new MasterMemoryRemoteProtocol.Operation
+            { Id = "refresh", Label = "Refresh battle", Context = "battle:2:g4", Revision = 9 });
+            MasterMemoryDebugRegistry.ClearTables();
+            MasterMemoryDebugRemote.IsToolMode = true;
+
+            rawServer = new TcpListener(IPAddress.Loopback, 0);
+            rawServer.Start();
+            MasterMemoryDebugRemote.Connect("127.0.0.1", ((IPEndPoint)rawServer.LocalEndpoint).Port, "42");
+            PumpUntil(() => rawServer.Pending(), "the connection");
+            var game = rawServer.AcceptTcpClient().GetStream();
+            ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.Hello);
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(welcome));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected, "the tables");
+            Assert.AreEqual("refresh", MasterMemoryDebugRemote.Operations[0].Id);
+            Assert.IsTrue(MasterMemoryDebugRemote.RequestOperation("refresh"));
+            var request = MasterMemoryRemoteProtocol.DecodeOperationRequest(
+                ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.OperationRequest));
+            Assert.AreEqual("battle:2:g4", request.Context);
+            Assert.AreEqual(9, request.Revision);
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(
+                new MasterMemoryRemoteProtocol.OperationResult
+                { RequestId = request.RequestId, Status = (byte)MasterMemoryRemoteOperationStatus.Success,
+                    Message = "applied", OldSha = "old", NewSha = "new" }));
+            PumpUntil(() => MasterMemoryDebugRemote.LastOperationResult != null, "the operation result");
+            Assert.AreEqual(MasterMemoryRemoteOperationStatus.Success, MasterMemoryDebugRemote.LastOperationResult.Status);
+            Assert.AreEqual("new", MasterMemoryDebugRemote.LastOperationResult.NewSha);
+            MasterMemoryDebugRemote.ReceiveOperations(welcome.Operations, "another-game");
+            Assert.IsNull(MasterMemoryDebugRemote.LastOperationResult,
+                "a new game must not display the prior game's completed result");
+        }
+
+        [Test]
+        public void Client_ShouldResendPendingOperationOnlyToTheSameServerEpoch()
+        {
+            MasterMemoryDebugRemote.ReconnectDelaySeconds = 0.01;
+            RegisterTestDatabase();
+            var welcome = MasterMemoryRemoteServer.CreateWelcome();
+            welcome.ServerEpoch = "original-game";
+            welcome.Operations.Add(new MasterMemoryRemoteProtocol.Operation
+            { Id = "refresh", Label = "Refresh", Context = "battle:1", Revision = 2 });
+            MasterMemoryDebugRegistry.ClearTables();
+            MasterMemoryDebugRemote.IsToolMode = true;
+            rawServer = new TcpListener(IPAddress.Loopback, 0);
+            rawServer.Start();
+            MasterMemoryDebugRemote.Connect("127.0.0.1", ((IPEndPoint)rawServer.LocalEndpoint).Port, "42");
+            PumpUntil(() => rawServer.Pending(), "the first connection");
+            var first = rawServer.AcceptTcpClient().GetStream();
+            ReceiveOf(first, MasterMemoryRemoteProtocol.MessageType.Hello);
+            MasterMemoryRemoteProtocol.WriteFrame(first, MasterMemoryRemoteProtocol.Encode(welcome));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected, "the first welcome");
+            Assert.IsTrue(MasterMemoryDebugRemote.RequestOperation("refresh"));
+            var request = MasterMemoryRemoteProtocol.DecodeOperationRequest(
+                ReceiveOf(first, MasterMemoryRemoteProtocol.MessageType.OperationRequest));
+
+            first.Close();
+            PumpUntil(() => rawServer.Pending(), "the same game reconnection");
+            var second = rawServer.AcceptTcpClient().GetStream();
+            ReceiveOf(second, MasterMemoryRemoteProtocol.MessageType.Hello);
+            MasterMemoryRemoteProtocol.WriteFrame(second, MasterMemoryRemoteProtocol.Encode(welcome));
+            var retried = MasterMemoryRemoteProtocol.DecodeOperationRequest(
+                ReceiveOf(second, MasterMemoryRemoteProtocol.MessageType.OperationRequest));
+            Assert.AreEqual(request.RequestId, retried.RequestId);
+            MasterMemoryRemoteProtocol.WriteFrame(second, MasterMemoryRemoteProtocol.Encode(
+                new MasterMemoryRemoteProtocol.OperationResult
+                { RequestId = request.RequestId, Status = (byte)MasterMemoryRemoteOperationStatus.Success }));
+            PumpUntil(() => MasterMemoryDebugRemote.LastOperationResult != null, "the retried result");
+            Assert.AreEqual(MasterMemoryRemoteOperationStatus.Success, MasterMemoryDebugRemote.LastOperationResult.Status);
+
+            Assert.IsTrue(MasterMemoryDebugRemote.RequestOperation("refresh"));
+            ReceiveOf(second, MasterMemoryRemoteProtocol.MessageType.OperationRequest);
+            second.Close();
+            PumpUntil(() => rawServer.Pending(), "the restarted game connection");
+            var restarted = rawServer.AcceptTcpClient().GetStream();
+            ReceiveOf(restarted, MasterMemoryRemoteProtocol.MessageType.Hello);
+            welcome.ServerEpoch = "new-game";
+            MasterMemoryRemoteProtocol.WriteFrame(restarted, MasterMemoryRemoteProtocol.Encode(welcome));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected, "the restarted welcome");
+            Assert.AreEqual(MasterMemoryRemoteOperationStatus.Stale, MasterMemoryDebugRemote.LastOperationResult.Status);
+            Assert.IsFalse(restarted.DataAvailable, "an old request must not be sent to a new game process");
         }
 
         [Test]

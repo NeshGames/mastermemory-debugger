@@ -23,7 +23,7 @@ namespace Nesh.MasterMemoryDebugger.Editor
 
         public void OnPreprocessBuild(BuildReport report)
         {
-            Clean();
+            Clean(forceDuringBuild: true);
             // a failed build does not call OnPostprocessBuild
             EditorApplication.delayCall += Clean;
             if ((report.summary.options & BuildOptions.Development) == 0) return;
@@ -44,7 +44,7 @@ namespace Nesh.MasterMemoryDebugger.Editor
             AssetDatabase.SaveAssets();
         }
 
-        public void OnPostprocessBuild(BuildReport report) => Clean();
+        public void OnPostprocessBuild(BuildReport report) => Clean(forceDuringBuild: true);
 
         [InitializeOnLoadMethod]
         static void CleanLeftovers()
@@ -53,9 +53,11 @@ namespace Nesh.MasterMemoryDebugger.Editor
             if (!BuildPipeline.isBuildingPlayer) EditorApplication.delayCall += Clean;
         }
 
-        internal static void Clean()
+        internal static void Clean() => Clean(false);
+
+        static void Clean(bool forceDuringBuild)
         {
-            if (BuildPipeline.isBuildingPlayer || !AssetDatabase.IsValidFolder(GeneratedFolder)) return;
+            if ((BuildPipeline.isBuildingPlayer && !forceDuringBuild) || !AssetDatabase.IsValidFolder(GeneratedFolder)) return;
             AssetDatabase.DeleteAsset(GeneratedFolder);
         }
 

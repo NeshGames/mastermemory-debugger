@@ -33,6 +33,7 @@ namespace Nesh.MasterMemoryDebugger
             content.Add(portField);
             content.Add(codeField);
             content.Add(CreateStatusLabel());
+            content.Add(CreateOperations(setStatus));
 
             var connected = MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected || MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connecting;
             var cancel = new MasterMemoryDebuggerDialog.DialogButton("Close", null);
@@ -60,6 +61,46 @@ namespace Nesh.MasterMemoryDebugger
                 content,
                 connected ? new[] { cancel, disconnect, connect } : new[] { cancel, connect });
             codeField.schedule.Execute(() => codeField.Focus());
+        }
+
+        static VisualElement CreateOperations(Action<string, bool> setStatus)
+        {
+            var root = new VisualElement();
+            var result = new Label();
+            var list = new VisualElement();
+            root.Add(new Label("Game operations"));
+            root.Add(list);
+            root.Add(result);
+            void Refresh()
+            {
+                list.Clear();
+                if (MasterMemoryDebugRemote.State != MasterMemoryRemoteState.Connected)
+                    list.Add(new Label("Connect to a game to use its operations."));
+                else if (MasterMemoryDebugRemote.Operations.Count == 0)
+                    list.Add(new Label("The game has no available operations."));
+                else foreach (var operation in MasterMemoryDebugRemote.Operations)
+                {
+                    var id = operation.Id;
+                    var button = new Button(() =>
+                    {
+                        if (!MasterMemoryDebugRemote.RequestOperation(id))
+                            setStatus("Remote operation is unavailable or busy.", true);
+                        else result.text = "Request sent: " + id;
+                    }) { text = operation.Label, tooltip = operation.Context + " / revision " + operation.Revision };
+                    button.AddToClassList("mm-debugger__button");
+                    list.Add(button);
+                }
+                var last = MasterMemoryDebugRemote.LastOperationResult;
+                if (last != null)
+                    result.text = last.Status + ": " + last.Message + "  " + last.OldSha + " → " + last.NewSha;
+            }
+            root.RegisterCallback<AttachToPanelEvent>(_ =>
+            {
+                MasterMemoryDebugRemote.Changed += Refresh;
+                Refresh();
+            });
+            root.RegisterCallback<DetachFromPanelEvent>(_ => MasterMemoryDebugRemote.Changed -= Refresh);
+            return root;
         }
 
         /// <summary>Games answering on the local network; clicking one fills the address and port.</summary>

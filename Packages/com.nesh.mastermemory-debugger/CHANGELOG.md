@@ -2,6 +2,17 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.11.0] - 2026-09-27
+
+### Added
+
+- Remote protocol v4: a paired tool can list registered game operations, send a request with the target context and candidate revision, and receive a status, message and old/new fingerprints. Requests run on the game's main thread; stale contexts are rejected, and repeated request IDs return the original result. The Remote dialog shows the available operations and their latest result.
+- `MasterMemoryDebugRemote.RegisterOperation` returns an owner token; disposing it removes the action. `NotifyOperationsChanged` publishes a new context or revision without replacing the registration.
+
+### Fixed
+
+- The build processor removes its temporary Debugger Resources assets during the build postprocess callback, including batchmode builds that quit before a delayed editor callback can run.
+
 ## [0.10.1] - 2026-09-27
 
 ### Fixed

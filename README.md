@@ -28,12 +28,12 @@ Everything runs only in the Editor and in Development Builds; release builds con
 2. Package Manager → Add package from git URL:
 
    ```
-   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.10.1
+   https://github.com/NeshGames/mastermemory-debugger.git?path=/Packages/com.nesh.mastermemory-debugger#v0.11.0
    ```
 
-   `#v0.10.1` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
+   `#v0.11.0` pins a release (see [Releases](https://github.com/NeshGames/mastermemory-debugger/releases)); without it you get the latest `main`.
 
-See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for usage.
+See the [package README](Packages/com.nesh.mastermemory-debugger/README.md) for usage, or follow the [Remote Editor Build guide](Packages/com.nesh.mastermemory-debugger/REMOTE_EDITOR_GUIDE.md) to build and use the desktop tool.
 
 ## Develop the package in this repository
 
@@ -57,11 +57,15 @@ compile-only Unity stubs) and runs the tests that do not need a UI panel. See [T
 
 - **CI** (`.github/workflows/ci.yml`) runs it on every pull request and push to `main`, and checks that `CHANGELOG.md`
   has a section for the version in `package.json`.
+- **Protected `main`** ([ruleset](https://github.com/NeshGames/mastermemory-debugger/rules/24073327)) accepts changes
+  through pull requests after the `Build and test (outside Unity)` check passes against the latest `main`. Force pushes
+  and branch deletion are blocked.
 - **Release** (`.github/workflows/release.yml`): when a push to `main` changes the version in `package.json`, the
   `vX.Y.Z` tag and a GitHub Release with that version's CHANGELOG section are created automatically.
 
 Releasing is therefore: bump `version` in `package.json`, add the CHANGELOG section (and update the `#vX.Y.Z` in the
-READMEs), run the [smoke test](Tools/Harness/SMOKE_TEST.md) in Unity, merge to `main`.
+READMEs), run the [smoke test](Tools/Harness/SMOKE_TEST.md) in Unity, wait for the required CI check on the pull request,
+then squash merge to `main`.
 
 To create the GitHub Release of an older tag, run the Release workflow by hand (Actions → Release → Run workflow) with
 the tag, for example `v0.4.0`; the notes come from that version's CHANGELOG section.
