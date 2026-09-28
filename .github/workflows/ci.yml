@@ -17,6 +17,9 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Verify architecture invariants
+        run: python3 Tools/verify-architecture.py
+
       - name: Changelog and READMEs match the package version
         run: |
           version=$(jq -r .version Packages/com.nesh.mastermemory-debugger/package.json)

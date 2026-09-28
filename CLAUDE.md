@@ -28,14 +28,14 @@ turns it off).
 ```
 Packages/com.nesh.mastermemory-debugger/
   Runtime/
-    Core/        registry of tables, override runtime, history (undo), rebuild + validation, batch edit, TSV import,
-                 localization, references (IValidatable Exists), queries
-    Override/    thread-safe override store (EntryChanged feeds undo history and remote sync)
+    Core/        registry/session, MasterMemory v3 adapter, history, rebuild/validation, queries, diagnostics
+    Override/    thread-safe override store and atomic compare-and-swap commits
     Reflection/  reflection cache (no Emit), clone, diff, value formatting / JSON values
-    Patch/       patch model, JSON, storage, service (create / apply), compare, export / import, WebGL bridge
-    Remote/      remote editing: protocol, TCP connection, server (game), client (tool), discovery (UDP), launcher
-    UI/          controllers of the UI Toolkit debugger; UI/Layout holds the UXML / USS / theme (NOT in Resources)
-    Settings/    MasterMemoryDebuggerSettings (ScriptableObject)
+    Patch/       shared transactional Patch engine, JSON/storage/compare/export/import
+    Remote/      protocol v6, lazy table chunks, TCP/discovery, server/client and bounded replay caches
+    UI/          UI Toolkit controllers/assets, Diagnostics tab and remote editor host
+    InputSystem/ optional Input System adapter assembly
+    Settings/    MasterMemoryDebuggerSettings
   Editor/        settings page, menus, link.xml generator, build processor (copies UI + settings into Development Builds)
   Samples~/BasicExample/   example tables (incl. 50,000 record table), registration, launcher
   Tests/Runtime, Tests/Editor
@@ -59,6 +59,14 @@ of remote editing and 50,000 record timing checks). Run it before every commit.
 - `RuntimeDebuggerTests` (PlayMode) and `Tests/Editor` only compile in the harness; they run in the Unity Test Runner.
 - Tests touch static state: `DebuggerTestBase` resets it; anything persisted (PlayerPrefs) has `ResetForTests` /
   `EndTests` so tests never write the developer's prefs.
+
+## Architecture guardrails
+
+- Read `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/INVARIANTS.md` and `docs/TEST_MATRIX.md` for cross-layer work.
+- Dependency direction is Core <- Remote <- UI <- optional InputSystem.
+- Local and remote Patch application share `MasterDataPatchEngine`.
+- MasterMemory generated API reflection belongs in `MasterMemoryV3Adapter`.
+- Protocol v6 Welcome stays metadata-only; records are lazy chunk requests.
 
 ## Conventions
 
@@ -92,7 +100,7 @@ of remote editing and 50,000 record timing checks). Run it before every commit.
   Resources; `MasterMemoryDebuggerBuildProcessor` copies them into `Assets/MasterMemoryDebuggerBuild/Resources` for
   Development Builds only and deletes it afterwards.
 - Remote editing: records travel as MessagePack (`MasterMemoryDebugRemote.SerializerOptions` for IL2CPP resolvers;
-  the server checks each table at start). JSON transport was evaluated (2026-09-27: ~16× slower to serialize, +37%
+  the server checks each table at start). Protocol v6 sends metadata in Welcome and records lazily in chunks. JSON transport was evaluated (2026-09-27: ~16× slower to serialize, +37%
   size) and dropped: keep MessagePack. The tool mirrors the game's tables into its own registry / store, so the
   whole UI works unchanged; sockets are closed when Play Mode ends.
 - The environment's git proxy refuses tag pushes and branch deletion; the Release workflow creates tags.
