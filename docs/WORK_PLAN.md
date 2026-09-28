@@ -172,11 +172,13 @@ Introduce these only after the rewritten codebase is warning-clean.
 
 The shared Patch engine already produces a preflight plan; expose it to users before applying/importing a Patch.
 
-- [ ] Show changed/added/deleted target counts.
-- [ ] Show warnings/errors before any mutation.
-- [ ] Show master-version/schema mismatch clearly.
-- [ ] Use the same `MasterDataPatchEngine` plan as the actual commit.
-- [ ] Remote CLI can optionally output equivalent dry-run impact data.
+- [x] Show changed/added/deleted target counts.
+- [x] Show warnings/errors before any mutation.
+- [x] Show master-version/schema mismatch clearly.
+- [x] Use the same `MasterDataPatchEngine` plan as the actual commit.
+- [x] Remote CLI `patch-plan` already provides the non-mutating target/error plan used for equivalent dry-run inspection.
+
+Apply/Merge now always presents the shared-engine impact preview before commit. Automated execution remains part of P0.2.
 
 **Definition of done**
 

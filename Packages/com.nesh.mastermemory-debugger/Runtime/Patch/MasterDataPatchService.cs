@@ -219,7 +219,74 @@ namespace Nesh.MasterMemoryDebugger
             return json;
         }
 
-        // ------------------------------------------------------------------ apply
+        // ------------------------------------------------------------------ preview / apply
+
+        /// <summary>
+        /// Builds the same fully validated transaction plan as <see cref="Apply"/> without mutating the override store.
+        /// </summary>
+        public static MasterDataPatchPreviewResult Preview(
+            MasterDataPatch patch,
+            bool force = false,
+            bool replaceExisting = true)
+        {
+            if (patch == null) throw new ArgumentNullException(nameof(patch));
+            var result = new MasterDataPatchPreviewResult
+            {
+                PatchMasterVersion = patch.MasterVersion ?? MasterMemoryDebugRegistry.UnknownMasterVersion,
+                CurrentMasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
+                PatchSchemaHash = patch.SchemaHash,
+                CurrentSchemaHash = MasterMemoryDebugRegistry.GetSchemaHash(),
+            };
+
+            if (!MasterMemoryDebugBuild.IsEnabled)
+            {
+                result.Status = MasterDataPatchPreviewStatus.Disabled;
+                return result;
+            }
+
+            var plan = MasterDataPatchEngine.Build(
+                patch,
+                replaceExisting: replaceExisting,
+                requireOriginalPreconditions: true,
+                forceIdentity: force);
+            result.Warnings.AddRange(plan.Warnings);
+            foreach (var error in plan.Errors)
+                result.Errors.Add($"{error.Code}: {error.TableName} {error.Key} {error.Field} {error.Message}".Trim());
+
+            if (!plan.Succeeded)
+            {
+                var code = plan.Errors.Count == 0 ? null : plan.Errors[0].Code;
+                result.Status = code == "UNSUPPORTED_FORMAT" ? MasterDataPatchPreviewStatus.UnsupportedFormat
+                    : code == "VERSION_MISMATCH" ? MasterDataPatchPreviewStatus.VersionMismatch
+                    : code == "SCHEMA_MISMATCH" ? MasterDataPatchPreviewStatus.SchemaMismatch
+                    : MasterDataPatchPreviewStatus.Invalid;
+                return result;
+            }
+
+            result.TargetRecords = plan.Targets.Count;
+            result.Fields = plan.FieldCount;
+            result.RemovedExistingOverrides = Math.Max(0, plan.Changes.Count - plan.Targets.Count);
+            foreach (var target in plan.Targets)
+            {
+                switch (target.Kind)
+                {
+                    case MasterDataPatchOperationKind.Add:
+                        result.AddedRecords++;
+                        break;
+                    case MasterDataPatchOperationKind.Delete:
+                        result.DeletedRecords++;
+                        break;
+                    case MasterDataPatchOperationKind.Reset:
+                        result.ResetRecords++;
+                        break;
+                    default:
+                        result.ChangedRecords++;
+                        break;
+                }
+            }
+            result.Status = MasterDataPatchPreviewStatus.Ready;
+            return result;
+        }
 
         /// <summary>
         /// Applies a patch.

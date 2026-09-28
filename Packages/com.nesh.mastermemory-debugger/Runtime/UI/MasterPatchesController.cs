@@ -226,7 +226,7 @@ namespace Nesh.MasterMemoryDebugger
             var (name, info) = ((Label, Label))item.userData;
             name.text = entry.Name == MasterDataPatchStorage.DefaultPatchName ? entry.Name + "  (default)" : entry.Name;
             info.text = entry.Error != null ? "unreadable: " + entry.Error : Describe(entry, compact: true);
-            item.EnableInClassList("mm-debugger__patch-item--problem", entry.Error != null || !IsSameVersion(entry));
+            item.EnableInClassList("mm-debugger__patch-item--problem", entry.Error != null || !IsSameIdentity(entry));
         }
 
         void OnSelectionChanged(IEnumerable<object> selection)
@@ -246,10 +246,36 @@ namespace Nesh.MasterMemoryDebugger
                 : $"{patch.RecordCount} records, {entry.FieldCount} fields   ·   master version {patch.MasterVersion ?? "-"}   ·   saved {time}";
         }
 
-        static bool IsSameVersion(Entry entry)
+        static bool IsSameIdentity(Entry entry)
         {
-            return entry.Patch == null || MasterDataPatchService.IsSameMasterVersion(entry.Patch.MasterVersion, MasterMemoryDebugRegistry.GetMasterVersion());
+            if (entry.Patch == null) return true;
+            if (!MasterDataPatchService.IsSameMasterVersion(
+                    entry.Patch.MasterVersion, MasterMemoryDebugRegistry.GetMasterVersion()))
+                return false;
+            return string.IsNullOrEmpty(entry.Patch.SchemaHash)
+                || string.Equals(entry.Patch.SchemaHash, MasterMemoryDebugRegistry.GetSchemaHash(), StringComparison.Ordinal);
         }
+
+        static string IdentityWarning(Entry entry)
+        {
+            if (entry?.Patch == null) return string.Empty;
+            var warnings = new List<string>();
+            if (!MasterDataPatchService.IsSameMasterVersion(
+                    entry.Patch.MasterVersion, MasterMemoryDebugRegistry.GetMasterVersion()))
+            {
+                warnings.Add(
+                    $"master version {entry.Patch.MasterVersion ?? "-"} → {MasterMemoryDebugRegistry.GetMasterVersion()}");
+            }
+            if (!string.IsNullOrEmpty(entry.Patch.SchemaHash)
+                && !string.Equals(entry.Patch.SchemaHash, MasterMemoryDebugRegistry.GetSchemaHash(), StringComparison.Ordinal))
+            {
+                warnings.Add($"schema {ShortHash(entry.Patch.SchemaHash)} → {ShortHash(MasterMemoryDebugRegistry.GetSchemaHash())}");
+            }
+            return warnings.Count == 0 ? string.Empty : "Identity mismatch: " + string.Join(", ", warnings) + ".";
+        }
+
+        static string ShortHash(string value) =>
+            string.IsNullOrEmpty(value) || value.Length <= 12 ? value ?? "-" : value.Substring(0, 12);
 
         // ------------------------------------------------------------------ detail
 
@@ -273,9 +299,7 @@ namespace Nesh.MasterMemoryDebugger
                 return;
             }
             detailInfo.text = Describe(selected, compact: false);
-            detailWarning.text = IsSameVersion(selected)
-                ? string.Empty
-                : $"Created for master version \"{selected.Patch.MasterVersion}\", the current version is \"{MasterMemoryDebugRegistry.GetMasterVersion()}\".";
+            detailWarning.text = IdentityWarning(selected);
 
             foreach (var table in selected.Patch.Tables)
             {
@@ -324,33 +348,75 @@ namespace Nesh.MasterMemoryDebugger
         {
             var entry = selected;
             if (entry?.Patch == null) return;
-            var count = MasterMemoryDebugRuntime.OverrideCount;
-            if (replace && count > 0)
+
+            var previewResult = MasterDataPatchService.Preview(entry.Patch, force: false, replaceExisting: replace);
+            if (previewResult.Status == MasterDataPatchPreviewStatus.VersionMismatch
+                || previewResult.Status == MasterDataPatchPreviewStatus.SchemaMismatch)
             {
-                dialog.Show(
-                    "Apply patch",
-                    $"Apply \"{entry.Name}\"? The {count} current overrides are replaced (use Merge to keep them).",
-                    new MasterMemoryDebuggerDialog.DialogButton("Cancel", null),
-                    new MasterMemoryDebuggerDialog.DialogButton("Apply", () => Apply(entry, replace: true), isPrimary: true));
+                var forced = MasterDataPatchService.Preview(entry.Patch, force: true, replaceExisting: replace);
+                ShowImpactPreview(entry, replace, forced, force: true);
                 return;
             }
-            Apply(entry, replace);
+
+            ShowImpactPreview(entry, replace, previewResult, force: false);
         }
 
-        void Apply(Entry entry, bool replace)
+        void ShowImpactPreview(Entry entry, bool replace, MasterDataPatchPreviewResult previewResult, bool force)
         {
-            var result = ApplyPatch(entry, force: false, replace);
-            if (result.Status == MasterDataPatchApplyStatus.VersionMismatch)
+            var title = force ? "Patch impact (force)" : "Patch impact";
+            var action = replace ? "Apply" : "Merge";
+            var message = FormatImpact(previewResult, replace);
+
+            if (!previewResult.Succeeded)
             {
                 dialog.Show(
-                    "Master version mismatch",
-                    $"Patch \"{entry.Name}\" was created for master version \"{result.PatchMasterVersion}\" but the current version is \"{result.CurrentMasterVersion}\".\n" +
-                    "Records or fields may have changed.",
-                    new MasterMemoryDebuggerDialog.DialogButton("Cancel", () => setStatus("Apply cancelled.", false)),
-                    new MasterMemoryDebuggerDialog.DialogButton("Force Apply", () => Report(entry.Name, replace, ApplyPatch(entry, force: true, replace)), isDanger: true));
+                    title,
+                    message,
+                    new MasterMemoryDebuggerDialog.DialogButton("Close", null));
                 return;
             }
-            Report(entry.Name, replace, result);
+
+            dialog.Show(
+                title,
+                message,
+                new MasterMemoryDebuggerDialog.DialogButton("Cancel", () => setStatus(action + " cancelled.", false)),
+                new MasterMemoryDebuggerDialog.DialogButton(
+                    force ? "Force " + action : action,
+                    () => Report(entry.Name, replace, ApplyPatch(entry, force, replace)),
+                    isPrimary: !force,
+                    isDanger: force));
+        }
+
+        static string FormatImpact(MasterDataPatchPreviewResult result, bool replace)
+        {
+            var lines = new List<string>
+            {
+                $"Mode: {(replace ? "replace current overrides" : "merge with current overrides")}",
+                $"Targets: {result.TargetRecords} records, {result.Fields} fields",
+                $"Changed {result.ChangedRecords} · Added {result.AddedRecords} · Deleted {result.DeletedRecords} · Reset {result.ResetRecords}",
+            };
+            if (replace && result.RemovedExistingOverrides > 0)
+                lines.Add($"Also removes {result.RemovedExistingOverrides} current overrides not present in this patch.");
+
+            if (result.PatchMasterVersion != result.CurrentMasterVersion)
+                lines.Add($"Master version: {result.PatchMasterVersion} → {result.CurrentMasterVersion}");
+            if (!string.IsNullOrEmpty(result.PatchSchemaHash)
+                && result.PatchSchemaHash != result.CurrentSchemaHash)
+                lines.Add($"Schema: {ShortHash(result.PatchSchemaHash)} → {ShortHash(result.CurrentSchemaHash)}");
+
+            if (result.Warnings.Count > 0)
+            {
+                lines.Add("");
+                lines.Add("Warnings:");
+                foreach (var warning in result.Warnings) lines.Add("• " + warning);
+            }
+            if (result.Errors.Count > 0)
+            {
+                lines.Add("");
+                lines.Add("Errors:");
+                foreach (var error in result.Errors) lines.Add("• " + error);
+            }
+            return string.Join("\n", lines);
         }
 
         static MasterDataPatchApplyResult ApplyPatch(Entry entry, bool force, bool replace)
