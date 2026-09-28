@@ -34,6 +34,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugRemote.AutoReconnect = true;
             MasterMemoryDebugRemote.ReconnectDelaySeconds = 3;
             MasterMemoryDebugRemote.IsToolMode = false;
+            MasterMemoryRemoteServer.HelloTimeoutSeconds = 10.0;
             rawClient?.Close();
             rawServer?.Stop();
         }
@@ -129,6 +130,25 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void Server_ShouldDropAConnectionThatNeverSendsHello()
+        {
+            RegisterTestDatabase();
+            MasterMemoryRemoteServer.HelloTimeoutSeconds = 0.01;
+            Assert.IsTrue(MasterMemoryDebugRemote.StartServer(0, "123456"));
+
+            rawClient = new TcpClient();
+            rawClient.Connect(IPAddress.Loopback, MasterMemoryDebugRemote.ServerPort);
+            var stream = rawClient.GetStream();
+
+            var reply = Receive(stream, "the hello timeout");
+
+            Assert.AreEqual(MasterMemoryRemoteProtocol.MessageType.Reject,
+                MasterMemoryRemoteProtocol.GetType(reply));
+            StringAssert.Contains("Timed out", MasterMemoryRemoteProtocol.DecodeReject(reply));
+            Assert.AreEqual(MasterMemoryRemoteState.Listening, MasterMemoryDebugRemote.State);
+        }
+
+        [Test]
         public void Server_ShouldRefuseAWrongCode()
         {
             RegisterTestDatabase();
@@ -188,6 +208,34 @@ namespace Nesh.MasterMemoryDebugger.Tests
                 // the rebuild-less test game has no validation; only validation states may follow
                 Assert.AreEqual(MasterMemoryRemoteProtocol.MessageType.ValidationState, MasterMemoryRemoteProtocol.GetType(MasterMemoryRemoteProtocol.ReadFrame(stream)), "changes of the tool are not echoed");
             }
+        }
+
+        [Test]
+        public void Server_ShouldAllowTableTransferRetryAfterDisconnect()
+        {
+            RegisterTestDatabase();
+            MasterMemoryDebugRemote.StartServer(0, "1");
+
+            var first = ConnectRaw("1");
+            var firstWelcome = MasterMemoryRemoteProtocol.DecodeWelcome(Receive(first, "the first welcome"));
+            var manifest = firstWelcome.Tables.Single(x => x.TableName == nameof(TestSkill));
+            MasterMemoryRemoteProtocol.WriteFrame(first,
+                MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableRequest
+                {
+                    RequestId = "first-load",
+                    TableName = manifest.TableName,
+                }));
+            MasterMemoryDebugRemote.Pump();
+            rawClient.Close();
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Listening,
+                "the interrupted table transfer to close");
+
+            var second = ConnectRaw("1");
+            var secondWelcome = MasterMemoryRemoteProtocol.DecodeWelcome(Receive(second, "the second welcome"));
+            var loaded = RequestTable(second,
+                secondWelcome.Tables.Single(x => x.TableName == nameof(TestSkill)));
+
+            Assert.AreEqual(3, loaded.Records.Count);
         }
 
         [Test]
@@ -564,6 +612,90 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugRemote.Connect("127.0.0.1", port, "1");
             PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Failed, "the failure");
             StringAssert.Contains(port.ToString(), MasterMemoryDebugRemote.Status);
+        }
+
+        [Test]
+        public void Protocol_GoldenHelloAndTableRequest_ShouldStayStable()
+        {
+            var hello = MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.Hello
+            {
+                Version = 6,
+                Code = "42",
+            });
+            Assert.AreEqual("0106000000023432", BitConverter.ToString(hello).Replace("-", "").ToLowerInvariant());
+
+            var request = MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableRequest
+            {
+                RequestId = "req",
+                TableName = "T",
+            });
+            Assert.AreEqual("0f037265710154", BitConverter.ToString(request).Replace("-", "").ToLowerInvariant());
+        }
+
+        [Test]
+        public void Protocol_ShouldRejectTruncatedFrame()
+        {
+            using var stream = new MemoryStream();
+            var header = BitConverter.GetBytes(4);
+            if (!BitConverter.IsLittleEndian) Array.Reverse(header);
+            stream.Write(header, 0, header.Length);
+            stream.WriteByte(1);
+            stream.WriteByte(2);
+            stream.Position = 0;
+
+            Assert.Throws<EndOfStreamException>(() => MasterMemoryRemoteProtocol.ReadFrame(stream));
+        }
+
+        [Test]
+        public void Protocol_ShouldRejectMismatchedChunkDisplayNames()
+        {
+            var payload = MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = "table",
+                TableName = "Skill",
+                ChunkIndex = 0,
+                IsLast = true,
+                Records =
+                {
+                    new byte[] { 1 },
+                    new byte[] { 2 },
+                },
+                DisplayNames = new System.Collections.Generic.List<string> { "only-one" },
+            });
+
+            Assert.Throws<InvalidDataException>(() => MasterMemoryRemoteProtocol.DecodeTableChunk(payload));
+        }
+
+        [Test]
+        public void Connection_ShouldCloseWhenIncomingQueueIsFull()
+        {
+            using var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            using var sender = new TcpClient();
+            sender.Connect(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port);
+            using var accepted = listener.AcceptTcpClient();
+            using var connection = new MasterMemoryRemoteConnection(accepted);
+            var stream = sender.GetStream();
+            var payload = MasterMemoryRemoteProtocol.EncodeReject("queued");
+
+            for (var i = 0; i < MasterMemoryRemoteConnection.MaxQueuedFrames + 2; i++)
+            {
+                try
+                {
+                    MasterMemoryRemoteProtocol.WriteFrame(stream, payload);
+                }
+                catch (IOException)
+                {
+                    break;
+                }
+            }
+
+            var watch = Stopwatch.StartNew();
+            while (!connection.IsClosed && watch.ElapsedMilliseconds < 5000)
+                System.Threading.Thread.Sleep(5);
+
+            Assert.IsTrue(connection.IsClosed);
+            StringAssert.Contains("incoming message queue", connection.CloseReason);
         }
 
         [Test]

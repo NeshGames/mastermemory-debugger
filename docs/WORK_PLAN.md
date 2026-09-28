@@ -135,13 +135,15 @@ The responsibility split is implemented. Compilation and the Unity UI smoke test
 
 ### 5. Add protocol golden / malformed-input tests
 
-- [ ] Golden round-trip fixtures for protocol v6 message types.
-- [ ] Invalid counts/lengths and truncated payloads.
-- [ ] Out-of-order/duplicate TableChunk behavior.
-- [ ] Duplicate request id with different Patch fingerprint.
-- [ ] Queue/backpressure saturation behavior.
-- [ ] Handshake timeout for clients that connect but never send Hello.
-- [ ] Table-transfer cancellation/retry when connection changes.
+- [x] Golden round-trip fixtures for protocol v6 message types.
+- [x] Invalid counts/lengths and truncated payloads.
+- [x] Out-of-order/duplicate TableChunk behavior.
+- [x] Duplicate request id with different Patch fingerprint.
+- [x] Queue/backpressure saturation behavior.
+- [x] Handshake timeout for clients that connect but never send Hello.
+- [x] Table-transfer cancellation/retry when connection changes.
+
+Implementation and regression coverage are complete; execution remains part of P0.2.
 
 **Definition of done**
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -14,6 +15,8 @@ namespace Nesh.MasterMemoryDebugger
     internal sealed class MasterMemoryRemoteServer : MasterMemoryRemotePeer
     {
         const int MaxReplayResults = 4096;
+        internal static double HelloTimeoutSeconds = 10.0;
+
         readonly TcpListener listener;
         readonly Thread acceptThread;
         readonly ConcurrentQueue<TcpClient> accepted = new ConcurrentQueue<TcpClient>();
@@ -21,6 +24,7 @@ namespace Nesh.MasterMemoryDebugger
         readonly Queue<MasterMemoryRemoteProtocol.TableRequest> tableRequests =
             new Queue<MasterMemoryRemoteProtocol.TableRequest>();
         MasterMemoryRemoteConnection waitingForHello;
+        long waitingForHelloStarted;
         TableTransfer tableTransfer;
         volatile bool stopped;
         bool validationChanged;
@@ -171,11 +175,19 @@ namespace Nesh.MasterMemoryDebugger
             // a new attempt replaces one that never sent its code
             if (waitingForHello != null) Reject(waitingForHello, "Replaced by a newer connection.");
             waitingForHello = connection;
+            waitingForHelloStarted = Stopwatch.GetTimestamp();
         }
 
         void ReceiveHello()
         {
             var connection = waitingForHello;
+            var elapsed = (Stopwatch.GetTimestamp() - waitingForHelloStarted) / (double)Stopwatch.Frequency;
+            if (elapsed >= HelloTimeoutSeconds)
+            {
+                waitingForHello = null;
+                Reject(connection, "Timed out waiting for the pairing code.");
+                return;
+            }
             if (connection.IsClosed)
             {
                 waitingForHello = null;

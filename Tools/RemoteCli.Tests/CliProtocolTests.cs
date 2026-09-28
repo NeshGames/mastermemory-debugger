@@ -70,6 +70,40 @@ public sealed class CliProtocolTests
     }
 
     [Test]
+    public void ReadTable_ShouldRejectDuplicateChunkIndex()
+    {
+        var manifest = new MasterMemoryRemoteProtocol.Table
+        {
+            TableName = "Skill",
+            RecordCount = 2,
+        };
+        using var stream = new MemoryStream();
+        MasterMemoryRemoteProtocol.WriteFrame(stream,
+            MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = "table",
+                TableName = "Skill",
+                ChunkIndex = 0,
+                Records = { new byte[] { 1 } },
+            }));
+        MasterMemoryRemoteProtocol.WriteFrame(stream,
+            MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = "table",
+                TableName = "Skill",
+                ChunkIndex = 0,
+                IsLast = true,
+                Records = { new byte[] { 2 } },
+            }));
+        stream.Position = 0;
+
+        var error = Assert.Throws<CliError>(() => CliProtocol.ReadTable(stream, manifest, "table"));
+
+        Assert.AreEqual("PROTOCOL_ERROR", error.Code);
+        StringAssert.Contains("out of order", error.Message);
+    }
+
+    [Test]
     public void ReadTable_ShouldRejectOutOfOrderChunks()
     {
         var manifest = new MasterMemoryRemoteProtocol.Table
