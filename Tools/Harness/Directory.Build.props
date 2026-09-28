@@ -4,5 +4,6 @@
     <PackageRoot>$(MSBuildThisFileDirectory)../../Packages/com.nesh.mastermemory-debugger/</PackageRoot>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 </Project>

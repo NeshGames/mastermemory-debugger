@@ -157,7 +157,7 @@ Implementation and regression coverage are complete; execution remains part of P
 
 Introduce these only after the rewritten codebase is warning-clean.
 
-- [ ] Enable warnings-as-errors in harness projects.
+- [x] Enable warnings-as-errors in harness projects.
 - [ ] Add `dotnet format --verify-no-changes` or equivalent formatting check.
 - [ ] Add test coverage reporting for Core/Patch/Remote.
 - [ ] Add property/fuzz-style tests for Patch JSON, query parsing and protocol framing where practical.
