@@ -14,11 +14,6 @@ namespace Nesh.MasterMemoryDebugger
 
         readonly MasterMemoryTouchGesture touchGesture = new MasterMemoryTouchGesture();
 
-#if MMDEBUGGER_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM
-        KeyCode cachedKeyCode = KeyCode.None;
-        UnityEngine.InputSystem.Key cachedKey = UnityEngine.InputSystem.Key.None;
-#endif
-
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Initialize()
         {
@@ -48,66 +43,9 @@ namespace Nesh.MasterMemoryDebugger
             if ((WasTogglePressed() || touchToggle) && !MasterMemoryDebugRemote.IsToolMode) RuntimeMasterMemoryDebugger.Toggle();
         }
 
-        static int GetTouchCount()
-        {
-#if MMDEBUGGER_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM
-            var touchscreen = UnityEngine.InputSystem.Touchscreen.current;
-            if (touchscreen == null) return 0;
-            var count = 0;
-            foreach (var touch in touchscreen.touches)
-            {
-                if (touch.press.isPressed) count++;
-            }
-            return count;
-#elif ENABLE_LEGACY_INPUT_MANAGER
-            return Input.touchCount;
-#else
-            return 0;
-#endif
-        }
+        static int GetTouchCount() => MasterMemoryDebugInput.GetTouchCount();
 
-        bool WasTogglePressed()
-        {
-            var keyCode = MasterMemoryDebuggerSettings.Current.ToggleKey;
-            if (keyCode == KeyCode.None) return false;
-
-#if MMDEBUGGER_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM
-            var keyboard = UnityEngine.InputSystem.Keyboard.current;
-            if (keyboard == null) return false;
-            if (keyCode != cachedKeyCode)
-            {
-                cachedKeyCode = keyCode;
-                cachedKey = ToInputSystemKey(keyCode);
-            }
-            return cachedKey != UnityEngine.InputSystem.Key.None && keyboard[cachedKey].wasPressedThisFrame;
-#elif ENABLE_LEGACY_INPUT_MANAGER
-            return Input.GetKeyDown(keyCode);
-#else
-            return false;
-#endif
-        }
-
-#if MMDEBUGGER_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM
-        static UnityEngine.InputSystem.Key ToInputSystemKey(KeyCode keyCode)
-        {
-            if (keyCode >= KeyCode.Alpha0 && keyCode <= KeyCode.Alpha9)
-            {
-                return UnityEngine.InputSystem.Key.Digit0 + (keyCode - KeyCode.Alpha0);
-            }
-            if (keyCode >= KeyCode.Keypad0 && keyCode <= KeyCode.Keypad9)
-            {
-                return UnityEngine.InputSystem.Key.Numpad0 + (keyCode - KeyCode.Keypad0);
-            }
-            switch (keyCode)
-            {
-                case KeyCode.BackQuote: return UnityEngine.InputSystem.Key.Backquote;
-                case KeyCode.Return: return UnityEngine.InputSystem.Key.Enter;
-                case KeyCode.KeypadEnter: return UnityEngine.InputSystem.Key.NumpadEnter;
-                case KeyCode.Print: return UnityEngine.InputSystem.Key.PrintScreen;
-            }
-            // F1..F12, A..Z, Space, Tab, Escape, Insert, Delete, Home, End, PageUp, PageDown, Pause, ScrollLock ...
-            return System.Enum.TryParse(keyCode.ToString(), out UnityEngine.InputSystem.Key key) ? key : UnityEngine.InputSystem.Key.None;
-        }
-#endif
+        bool WasTogglePressed() =>
+            MasterMemoryDebugInput.WasPressed(MasterMemoryDebuggerSettings.Current.ToggleKey);
     }
 }

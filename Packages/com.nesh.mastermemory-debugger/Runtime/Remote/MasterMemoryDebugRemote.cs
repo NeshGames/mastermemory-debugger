@@ -57,7 +57,7 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     public static class MasterMemoryDebugRemote
     {
-        public const int DefaultPort = 7788;
+        public const int DefaultPort = MasterMemoryDebugDefaults.RemotePort;
 
         static MasterMemoryRemotePeer s_peer;
         static MasterMemoryRemoteRunner s_runner;

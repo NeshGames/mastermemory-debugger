@@ -1,7 +1,8 @@
 {
-    "name": "Nesh.MasterMemoryDebugger.Runtime",
+    "name": "Nesh.MasterMemoryDebugger.InputSystem",
     "rootNamespace": "Nesh.MasterMemoryDebugger",
     "references": [
+        "Nesh.MasterMemoryDebugger.UI",
         "Unity.InputSystem"
     ],
     "includePlatforms": [],
@@ -10,7 +11,10 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "MMDEBUGGER_INPUT_SYSTEM",
+        "ENABLE_INPUT_SYSTEM"
+    ],
     "versionDefines": [
         {
             "name": "com.unity.inputsystem",

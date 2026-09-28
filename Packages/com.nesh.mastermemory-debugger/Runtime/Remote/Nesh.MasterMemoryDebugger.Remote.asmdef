@@ -1,10 +1,8 @@
 {
-    "name": "Nesh.MasterMemoryDebugger.Samples.BasicExample",
-    "rootNamespace": "Nesh.MasterMemoryDebugger.Samples.BasicExample",
+    "name": "Nesh.MasterMemoryDebugger.Remote",
+    "rootNamespace": "Nesh.MasterMemoryDebugger",
     "references": [
-        "Nesh.MasterMemoryDebugger.Core",
-        "Nesh.MasterMemoryDebugger.Remote",
-        "Nesh.MasterMemoryDebugger.UI"
+        "Nesh.MasterMemoryDebugger.Core"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
