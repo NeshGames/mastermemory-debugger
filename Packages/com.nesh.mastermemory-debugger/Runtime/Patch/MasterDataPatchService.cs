@@ -244,12 +244,13 @@ namespace Nesh.MasterMemoryDebugger
                 return result;
             }
 
+            var legacyCompatibility = string.IsNullOrEmpty(patch.SchemaHash);
             var plan = MasterDataPatchEngine.Build(
                 patch,
                 replaceExisting: replaceExisting,
-                requireOriginalPreconditions: false,
+                requireOriginalPreconditions: !legacyCompatibility,
                 forceIdentity: force,
-                allowPartial: true);
+                allowPartial: legacyCompatibility);
             result.Warnings.AddRange(plan.Warnings);
             foreach (var error in plan.Errors)
                 result.Errors.Add($"{error.Code}: {error.TableName} {error.Key} {error.Field} {error.Message}".Trim());
@@ -311,12 +312,13 @@ namespace Nesh.MasterMemoryDebugger
                 return result;
             }
 
+            var legacyCompatibility = string.IsNullOrEmpty(patch.SchemaHash);
             var plan = MasterDataPatchEngine.Build(
                 patch,
                 replaceExisting: replaceExisting,
-                requireOriginalPreconditions: false,
+                requireOriginalPreconditions: !legacyCompatibility,
                 forceIdentity: force,
-                allowPartial: true);
+                allowPartial: legacyCompatibility);
             result.Warnings.AddRange(plan.Warnings);
 
             if (!plan.Succeeded)
