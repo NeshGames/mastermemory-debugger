@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>Nesh.MasterMemoryDebugger.Core</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>$(ExtraDefines)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PackageRoot)Runtime/AssemblyInfo.cs" />
+    <Compile Include="$(PackageRoot)Runtime/Core/**/*.cs" />
+    <Compile Include="$(PackageRoot)Runtime/Override/**/*.cs" />
+    <Compile Include="$(PackageRoot)Runtime/Reflection/**/*.cs" />
+    <Compile Include="$(PackageRoot)Runtime/Patch/**/*.cs" />
+    <Compile Include="$(PackageRoot)Runtime/Settings/**/*.cs" />
+    <ProjectReference Include="../Stubs/Stubs.csproj" />
+    <PackageReference Include="MasterMemory" Version="3.0.4" />
+  </ItemGroup>
+</Project>

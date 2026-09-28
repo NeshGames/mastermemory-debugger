@@ -68,6 +68,36 @@ connection = (PKG/"Runtime/Remote/MasterMemoryRemoteConnection.cs").read_text(en
 if "MaxQueuedFrames" not in connection or "BlockingCollection<byte[]>" not in connection:
     fail("remote queues must remain bounded")
 
+
+# The outside-Unity harness must mirror the same runtime assembly boundaries.
+harness_projects = {
+    "Core": ROOT / "Tools/Harness/Core/Core.csproj",
+    "Remote": ROOT / "Tools/Harness/Remote/Remote.csproj",
+    "UI": ROOT / "Tools/Harness/UI/UI.csproj",
+    "InputSystem": ROOT / "Tools/Harness/InputSystem/InputSystem.csproj",
+    "NoInputSystemConsumer": ROOT / "Tools/Harness/Consumers/NoInputSystem/NoInputSystem.csproj",
+    "WithInputSystemConsumer": ROOT / "Tools/Harness/Consumers/WithInputSystem/WithInputSystem.csproj",
+}
+for name, path in harness_projects.items():
+    if not path.exists():
+        fail(f"missing harness project: {name} ({path.relative_to(ROOT)})")
+if (ROOT / "Tools/Harness/Runtime/Runtime.csproj").exists():
+    fail("legacy monolithic Harness Runtime.csproj must not return")
+
+if harness_projects["Core"].exists():
+    text = harness_projects["Core"].read_text(encoding="utf-8")
+    for forbidden in ["Runtime/Remote", "Runtime/UI", "Runtime/InputSystem"]:
+        if forbidden in text:
+            fail(f"Core harness project includes feature layer {forbidden}")
+if harness_projects["UI"].exists():
+    text = harness_projects["UI"].read_text(encoding="utf-8")
+    if "../InputSystem/" in text or "InputSystemStubs" in text:
+        fail("UI harness project must not depend on InputSystem")
+if harness_projects["NoInputSystemConsumer"].exists():
+    text = harness_projects["NoInputSystemConsumer"].read_text(encoding="utf-8")
+    if "InputSystem" in text:
+        fail("no-InputSystem consumer project must not reference InputSystem")
+
 if errors:
     print("Architecture verification failed:")
     for error in errors: print("  -", error)

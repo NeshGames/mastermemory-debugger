@@ -2,16 +2,14 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>9.0</LangVersion>
-    <AssemblyName>Nesh.MasterMemoryDebugger.Samples.BasicExample</AssemblyName>
+    <AssemblyName>Nesh.MasterMemoryDebugger.UI</AssemblyName>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <DefineConstants>$(ExtraDefines)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="$(PackageRoot)Samples~/BasicExample/*.cs" />
+    <Compile Include="$(PackageRoot)Runtime/UI/**/*.cs" />
     <ProjectReference Include="../Core/Core.csproj" />
     <ProjectReference Include="../Remote/Remote.csproj" />
-    <ProjectReference Include="../UI/UI.csproj" />
     <ProjectReference Include="../Stubs/Stubs.csproj" />
-    <PackageReference Include="MasterMemory" Version="3.0.4" />
   </ItemGroup>
 </Project>

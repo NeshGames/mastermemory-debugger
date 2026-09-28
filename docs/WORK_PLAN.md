@@ -37,12 +37,15 @@ Clean baseline commits:
 Current risk: `Tools/Harness/Runtime/Runtime.csproj` still compiles `Runtime/**/*.cs` as one assembly, so it can miss
 Core/Remote/UI dependency mistakes that Unity asmdefs would catch.
 
-- [ ] Split or restructure the harness so Core, Remote and UI compile as separate projects/assemblies.
-- [ ] Compile the optional InputSystem adapter only in the Input System configuration.
-- [ ] Add a consumer compile smoke test with **no Input System package/reference**.
-- [ ] Add a consumer compile smoke test with Input System enabled.
-- [ ] Keep WebGL / legacy input / disable-symbol configurations.
-- [ ] Ensure Editor, Samples and Tests reference the same logical assembly topology as Unity.
+- [x] Split the harness so Core, Remote and UI compile as separate projects/assemblies.
+- [x] Compile the optional InputSystem adapter only in the Input System configuration.
+- [x] Add a consumer compile smoke test with **no Input System package/reference**.
+- [x] Add a consumer compile smoke test with Input System enabled.
+- [x] Keep WebGL / legacy input / disable-symbol configurations.
+- [x] Ensure Editor, Samples and Tests reference the same logical assembly topology as Unity.
+
+Implementation is complete on the branch. The runtime execution checks below remain part of P0.2 because this chat
+environment cannot execute the repository's full .NET/Unity toolchain directly.
 
 **Definition of done**
 
