@@ -158,9 +158,11 @@ Implementation and regression coverage are complete; execution remains part of P
 Introduce these only after the rewritten codebase is warning-clean.
 
 - [x] Enable warnings-as-errors in harness projects.
-- [ ] Add `dotnet format --verify-no-changes` or equivalent formatting check.
-- [ ] Add test coverage reporting for Core/Patch/Remote.
-- [ ] Add property/fuzz-style tests for Patch JSON, query parsing and protocol framing where practical.
+- [x] Add `dotnet format --verify-no-changes` or equivalent formatting check.
+- [x] Add test coverage reporting for Core/Patch/Remote.
+- [x] Add property/fuzz-style tests for Patch JSON, query parsing and protocol framing where practical.
+
+Implementation uses compiler warnings-as-errors, `git diff --check` as the low-churn formatting gate, Cobertura artifacts via Coverlet, and fixed-seed randomized robustness tests. The formatting gate intentionally avoids a repository-wide restyle of Unity package sources.
 
 **Definition of done**
 

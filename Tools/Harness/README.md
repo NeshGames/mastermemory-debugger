@@ -22,9 +22,9 @@ The script:
 - Compiles a consumer with no Input System assembly/reference.
 - Compiles a second consumer with the Input System adapter enabled.
 - Builds Editor, the Basic Example sample, editor tests and the Remote CLI.
-- Runs `Tests/Runtime` (NUnit). `RuntimeDebuggerTests` and editor tests are compile-only here; run them in Unity.
+- Runs `Tests/Runtime` (NUnit), including deterministic randomized robustness checks for Patch JSON, query parsing and remote framing. `RuntimeDebuggerTests` and editor tests are compile-only here; run them in Unity.
 
-Requires the .NET 8 SDK. CI runs the same script on every pull request.
+Requires the .NET 8 SDK. CI runs the same script on every pull request, checks changed-file whitespace with `git diff --check`, and uploads Cobertura coverage artifacts for the harness and Remote CLI tests. Coverage is observability only; there is no arbitrary percentage gate.
 
 When the package starts using a Unity API the stubs do not have, the build fails with a missing member error. Add the
 member with Unity's exact signature. Input System API additions belong in `InputSystemStubs/`, not `Stubs/`.
