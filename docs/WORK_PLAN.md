@@ -114,12 +114,14 @@ Keep the controller as the UI composition root, but move unrelated behavior into
 
 Suggested extraction:
 
-- [ ] Header/status/remote-state presentation → `MasterDebuggerHeaderController`.
-- [ ] Tab/navigation visibility/state → `MasterDebuggerNavigationController`.
-- [ ] Root keyboard shortcuts → `MasterDebuggerShortcutController`.
-- [ ] Keep edit-guard and cross-feature orchestration at the root.
-- [ ] Preserve the existing UXML contract and session restore behavior.
-- [ ] Do **not** replace `MasterRecordGrid` with `MultiColumnListView`.
+- [x] Header/status/remote-state presentation → `MasterDebuggerHeaderController`.
+- [x] Tab/navigation visibility/state → `MasterDebuggerNavigationController`.
+- [x] Root keyboard shortcuts → `MasterDebuggerShortcutController`.
+- [x] Keep edit-guard and cross-feature orchestration at the root.
+- [x] Preserve the existing UXML contract and session restore behavior.
+- [x] Do **not** replace `MasterRecordGrid` with `MultiColumnListView`.
+
+The responsibility split is implemented. Compilation and the Unity UI smoke test remain part of P0.2.
 
 **Definition of done**
 

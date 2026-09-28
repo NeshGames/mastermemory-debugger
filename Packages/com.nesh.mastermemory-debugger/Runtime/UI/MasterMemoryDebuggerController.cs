@@ -26,16 +26,6 @@ namespace Nesh.MasterMemoryDebugger
         const float MaxScale = 2f;
         const float ScaleStep = 0.1f;
 
-        enum Tab
-        {
-            Data,
-            Changes,
-            Patches,
-            Find,
-            Validation,
-            Diagnostics,
-        }
-
         // Kept across open / close so the debugger reopens where it was.
         static class Session
         {
@@ -45,30 +35,23 @@ namespace Nesh.MasterMemoryDebugger
             public static bool ModifiedOnly;
             public static float Scale = 1f;
             public static string PatchName;
-            public static Tab Tab = Tab.Data;
+            public static MasterDebuggerTab Tab = MasterDebuggerTab.Data;
             public static string FindQuery;
             public static bool FindWholeValue;
         }
 
         readonly MasterMemoryDebuggerDocument host;
         readonly VisualElement root;
-        readonly VisualElement mainPanel;
-        readonly VisualElement patchesPanel;
-        readonly Button dataTab;
-        readonly Button changesTab;
-        readonly Button patchesTab;
-        readonly Button validationTab;
-        readonly Button findTab;
-        readonly Button diagnosticsTab;
         readonly MasterChangesController changes;
         readonly MasterPatchesController patches;
         readonly MasterValidationController validation;
         readonly MasterFindController find;
         readonly MasterDiagnosticsController diagnostics;
-        Tab currentTab;
+        readonly MasterDebuggerHeaderController header;
+        readonly MasterDebuggerNavigationController navigation;
+        readonly MasterDebuggerShortcutController shortcuts;
         readonly ScrollView logView;
         readonly Button logToggle;
-        readonly Button remoteButton;
         MasterMemoryRemoteState remoteState;
         readonly Button undoButton;
         readonly Button redoButton;
@@ -83,8 +66,6 @@ namespace Nesh.MasterMemoryDebugger
         readonly MasterRecordEditorController editor;
         readonly MasterMemoryDebuggerDialog dialog;
         readonly Label statusLabel;
-        readonly Label versionLabel;
-        readonly Label overrideCountLabel;
         readonly List<(Button button, Action action)> buttons = new List<(Button, Action)>();
 
         public MasterMemoryDebuggerController(VisualElement root, MasterMemoryDebuggerDocument host)
@@ -95,8 +76,7 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugLocalization.Language = MasterMemoryDebugLocalization.CodeNames;
 
             statusLabel = Required<Label>(root, "mm-status");
-            versionLabel = Required<Label>(root, "mm-master-version");
-            overrideCountLabel = Required<Label>(root, "mm-override-count");
+            header = new MasterDebuggerHeaderController(root);
             dialog = new MasterMemoryDebuggerDialog(Required<VisualElement>(root, "mm-dialog-layer"));
 
             tableList = new MasterTableListController(Required<TreeView>(root, "mm-table-list"), Required<TextField>(root, "mm-table-search"));
@@ -130,14 +110,6 @@ namespace Nesh.MasterMemoryDebugger
             languageField.RegisterValueChangedCallback(OnLanguageSelected);
             RefreshLanguageChoices();
 
-            mainPanel = Required<VisualElement>(root, "mm-main");
-            patchesPanel = Required<VisualElement>(root, "mm-patches-panel");
-            dataTab = Required<Button>(root, "mm-tab-data");
-            changesTab = Required<Button>(root, "mm-tab-changes");
-            patchesTab = Required<Button>(root, "mm-tab-patches");
-            validationTab = Required<Button>(root, "mm-tab-validation");
-            findTab = Required<Button>(root, "mm-tab-find");
-            diagnosticsTab = Required<Button>(root, "mm-tab-diagnostics");
             changes = new MasterChangesController(
                 Required<VisualElement>(root, "mm-changes-panel"),
                 Required<ScrollView>(root, "mm-changes-list"),
@@ -147,24 +119,27 @@ namespace Nesh.MasterMemoryDebugger
                 Required<Button>(root, "mm-changes-copy"),
                 Required<Button>(root, "mm-changes-paste"),
                 dialog);
-            patches = new MasterPatchesController(patchesPanel, dialog, SetStatus, Session.PatchName);
+            patches = new MasterPatchesController(Required<VisualElement>(root, "mm-patches-panel"), dialog, SetStatus, Session.PatchName);
             validation = new MasterValidationController(Required<VisualElement>(root, "mm-validation-panel"), OpenRecord);
             find = new MasterFindController(Required<VisualElement>(root, "mm-find-panel"), OpenRecord, Session.FindQuery, Session.FindWholeValue);
             diagnostics = new MasterDiagnosticsController(Required<VisualElement>(root, "mm-diagnostics-panel"));
+            navigation = new MasterDebuggerNavigationController(
+                root, recordList, changes, patches, validation, find, diagnostics);
             logView = Required<ScrollView>(root, "mm-log");
             logToggle = Required<Button>(root, "mm-log-toggle");
-            remoteButton = Required<Button>(root, "mm-remote");
             undoButton = Required<Button>(root, "mm-undo");
             redoButton = Required<Button>(root, "mm-redo");
             logView.style.display = DisplayStyle.None;
+            shortcuts = new MasterDebuggerShortcutController(
+                root, dialog, tableList, searchCompletion, recordList, editor, find, Undo, Redo);
 
             Bind(root, "mm-close", RuntimeMasterMemoryDebugger.Close);
-            Bind(root, "mm-tab-data", () => SelectTab(Tab.Data));
-            Bind(root, "mm-tab-changes", () => SelectTab(Tab.Changes));
-            Bind(root, "mm-tab-patches", () => SelectTab(Tab.Patches));
-            Bind(root, "mm-tab-validation", () => SelectTab(Tab.Validation));
-            Bind(root, "mm-tab-find", () => SelectTab(Tab.Find));
-            Bind(root, "mm-tab-diagnostics", () => SelectTab(Tab.Diagnostics));
+            Bind(root, "mm-tab-data", () => SelectTab(MasterDebuggerTab.Data));
+            Bind(root, "mm-tab-changes", () => SelectTab(MasterDebuggerTab.Changes));
+            Bind(root, "mm-tab-patches", () => SelectTab(MasterDebuggerTab.Patches));
+            Bind(root, "mm-tab-validation", () => SelectTab(MasterDebuggerTab.Validation));
+            Bind(root, "mm-tab-find", () => SelectTab(MasterDebuggerTab.Find));
+            Bind(root, "mm-tab-diagnostics", () => SelectTab(MasterDebuggerTab.Diagnostics));
             Bind(root, "mm-log-toggle", ToggleLog);
             Bind(root, "mm-remote", () => MasterRemoteDialog.Show(dialog, SetStatus));
             Bind(root, "mm-undo", Undo);
@@ -202,7 +177,6 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugValidation.Changed += OnValidationChanged;
             MasterMemoryDebugHistory.Changed += RefreshHistoryButtons;
             MasterMemoryDebugRemote.Changed += OnRemoteChanged;
-            root.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
 
             // restore the previous session
             recordList.SetState(Session.Query, Session.ModifiedOnly);
@@ -214,7 +188,7 @@ namespace Nesh.MasterMemoryDebugger
             OnMessagesChanged();
             RefreshHistoryButtons();
             remoteState = MasterMemoryDebugRemote.State;
-            RefreshRemoteButton();
+            header.RefreshRemote();
             if (MasterMemoryDebugRemote.IsToolMode && remoteState != MasterMemoryRemoteState.Connected && remoteState != MasterMemoryRemoteState.Connecting)
             {
                 // the remote editor tool starts with the connect dialog
@@ -240,7 +214,7 @@ namespace Nesh.MasterMemoryDebugger
             Session.TableName = tableList.SelectedTable?.TableName;
             Session.RecordKey = editor.Record?.PrimaryKey;
             Session.PatchName = patches.SelectedName;
-            Session.Tab = currentTab;
+            Session.Tab = navigation.CurrentTab;
             Session.FindQuery = find.Query;
             Session.FindWholeValue = find.WholeValue;
 
@@ -253,7 +227,6 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugHistory.Changed -= RefreshHistoryButtons;
             MasterMemoryDebugRemote.Changed -= OnRemoteChanged;
             languageField.UnregisterValueChangedCallback(OnLanguageSelected);
-            root.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             tableList.TableSelected -= OnTableSelected;
             recordList.RecordSelected -= OnRecordSelected;
             editor.ReferenceRequested -= OpenReference;
@@ -268,6 +241,7 @@ namespace Nesh.MasterMemoryDebugger
             editor.Dispose();
             patches.Dispose();
             diagnostics.Dispose();
+            shortcuts.Dispose();
             tableTabs.Dispose();
         }
 
@@ -284,10 +258,10 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>A pinned tab was clicked.</summary>
         void SelectTableFromTab(MasterMemoryTableDescriptor table)
         {
-            if (table == shownTable && currentTab == Tab.Data) return;
+            if (table == shownTable && navigation.CurrentTab == MasterDebuggerTab.Data) return;
             RunAfterEditGuard(() =>
             {
-                SelectTab(Tab.Data);
+                SelectTab(MasterDebuggerTab.Data);
                 if (table == shownTable) return;
                 tableList.RestoreSelection(table);
                 ShowTable(table);
@@ -402,25 +376,13 @@ namespace Nesh.MasterMemoryDebugger
 
         // ------------------------------------------------------------------ tabs
 
-        void SelectTab(Tab tab)
+        void SelectTab(MasterDebuggerTab tab)
         {
-            currentTab = tab;
-            mainPanel.style.display = tab == Tab.Data ? DisplayStyle.Flex : DisplayStyle.None;
-            if (tab == Tab.Changes) changes.Show();
-            else changes.Hide();
-            patchesPanel.style.display = tab == Tab.Patches ? DisplayStyle.Flex : DisplayStyle.None;
-            if (tab == Tab.Patches) patches.Refresh();
-            if (tab == Tab.Validation) validation.Show();
-            else validation.Hide();
-            if (tab == Tab.Find) find.Show();
-            else find.Hide();
-            if (tab == Tab.Diagnostics) diagnostics.Show();
-            else diagnostics.Hide();
-            recordList.CloseColumnsPopup();
+            navigation.Select(tab);
             RefreshHeader();
         }
 
-        void HideChanges() => SelectTab(Tab.Data);
+        void HideChanges() => SelectTab(MasterDebuggerTab.Data);
 
         /// <summary>Jumps from the Changes / Find / Validation view to a record.</summary>
         void OpenRecord(MasterMemoryTableDescriptor table, object key)
@@ -584,19 +546,7 @@ namespace Nesh.MasterMemoryDebugger
                 SetStatus("Remote: " + MasterMemoryDebugRemote.Status, state == MasterMemoryRemoteState.Failed);
             }
             remoteState = state;
-            RefreshRemoteButton();
-        }
-
-        void RefreshRemoteButton()
-        {
-            var state = MasterMemoryDebugRemote.State;
-            remoteButton.text = state == MasterMemoryRemoteState.Connected ? "Remote ●"
-                : state == MasterMemoryRemoteState.Listening ? "Remote …"
-                : state == MasterMemoryRemoteState.Connecting ? "Remote …"
-                : "Remote";
-            remoteButton.tooltip = MasterMemoryDebugRemote.Status;
-            remoteButton.EnableInClassList("mm-debugger__remote--connected", state == MasterMemoryRemoteState.Connected);
-            remoteButton.EnableInClassList("mm-debugger__remote--failed", state == MasterMemoryRemoteState.Failed);
+            header.RefreshRemote();
         }
 
         // ------------------------------------------------------------------ copy
@@ -660,66 +610,7 @@ namespace Nesh.MasterMemoryDebugger
             }
         }
 
-        // ------------------------------------------------------------------ keyboard
-
-        void OnKeyDown(KeyDownEvent evt)
-        {
-            switch (evt.keyCode)
-            {
-                case KeyCode.Z:
-                case KeyCode.Y:
-                    // Ctrl (Cmd on macOS) + Z / Y; the search box keeps its own keys
-                    if (!evt.actionKey || dialog.IsVisible || IsInSearch(evt.target as VisualElement)) break;
-                    if (evt.keyCode == KeyCode.Y || evt.shiftKey) Redo();
-                    else Undo();
-                    evt.StopPropagation();
-                    break;
-                case KeyCode.Escape:
-                    if (!dialog.IsVisible && tableList.IsSearchTarget(evt.target as VisualElement)
-                        && !string.IsNullOrEmpty(root.Q<TextField>("mm-table-search").value))
-                    {
-                        tableList.ClearSearch();
-                        evt.StopPropagation();
-                        break;
-                    }
-                    if (dialog.IsVisible) dialog.Cancel();
-                    else if (searchCompletion.IsOpen) searchCompletion.Close();
-                    else if (recordList.IsColumnsPopupOpen) recordList.CloseColumnsPopup();
-                    else if (!MasterMemoryDebugRemote.IsToolMode) RuntimeMasterMemoryDebugger.Close();
-                    evt.StopPropagation();
-                    break;
-                case KeyCode.Return:
-                case KeyCode.KeypadEnter:
-                    var target = evt.target as VisualElement;
-                    if (dialog.IsVisible)
-                    {
-                        // Enter inserts a new line in the paste box
-                        if (target?.GetFirstAncestorOfType<TextField>()?.multiline == true || (target as TextField)?.multiline == true) break;
-                        dialog.Confirm();
-                        evt.StopPropagation();
-                    }
-                    else if (target != null && editor.Container.Contains(target))
-                    {
-                        // string editors are multiline (to wrap long values): Enter applies instead of adding a line break
-                        var textField = target as TextField ?? target.GetFirstAncestorOfType<TextField>();
-                        var inTextEditor = textField != null && textField.ClassListContains("mm-debugger__text-editor");
-                        var wasDirty = editor.IsDirty;
-                        if (wasDirty) editor.TryApply();
-                        if (wasDirty || inTextEditor) evt.StopPropagation();
-                    }
-                    break;
-            }
-        }
-
         // ------------------------------------------------------------------ helpers
-
-        bool IsInSearch(VisualElement target)
-        {
-            if (target == null) return false;
-            if (find.QueryField.Contains(target) || tableList.IsSearchTarget(target)) return true;
-            var toolbar = root.Q("mm-search-toolbar");
-            return toolbar != null && toolbar.Contains(target);
-        }
 
         void ChangeScale(float delta)
         {
@@ -731,22 +622,9 @@ namespace Nesh.MasterMemoryDebugger
 
         void RefreshHeader()
         {
-            versionLabel.text = "Master: " + MasterMemoryDebugRegistry.GetMasterVersion();
-            versionLabel.tooltip = versionLabel.text;
             var count = MasterMemoryDebugRuntime.OverrideCount;
-            changesTab.text = $"Changes ({count})";
-            patchesTab.text = $"Patches ({patches.PatchCount})";
-            dataTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Data);
-            changesTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Changes);
-            patchesTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Patches);
-            validationTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Validation);
-            findTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Find);
-            diagnosticsTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Diagnostics);
-            var newFailures = MasterMemoryDebugValidation.NewFailureCount;
-            validationTab.text = newFailures > 0 ? $"Validation ({newFailures} new)" : "Validation";
-            validationTab.EnableInClassList("mm-debugger__tab--alert", newFailures > 0);
-            overrideCountLabel.text = count > 0 ? $"{count} overrides" : "No overrides";
-            overrideCountLabel.EnableInClassList("mm-debugger__override-count--active", count > 0);
+            header.Refresh(count);
+            navigation.Refresh(count, patches.PatchCount, MasterMemoryDebugValidation.NewFailureCount);
         }
 
         void SetStatus(string message, bool isError)
