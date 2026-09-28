@@ -2,6 +2,13 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.14.0] - 2026-09-28
+
+### Added
+
+- Search field above the left Table list filters Table code names without changing data labels or record queries.
+- Up/Down selects matching Tables, Enter selects the first match, and Esc clears the filter. Search hints are localized in English, Traditional Chinese, and Japanese.
+
 ## [0.13.0] - 2026-09-28
 
 ### Added
