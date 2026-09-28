@@ -30,6 +30,7 @@
                         <ui:VisualElement class="mm-debugger__spacer" />
                         <ui:Button name="mm-label-template" text="Labels TSV" tooltip="Copy every table and field name as a label template (tab separated) to fill in and load with MasterMemoryDebugLocalization.LoadTsv" class="mm-debugger__button mm-debugger__small-button" />
                     </ui:VisualElement>
+                    <ui:TextField name="mm-table-search" class="mm-debugger__table-search" tooltip="Filter tables by code name (Up/Down to select, Esc to clear)" />
                     <ui:TreeView name="mm-table-list" class="mm-debugger__table-list" />
                 </ui:VisualElement>
 

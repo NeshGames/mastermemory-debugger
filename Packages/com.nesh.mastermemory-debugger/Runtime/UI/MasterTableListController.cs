@@ -21,6 +21,9 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         readonly TreeView treeView;
+        readonly TextField searchField;
+        readonly List<MasterMemoryTableDescriptor> visibleTables = new List<MasterMemoryTableDescriptor>();
+        int searchIndex = -1;
         readonly Dictionary<MasterMemoryTableDescriptor, int> idByTable = new Dictionary<MasterMemoryTableDescriptor, int>();
         readonly HashSet<string> collapsedGroups = new HashSet<string>(StringComparer.Ordinal);
         readonly List<int> groupIds = new List<int>();
@@ -30,9 +33,14 @@ namespace Nesh.MasterMemoryDebugger
 
         public MasterMemoryTableDescriptor SelectedTable { get; private set; }
 
-        public MasterTableListController(TreeView treeView)
+        public MasterTableListController(TreeView treeView, TextField searchField)
         {
             this.treeView = treeView;
+            this.searchField = searchField;
+            searchField.textEdition.placeholder = "Search tables";
+            searchField.RegisterValueChangedCallback(OnSearchChanged);
+            searchField.RegisterCallback<KeyDownEvent>(OnSearchKeyDown, TrickleDown.TrickleDown);
+            searchField.RegisterCallback<NavigationMoveEvent>(OnSearchNavigationMove, TrickleDown.TrickleDown);
             treeView.fixedItemHeight = RowHeight;
             treeView.selectionType = SelectionType.Single;
             treeView.makeItem = MakeItem;
@@ -43,18 +51,28 @@ namespace Nesh.MasterMemoryDebugger
         public void Dispose()
         {
             treeView.selectionChanged -= OnSelectionChanged;
+            searchField.UnregisterValueChangedCallback(OnSearchChanged);
+            searchField.UnregisterCallback<KeyDownEvent>(OnSearchKeyDown, TrickleDown.TrickleDown);
+            searchField.UnregisterCallback<NavigationMoveEvent>(OnSearchNavigationMove, TrickleDown.TrickleDown);
         }
+
+        public bool IsSearchTarget(VisualElement target) => target != null && searchField.Contains(target);
+
+        public void ClearSearch() => searchField.value = string.Empty;
 
         /// <summary>Reloads the table list from the registry and keeps the selection by name.</summary>
         public void Reload(string preferredTableName = null)
         {
             RememberCollapsedGroups();
             var selectedName = preferredTableName ?? SelectedTable?.TableName;
+            var filter = searchField.value?.Trim();
+            var searching = !string.IsNullOrEmpty(filter);
 
             var groups = MasterMemoryDebugRegistry.GetGroupedTables();
-            var showGroups = groups.Count > 1 || (groups.Count == 1 && !groups[0].IsUngrouped);
+            var showGroups = !searching && (groups.Count > 1 || (groups.Count == 1 && !groups[0].IsUngrouped));
 
             idByTable.Clear();
+            visibleTables.Clear();
             groupIds.Clear();
             groupNames.Clear();
             var roots = new List<TreeViewItemData<Node>>();
@@ -65,8 +83,10 @@ namespace Nesh.MasterMemoryDebugger
                 var children = new List<TreeViewItemData<Node>>(group.Tables.Count);
                 foreach (var table in group.Tables)
                 {
+                    if (searching && table.TableName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
                     var id = nextTableId++;
                     idByTable[table] = id;
+                    visibleTables.Add(table);
                     children.Add(new TreeViewItemData<Node>(id, new Node { Table = table }));
                 }
 
@@ -91,9 +111,30 @@ namespace Nesh.MasterMemoryDebugger
             }
             treeView.RefreshItems();
 
-            var tables = idByTable.Keys.ToList();
-            var target = selectedName == null ? null : tables.FirstOrDefault(x => x.TableName == selectedName);
-            if (target == null && SelectedTable == null) target = groups.SelectMany(x => x.Tables).FirstOrDefault();
+            var target = selectedName == null ? null : visibleTables.FirstOrDefault(x => x.TableName == selectedName);
+            if (searching)
+            {
+                searchIndex = target == null ? -1 : visibleTables.IndexOf(target);
+                if (target != null)
+                {
+                    treeView.SetSelectionByIdWithoutNotify(new[] { idByTable[target] });
+                    if (target != SelectedTable)
+                    {
+                        SelectedTable = target;
+                        TableSelected?.Invoke(target);
+                    }
+                }
+                else treeView.ClearSelection();
+                if (SelectedTable != null && !groups.Any(x => x.Tables.Contains(SelectedTable)))
+                {
+                    SelectedTable = null;
+                    TableSelected?.Invoke(null);
+                }
+                return;
+            }
+
+            searchIndex = -1;
+            if (target == null && SelectedTable == null) target = visibleTables.FirstOrDefault();
 
             if (target != null)
             {
@@ -113,10 +154,47 @@ namespace Nesh.MasterMemoryDebugger
             }
         }
 
+        void OnSearchChanged(ChangeEvent<string> evt) => Reload();
+
+        void OnSearchKeyDown(KeyDownEvent evt)
+        {
+            if (evt.ctrlKey || evt.altKey || evt.commandKey || string.IsNullOrWhiteSpace(searchField.value) || visibleTables.Count == 0) return;
+            switch (evt.keyCode)
+            {
+                case UnityEngine.KeyCode.DownArrow:
+                    searchIndex = (searchIndex + 1) % visibleTables.Count;
+                    break;
+                case UnityEngine.KeyCode.UpArrow:
+                    searchIndex = searchIndex < 0 ? visibleTables.Count - 1 : (searchIndex - 1 + visibleTables.Count) % visibleTables.Count;
+                    break;
+                case UnityEngine.KeyCode.Return:
+                case UnityEngine.KeyCode.KeypadEnter:
+                    if (searchIndex < 0) searchIndex = 0;
+                    break;
+                default:
+                    return;
+            }
+
+            var table = visibleTables[searchIndex];
+            treeView.SetSelectionById(idByTable[table]);
+            treeView.ScrollToItem(searchIndex);
+            evt.StopPropagation();
+            searchField.focusController?.IgnoreEvent(evt);
+        }
+
+        void OnSearchNavigationMove(NavigationMoveEvent evt)
+        {
+            if (string.IsNullOrWhiteSpace(searchField.value) || visibleTables.Count == 0) return;
+            if (evt.direction != NavigationMoveEvent.Direction.Up && evt.direction != NavigationMoveEvent.Direction.Down) return;
+            evt.StopPropagation();
+            searchField.focusController?.IgnoreEvent(evt);
+        }
+
         /// <summary>Selects a table without raising <see cref="TableSelected"/> (cancelled change, or selection driven by the caller).</summary>
         public void RestoreSelection(MasterMemoryTableDescriptor table)
         {
             SelectedTable = table;
+            searchIndex = table != null ? visibleTables.IndexOf(table) : -1;
             if (table != null && idByTable.TryGetValue(table, out var id)) treeView.SetSelectionByIdWithoutNotify(new[] { id });
             else treeView.ClearSelection();
         }
@@ -197,6 +275,7 @@ namespace Nesh.MasterMemoryDebugger
                 return;
             }
 
+            searchIndex = visibleTables.IndexOf(node.Table);
             if (node.Table == SelectedTable) return;
             SelectedTable = node.Table;
             TableSelected?.Invoke(node.Table);

@@ -186,6 +186,11 @@
     margin-right: 3px;
 }
 
+.mm-debugger__table-search {
+    flex-shrink: 0;
+    margin: 2px 4px 5px 4px;
+}
+
 .mm-debugger__table-list {
     flex-grow: 1;
 }

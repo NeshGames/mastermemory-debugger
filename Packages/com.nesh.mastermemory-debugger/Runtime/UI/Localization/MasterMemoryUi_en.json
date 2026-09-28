@@ -135,6 +135,14 @@
       "value": "Games on the network"
     },
     {
+      "key": "Search tables",
+      "value": "Search tables"
+    },
+    {
+      "key": "Filter tables by code name (Up/Down to select, Esc to clear)",
+      "value": "Filter tables by code name (Up/Down to select, Esc to clear)"
+    },
+    {
       "key": "Search",
       "value": "Search"
     },

@@ -15,7 +15,7 @@ namespace Nesh.MasterMemoryDebugger
         internal static readonly string[] RequiredElementNames =
         {
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
-            "mm-table-list", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template", "mm-batch-edit", "mm-new-record",
+            "mm-table-list", "mm-table-search", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template", "mm-batch-edit", "mm-new-record",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json", "mm-duplicate-record", "mm-delete-record",
             "mm-close", "mm-remote", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel", "mm-tab-find", "mm-find-panel",
             "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary", "mm-changes-copy", "mm-changes-paste",
@@ -96,7 +96,7 @@ namespace Nesh.MasterMemoryDebugger
             overrideCountLabel = Required<Label>(root, "mm-override-count");
             dialog = new MasterMemoryDebuggerDialog(Required<VisualElement>(root, "mm-dialog-layer"));
 
-            tableList = new MasterTableListController(Required<TreeView>(root, "mm-table-list"));
+            tableList = new MasterTableListController(Required<TreeView>(root, "mm-table-list"), Required<TextField>(root, "mm-table-search"));
             recordList = new MasterRecordListController(
                 Required<TextField>(root, "mm-search"),
                 Required<Toggle>(root, "mm-modified-only"),
@@ -660,6 +660,13 @@ namespace Nesh.MasterMemoryDebugger
                     evt.StopPropagation();
                     break;
                 case KeyCode.Escape:
+                    if (!dialog.IsVisible && tableList.IsSearchTarget(evt.target as VisualElement)
+                        && !string.IsNullOrEmpty(root.Q<TextField>("mm-table-search").value))
+                    {
+                        tableList.ClearSearch();
+                        evt.StopPropagation();
+                        break;
+                    }
                     if (dialog.IsVisible) dialog.Cancel();
                     else if (searchCompletion.IsOpen) searchCompletion.Close();
                     else if (recordList.IsColumnsPopupOpen) recordList.CloseColumnsPopup();
@@ -694,7 +701,7 @@ namespace Nesh.MasterMemoryDebugger
         bool IsInSearch(VisualElement target)
         {
             if (target == null) return false;
-            if (find.QueryField.Contains(target)) return true;
+            if (find.QueryField.Contains(target) || tableList.IsSearchTarget(target)) return true;
             var toolbar = root.Q("mm-search-toolbar");
             return toolbar != null && toolbar.Contains(target);
         }

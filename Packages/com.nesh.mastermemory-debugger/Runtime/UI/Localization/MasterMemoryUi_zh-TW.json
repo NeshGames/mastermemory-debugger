@@ -135,6 +135,14 @@
       "value": "網路上的遊戲"
     },
     {
+      "key": "Search tables",
+      "value": "搜尋資料表"
+    },
+    {
+      "key": "Filter tables by code name (Up/Down to select, Esc to clear)",
+      "value": "依程式名稱篩選資料表（↑／↓ 選取，Esc 清除）"
+    },
+    {
       "key": "Search",
       "value": "搜尋"
     },

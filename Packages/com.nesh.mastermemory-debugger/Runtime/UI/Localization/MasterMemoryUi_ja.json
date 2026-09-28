@@ -135,6 +135,14 @@
       "value": "ネットワーク上のゲーム"
     },
     {
+      "key": "Search tables",
+      "value": "テーブルを検索"
+    },
+    {
+      "key": "Filter tables by code name (Up/Down to select, Esc to clear)",
+      "value": "コード上の名前でテーブルを絞り込む（↑／↓ で選択、Esc でクリア）"
+    },
+    {
       "key": "Search",
       "value": "検索"
     },
