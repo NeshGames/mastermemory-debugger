@@ -38,3 +38,4 @@ dotnet build ../RemoteCli/RemoteCli.csproj -nologo -v q
 echo "::endgroup::"
 
 dotnet test Tests/Tests.csproj -nologo -p:ExtraDefines="UNITY_EDITOR" < /dev/null
+dotnet test ../RemoteCli.Tests/RemoteCli.Tests.csproj -nologo < /dev/null

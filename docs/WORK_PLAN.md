@@ -90,14 +90,17 @@ Tools/RemoteCli/
   CliOutput.cs
 ```
 
-- [ ] Keep `Program.cs` as entry point/orchestration only.
-- [ ] Move option parsing and usage validation into `CliOptions`.
-- [ ] Move connection/Welcome/frame waiting into `CliConnection`.
-- [ ] Move records/changes/tables/validate into query commands.
-- [ ] Move operation invocation into operation commands.
-- [ ] Move patch-export/plan/apply into Patch commands.
-- [ ] Preserve JSON `schemaVersion = 1`, exit codes and command-line flags.
-- [ ] Add focused CLI tests for option validation and protocol-response routing.
+- [x] Keep `Program.cs` as entry point/orchestration only.
+- [x] Move option parsing and usage validation into `CliOptions`.
+- [x] Move connection/Welcome/frame waiting into `CliConnection`.
+- [x] Move records/changes/tables/validate into query commands.
+- [x] Move operation invocation into operation commands.
+- [x] Move patch-export/plan/apply into Patch commands.
+- [x] Preserve JSON `schemaVersion = 1`, exit codes and command-line flags.
+- [x] Add focused CLI tests for option validation and protocol-response routing.
+
+Implementation and focused test coverage are complete. Execution of the full CLI/Harness suite remains part of the
+P0.2 validation pass.
 
 **Definition of done**
 
