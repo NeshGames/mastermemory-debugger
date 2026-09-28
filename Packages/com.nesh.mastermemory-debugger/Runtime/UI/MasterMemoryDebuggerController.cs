@@ -343,7 +343,8 @@ namespace Nesh.MasterMemoryDebugger
             searchCompletion.Refresh();
             tableTabs.Refresh();
             var newButton = root.Q<Button>("mm-new-record");
-            var canAdd = ready && MasterMemoryRecordFactory.CanAdd(table, out var reason);
+            string reason = null;
+            var canAdd = ready && MasterMemoryRecordFactory.CanAdd(table, out reason);
             newButton.SetEnabled(canAdd);
             newButton.tooltip = !ready
                 ? "Loading this table from the game…"
