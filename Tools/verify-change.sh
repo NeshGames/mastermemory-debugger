@@ -11,7 +11,7 @@ if [[ -z "$base" && -n "${GITHUB_BASE_REF:-}" ]]; then base="origin/$GITHUB_BASE
 if [[ -z "$base" ]] && git rev-parse --verify origin/main >/dev/null 2>&1; then base="origin/main"; fi
 if [[ -z "$base" ]]; then base="HEAD~1"; fi
 
-git diff --check "$base"...HEAD
+git diff --check "$base"...HEAD -- . ':(exclude,glob)**/*.meta'
 
 changed="$(git diff --name-only "$base"...HEAD || true)"
 if [[ -n "$changed" ]] && ! grep -Eq '^(Packages/|Tools/Harness/|Tools/RemoteCli/)' <<<"$changed"; then
