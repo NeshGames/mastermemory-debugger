@@ -62,7 +62,7 @@ environment cannot execute the repository's full .NET/Unity toolchain directly.
   - Protocol v6 intentionally makes Welcome metadata-only; table records **and override snapshots** are lazy/chunked.
   - The Core / Remote / UI assembly split is an intentional migration from the 0.14.x `Nesh.MasterMemoryDebugger.Runtime` assembly and is documented in the package README / architecture guide.
 - [x] Verify all newly added package files/folders have valid `.meta` files.
-- [ ] Run the required PR CI against the latest `main`.
+- [x] Run the required PR CI against the latest `main` (Draft PR #19).
 - [ ] Confirm package import/asmdef resolution in Unity 6000.6.
 
 **Definition of done**
