@@ -45,11 +45,11 @@ internal static class RemoteCli
 
             object result = options.Command switch
             {
-                "inspect" => new { welcome.ServerEpoch, welcome.MasterVersion, ProtocolVersion = welcome.Version,
-                    TableCount = welcome.Tables.Count, OverrideCount = welcome.Overrides.Count },
+                "inspect" => new { welcome.ServerEpoch, welcome.MasterVersion, welcome.SchemaHash,
+                    ProtocolVersion = welcome.Version, TableCount = welcome.Tables.Count, OverrideCount = welcome.Overrides.Count },
                 "tables" => welcome.Tables.Select(t => new { t.TableName, t.MemoryTableName, t.RecordType, t.KeyType,
-                    t.Group, RecordCount = t.Records.Count }).ToArray(),
-                "records" => Records(welcome, options),
+                    t.Group, t.RecordCount, t.HasCustomDisplayName }).ToArray(),
+                "records" => Records(stream, welcome, options),
                 "changes" => Changes(welcome, options),
                 "operations" => welcome.Operations.Select(o => new { o.Id, o.Label, o.Context, o.Revision,
                     welcome.ServerEpoch }).ToArray(),
@@ -206,16 +206,57 @@ internal static class RemoteCli
     static int Number(string text, int min, int max) => int.TryParse(text, out var value) && value >= min && value <= max
         ? value : throw new CliError("USAGE", $"Expected an integer from {min} to {max}: {text}.", 2);
 
-    static object Records(MasterMemoryRemoteProtocol.Welcome w, Options o)
+    static object Records(Stream stream, MasterMemoryRemoteProtocol.Welcome w, Options o)
     {
         var table = FindTable(w, o.Table!);
-        return new { table = table.TableName, total = table.Records.Count, offset = o.Offset,
-            records = table.Records.Skip(o.Offset).Take(o.Limit).Select((bytes, index) => new
+        var data = FetchTable(stream, table);
+        return new { table = table.TableName, total = table.RecordCount, offset = o.Offset,
+            records = data.Records.Skip(o.Offset).Take(o.Limit).Select((bytes, index) => new
             {
                 index = o.Offset + index, sha256 = Sha(bytes), value = RecordJson(bytes),
-                displayName = table.DisplayNames != null && o.Offset + index < table.DisplayNames.Count
-                    ? table.DisplayNames[o.Offset + index] : null,
+                displayName = data.DisplayNames != null && o.Offset + index < data.DisplayNames.Count
+                    ? data.DisplayNames[o.Offset + index] : null,
             }).ToArray() };
+    }
+
+    static MasterMemoryRemoteProtocol.Table FetchTable(Stream stream, MasterMemoryRemoteProtocol.Table manifest)
+    {
+        var requestId = Guid.NewGuid().ToString("N");
+        MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.Encode(
+            new MasterMemoryRemoteProtocol.TableRequest { RequestId = requestId, TableName = manifest.TableName }));
+
+        var result = new MasterMemoryRemoteProtocol.Table
+        {
+            TableName = manifest.TableName,
+            MemoryTableName = manifest.MemoryTableName,
+            RecordType = manifest.RecordType,
+            KeyType = manifest.KeyType,
+            Group = manifest.Group,
+            RecordCount = manifest.RecordCount,
+            HasCustomDisplayName = manifest.HasCustomDisplayName,
+            DisplayNames = manifest.HasCustomDisplayName ? new List<string>() : null,
+        };
+        var nextChunk = 0;
+        for (var i = 0; i < 100000; i++)
+        {
+            var payload = Read(stream);
+            if (MasterMemoryRemoteProtocol.GetType(payload) != MasterMemoryRemoteProtocol.MessageType.TableChunk) continue;
+            var chunk = MasterMemoryRemoteProtocol.DecodeTableChunk(payload);
+            if (chunk.RequestId != requestId || chunk.TableName != manifest.TableName) continue;
+            if (!string.IsNullOrEmpty(chunk.Error))
+                throw new CliError("TABLE_ERROR", chunk.Error, 7);
+            if (chunk.ChunkIndex != nextChunk++)
+                throw new CliError("PROTOCOL_ERROR", "Table chunks arrived out of order.", 5);
+            result.Records.AddRange(chunk.Records);
+            if (result.DisplayNames != null && chunk.DisplayNames != null)
+                result.DisplayNames.AddRange(chunk.DisplayNames);
+            if (!chunk.IsLast) continue;
+            if (result.Records.Count != manifest.RecordCount)
+                throw new CliError("PROTOCOL_ERROR",
+                    $"Expected {manifest.RecordCount} records, received {result.Records.Count}.", 5);
+            return result;
+        }
+        throw new CliError("PROTOCOL_ERROR", "Table transfer did not finish.", 5);
     }
 
     static object Changes(MasterMemoryRemoteProtocol.Welcome w, Options o)

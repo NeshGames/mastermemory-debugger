@@ -330,13 +330,19 @@ namespace Nesh.MasterMemoryDebugger
         {
             shownTable = table;
             editor.Show(null);
+            var ready = MasterMemoryDebugRemote.EnsureTableLoaded(table);
             recordList.SetTable(table);
             searchCompletion.Refresh();
             tableTabs.Refresh();
             var newButton = root.Q<Button>("mm-new-record");
-            var canAdd = MasterMemoryRecordFactory.CanAdd(table, out var reason);
+            var canAdd = ready && MasterMemoryRecordFactory.CanAdd(table, out var reason);
             newButton.SetEnabled(canAdd);
-            newButton.tooltip = canAdd ? "Add a record with default values (it exists as an override: a rebuilt database and TryGetOverride see it)" : reason;
+            newButton.tooltip = !ready
+                ? "Loading this table from the game…"
+                : canAdd
+                    ? "Add a record with default values (it exists as an override: a rebuilt database and TryGetOverride see it)"
+                    : reason;
+            if (!ready) SetStatus($"Loading {table?.TableName} from the game…", false);
         }
 
         void OnRecordSelected(MasterMemoryRecordDescriptor record)

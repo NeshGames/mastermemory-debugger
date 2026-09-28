@@ -10,8 +10,14 @@ namespace Nesh.MasterMemoryDebugger
         Applied,
         /// <summary>The patch was created for a different master version. Nothing was applied; retry with force.</summary>
         VersionMismatch,
+        /// <summary>The patch was created for a different registered schema. Nothing was applied; retry with force.</summary>
+        SchemaMismatch,
         /// <summary>The patch format is not supported. Nothing was applied.</summary>
         UnsupportedFormat,
+        /// <summary>Patch preflight failed. Nothing was applied.</summary>
+        Invalid,
+        /// <summary>The override layer changed after preflight. Nothing was applied.</summary>
+        Conflict,
         /// <summary>The debugger is disabled in this build. Nothing was applied.</summary>
         Disabled,
     }
@@ -21,6 +27,8 @@ namespace Nesh.MasterMemoryDebugger
         public MasterDataPatchApplyStatus Status;
         public string PatchMasterVersion;
         public string CurrentMasterVersion;
+        public string PatchSchemaHash;
+        public string CurrentSchemaHash;
         public int AppliedRecords;
         public int AppliedFields;
         /// <summary>Records added (included in <see cref="AppliedRecords"/>).</summary>
@@ -28,6 +36,7 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>Records deleted (included in <see cref="AppliedRecords"/>).</summary>
         public int DeletedRecords;
         public readonly List<string> Warnings = new List<string>();
+        public readonly List<string> Errors = new List<string>();
 
         public bool Succeeded => Status == MasterDataPatchApplyStatus.Applied;
     }
@@ -47,6 +56,7 @@ namespace Nesh.MasterMemoryDebugger
             var patch = new MasterDataPatch
             {
                 MasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
+                SchemaHash = MasterMemoryDebugRegistry.GetSchemaHash(),
                 ExportedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
             };
             if (!MasterMemoryDebugBuild.IsEnabled) return patch;
@@ -223,6 +233,8 @@ namespace Nesh.MasterMemoryDebugger
             {
                 PatchMasterVersion = patch.MasterVersion ?? MasterMemoryDebugRegistry.UnknownMasterVersion,
                 CurrentMasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
+                PatchSchemaHash = patch.SchemaHash,
+                CurrentSchemaHash = MasterMemoryDebugRegistry.GetSchemaHash(),
             };
 
             if (!MasterMemoryDebugBuild.IsEnabled)
@@ -230,37 +242,44 @@ namespace Nesh.MasterMemoryDebugger
                 result.Status = MasterDataPatchApplyStatus.Disabled;
                 return result;
             }
-            if (patch.FormatVersion > MasterDataPatch.CurrentFormatVersion || patch.FormatVersion <= 0)
+
+            var plan = MasterDataPatchEngine.Build(
+                patch,
+                replaceExisting: replaceExisting,
+                requireOriginalPreconditions: true,
+                forceIdentity: force);
+            result.Warnings.AddRange(plan.Warnings);
+
+            if (!plan.Succeeded)
             {
-                result.Status = MasterDataPatchApplyStatus.UnsupportedFormat;
-                result.Warnings.Add($"Unsupported patch format version {patch.FormatVersion}.");
+                foreach (var error in plan.Errors)
+                    result.Errors.Add($"{error.Code}: {error.TableName} {error.Key} {error.Field} {error.Message}".Trim());
+                var code = plan.Errors.Count == 0 ? null : plan.Errors[0].Code;
+                result.Status = code == "UNSUPPORTED_FORMAT" ? MasterDataPatchApplyStatus.UnsupportedFormat
+                    : code == "VERSION_MISMATCH" ? MasterDataPatchApplyStatus.VersionMismatch
+                    : code == "SCHEMA_MISMATCH" ? MasterDataPatchApplyStatus.SchemaMismatch
+                    : MasterDataPatchApplyStatus.Invalid;
                 return result;
             }
-            if (!IsSameMasterVersion(result.PatchMasterVersion, result.CurrentMasterVersion))
+
+            try
             {
-                if (!force)
-                {
-                    result.Status = MasterDataPatchApplyStatus.VersionMismatch;
-                    return result;
-                }
-                result.Warnings.Add($"Master version differs (patch: {result.PatchMasterVersion}, current: {result.CurrentMasterVersion}). Force loaded.");
+                MasterDataPatchEngine.Commit(plan);
+            }
+            catch (InvalidOperationException e)
+            {
+                result.Status = MasterDataPatchApplyStatus.Conflict;
+                result.Errors.Add(e.Message);
+                return result;
             }
 
-            using (MasterMemoryDebugRuntime.BeginBatch())
+            result.AppliedRecords = plan.Targets.Count;
+            result.AppliedFields = plan.FieldCount;
+            foreach (var target in plan.Targets)
             {
-                if (replaceExisting) MasterMemoryDebugRuntime.Store.Clear();
-                foreach (var patchTable in patch.Tables)
-                {
-                    var table = FindTable(patchTable);
-                    if (table == null)
-                    {
-                        result.Warnings.Add($"Table '{patchTable.TableName}' is not registered, skipped.");
-                        continue;
-                    }
-                    ApplyTable(patchTable, table, result);
-                }
+                if (target.Kind == MasterDataPatchOperationKind.Add) result.AddedRecords++;
+                else if (target.Kind == MasterDataPatchOperationKind.Delete) result.DeletedRecords++;
             }
-
             result.Status = MasterDataPatchApplyStatus.Applied;
             return result;
         }
@@ -450,7 +469,7 @@ namespace Nesh.MasterMemoryDebugger
             return lookup;
         }
 
-        static Dictionary<string, object> BuildOriginalLookupByKeyJson(MasterMemoryTableDescriptor table)
+        internal static Dictionary<string, object> BuildOriginalLookupByKeyJson(MasterMemoryTableDescriptor table)
         {
             var lookup = new Dictionary<string, object>(StringComparer.Ordinal);
             foreach (var record in table.GetAllRecords())

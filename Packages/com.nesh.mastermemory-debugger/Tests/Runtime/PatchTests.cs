@@ -226,6 +226,73 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void Apply_InvalidPatch_ShouldNotReplaceExistingOverrides()
+        {
+            RegisterTestDatabase();
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            MasterMemoryDebugRuntime.SetOverride(
+                1002, Database.TestSkillTable.FindById(1002) with { Damage = 77 });
+
+            var patch = new MasterDataPatch
+            {
+                MasterVersion = "v1",
+                SchemaHash = MasterMemoryDebugRegistry.GetSchemaHash(),
+            };
+            patch.Tables.Add(new MasterDataPatchTable
+            {
+                TableName = nameof(TestSkill),
+                RecordType = typeof(TestSkill).FullName,
+                Records =
+                {
+                    new MasterDataPatchRecord
+                    {
+                        PrimaryKey = new MasterDataJsonObject { { "Id", 1001 } },
+                        Changes =
+                        {
+                            new MasterDataPatchChange
+                            {
+                                Field = "MissingField",
+                                Original = 120,
+                                Value = 999,
+                            },
+                        },
+                    },
+                },
+            });
+
+            var result = MasterDataPatchService.Apply(patch, replaceExisting: true);
+
+            Assert.AreEqual(MasterDataPatchApplyStatus.Invalid, result.Status);
+            Assert.AreEqual(1, MasterMemoryDebugRuntime.OverrideCount,
+                "preflight failure must not clear the existing override layer");
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1002, out var existing));
+            Assert.AreEqual(77, existing.Damage);
+        }
+
+        [Test]
+        public void Apply_SchemaMismatch_ShouldRequireForce()
+        {
+            RegisterTestDatabase();
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            MasterMemoryDebugRuntime.SetOverride(
+                1001, Database.TestSkillTable.FindById(1001) with { Damage = 185 });
+            var patch = MasterDataPatchService.CreatePatch();
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            patch.SchemaHash = "different-schema";
+
+            var rejected = MasterDataPatchService.Apply(patch);
+
+            Assert.AreEqual(MasterDataPatchApplyStatus.SchemaMismatch, rejected.Status);
+            Assert.AreEqual(0, MasterMemoryDebugRuntime.OverrideCount);
+
+            var forced = MasterDataPatchService.Apply(patch, force: true);
+            Assert.AreEqual(MasterDataPatchApplyStatus.Applied, forced.Status);
+            Assert.IsTrue(forced.Warnings.Any(x => x.Contains("schema differs")));
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1001, out var skill));
+            Assert.AreEqual(185, skill.Damage);
+        }
+
+        [Test]
         public void Apply_UnsupportedFormat_ShouldFail()
         {
             var result = MasterDataPatchService.Apply(new MasterDataPatch { FormatVersion = 99, MasterVersion = "v1" });

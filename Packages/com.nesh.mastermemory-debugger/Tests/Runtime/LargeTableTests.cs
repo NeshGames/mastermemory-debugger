@@ -118,7 +118,9 @@ namespace Nesh.MasterMemoryDebugger.Tests
                 TestContext.Progress.WriteLine($"remote: welcome size {bytes.Length / 1024} KB");
                 var decoded = Measure("remote: decode", () => MasterMemoryRemoteProtocol.DecodeWelcome(bytes));
                 var skillTable = decoded.Tables.Single(x => x.TableName == nameof(TestSkill));
-                Measure("remote: deserialize records", () => skillTable.Records.Select(x => MasterMemoryRemotePeer.Deserialize(typeof(TestSkill), x)).ToList());
+                Assert.AreEqual(RecordCount, skillTable.RecordCount);
+                Assert.AreEqual(0, skillTable.Records.Count, "Welcome v6 is metadata-only");
+                Assert.Less(bytes.Length, 128 * 1024, "the initial remote handshake must not scale with table record count");
             }
             finally
             {

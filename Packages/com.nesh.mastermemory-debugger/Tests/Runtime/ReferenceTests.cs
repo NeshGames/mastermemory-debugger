@@ -6,6 +6,20 @@ namespace Nesh.MasterMemoryDebugger.Tests
     public class ReferenceTests : DebuggerTestBase
     {
         [Test]
+        public void ExplicitReferences_ShouldMergeWithDiscoveredReferences()
+        {
+            RegisterTestDatabase();
+            MasterMemoryReferences.Register<TestSkill, TestEnemyLevel, int>(
+                x => x.SummonEnemyId, x => x.EnemyId);
+
+            var references = MasterMemoryReferences.Get(Table<TestSkill>());
+
+            Assert.AreEqual(1, references.Count, "the explicit reference and Exists discovery are de-duplicated");
+            Assert.AreEqual("SummonEnemyId", references[0].SourceMember);
+            Assert.AreEqual("EnemyId", references[0].TargetMember);
+        }
+
+        [Test]
         public void References_ShouldComeFromValidateExists()
         {
             RegisterTestDatabase();

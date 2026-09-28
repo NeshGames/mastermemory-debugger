@@ -59,7 +59,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugRegistry.ClearTableGroups();
             MasterMemoryDebugRegistry.SetDisplayName<ManualItem>(null);
             MasterDataCloneUtility.ClearProviders();
-            MasterMemoryReferences.ClearCache();
+            MasterMemoryReferences.Reset();
             MasterMemoryDebugValidation.ClearForTests();
             MasterGridLayout.ResetForTests();
             MasterMemoryDebugLocalization.ResetForTests();

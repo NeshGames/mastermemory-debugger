@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using MasterMemory.Meta;
 using UnityEngine;
 
@@ -162,6 +164,37 @@ namespace Nesh.MasterMemoryDebugger
             }
         }
 
+        /// <summary>
+        /// Deterministic SHA-256 of the registered table schema. Unlike MasterVersion this is always available and changes
+        /// when table names, record/key types, fields or key declarations change.
+        /// </summary>
+        public static string GetSchemaHash()
+        {
+            var text = new StringBuilder();
+            foreach (var table in s_tables.OrderBy(x => x.TableName, StringComparer.Ordinal))
+            {
+                text.Append(table.TableName).Append('|')
+                    .Append(table.MemoryTableName ?? string.Empty).Append('|')
+                    .Append(TypeIdentity(table.RecordType)).Append('|')
+                    .Append(TypeIdentity(table.KeyType)).AppendLine();
+                foreach (var field in table.TypeDescriptor.Fields.OrderBy(x => x.Order))
+                {
+                    text.Append(field.Order).Append(':').Append(field.Name).Append(':')
+                        .Append(TypeIdentity(field.FieldType)).Append(':')
+                        .Append(field.IsPrimaryKey ? field.PrimaryKeyOrder + 1 : 0).Append(':')
+                        .Append(field.IsSecondaryKey ? 1 : 0).AppendLine();
+                }
+            }
+            using (var sha = SHA256.Create())
+            {
+                var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(text.ToString()));
+                return BitConverter.ToString(bytes).Replace("-", string.Empty).ToLowerInvariant();
+            }
+        }
+
+        static string TypeIdentity(Type type) =>
+            type == null ? string.Empty : type.FullName + "," + type.Assembly.GetName().Name;
+
         // ------------------------------------------------------------------ groups
 
         /// <summary>
@@ -319,53 +352,8 @@ namespace Nesh.MasterMemoryDebugger
 
         static MasterMemoryTableDescriptor CreateFromMetaTable(MetaTable metaTable, Func<string, object> getTable)
         {
-            var memoryTableName = metaTable.TableName;
-            var recordType = metaTable.DataType;
-            var tableType = metaTable.TableType;
-
-            var rawDataMethod = tableType.GetMethod("GetRawDataUnsafe", BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null)
-                ?? throw new MissingMethodException(tableType.FullName, "GetRawDataUnsafe");
-            var selectorProperty = tableType.GetProperty("PrimaryKeySelector", BindingFlags.Instance | BindingFlags.Public)
-                ?? throw new MissingMemberException(tableType.FullName, "PrimaryKeySelector");
-            var keyType = selectorProperty.PropertyType.GetGenericArguments()[1];
-
-            Func<IEnumerable<object>> getAllRecords = () =>
-            {
-                var table = getTable(memoryTableName);
-                if (table == null) return Array.Empty<object>();
-                return ToObjects((IEnumerable)rawDataMethod.Invoke(table, null));
-            };
-
-            Func<object, object> getPrimaryKey;
-            var primaryIndex = metaTable.Indexes.FirstOrDefault(x => x.IsPrimaryIndex);
-            if (primaryIndex != null && primaryIndex.IndexProperties.Count == 1)
-            {
-                var keyProperty = primaryIndex.IndexProperties[0];
-                getPrimaryKey = record => keyProperty.GetValue(record);
-            }
-            else
-            {
-                // composite key: use the generated selector so the key is exactly the ValueTuple used by FindBy
-                Delegate selector = null;
-                getPrimaryKey = record =>
-                {
-                    if (selector == null)
-                    {
-                        var table = getTable(memoryTableName) ?? throw new InvalidOperationException($"Table '{memoryTableName}' is not loaded.");
-                        selector = (Delegate)selectorProperty.GetValue(table);
-                    }
-                    return selector.DynamicInvoke(record);
-                };
-            }
-
-            return new MasterMemoryTableDescriptor(
-                recordType.Name,
-                memoryTableName,
-                recordType,
-                keyType,
-                getAllRecords,
-                getPrimaryKey,
-                CreateDefaultDisplayName(recordType));
+            return MasterMemoryDebugRuntime.Session.MasterMemoryAdapter.CreateTable(
+                metaTable, getTable, CreateDefaultDisplayName);
         }
 
         static readonly string[] s_displayNameCandidates = { "Name", "DisplayName", "Title", "Label" };
