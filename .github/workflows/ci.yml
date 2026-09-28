@@ -40,9 +40,9 @@ jobs:
         shell: bash
         run: |
           if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
-            git diff --check "origin/$GITHUB_BASE_REF"...HEAD
+            git diff --check "origin/$GITHUB_BASE_REF"...HEAD -- . ':(exclude,glob)**/*.meta'
           elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            git diff --check HEAD^...HEAD
+            git diff --check HEAD^...HEAD -- . ':(exclude,glob)**/*.meta'
           fi
 
       - name: Build every configuration and run the tests
