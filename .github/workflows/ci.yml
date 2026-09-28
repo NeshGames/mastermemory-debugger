@@ -25,11 +25,15 @@ jobs:
       - name: Changelog and READMEs match the package version
         run: |
           version=$(jq -r .version Packages/com.nesh.mastermemory-debugger/package.json)
-          grep -q "^## \\[$version\\]" Packages/com.nesh.mastermemory-debugger/CHANGELOG.md \\
-            || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
+          grep -q "^## \[$version\]" Packages/com.nesh.mastermemory-debugger/CHANGELOG.md || {
+            echo "::error::CHANGELOG.md has no section for $version"
+            exit 1
+          }
           for readme in README.md Packages/com.nesh.mastermemory-debugger/README.md; do
-            grep -q "#v$version" "$readme" \\
-              || { echo "::error::$readme does not pin the install URL to #v$version"; exit 1; }
+            grep -q "#v$version" "$readme" || {
+              echo "::error::$readme does not pin the install URL to #v$version"
+              exit 1
+            }
           done
 
       - name: Verify changed-file formatting
@@ -47,13 +51,12 @@ jobs:
       - name: Collect code coverage
         run: |
           rm -rf artifacts/coverage
-          dotnet test Tools/Harness/Tests/Tests.csproj -nologo -p:ExtraDefines="UNITY_EDITOR" \\
+          dotnet test Tools/Harness/Tests/Tests.csproj -nologo -p:ExtraDefines="UNITY_EDITOR" \
             --collect:"XPlat Code Coverage" --results-directory artifacts/coverage/harness < /dev/null
-          dotnet test Tools/RemoteCli.Tests/RemoteCli.Tests.csproj -nologo \\
+          dotnet test Tools/RemoteCli.Tests/RemoteCli.Tests.csproj -nologo \
             --collect:"XPlat Code Coverage" --results-directory artifacts/coverage/cli < /dev/null
 
       - name: Upload code coverage
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: code-coverage
