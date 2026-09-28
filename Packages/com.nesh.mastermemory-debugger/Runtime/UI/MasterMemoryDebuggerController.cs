@@ -15,7 +15,7 @@ namespace Nesh.MasterMemoryDebugger
         internal static readonly string[] RequiredElementNames =
         {
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
-            "mm-table-list", "mm-table-search", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template", "mm-batch-edit", "mm-new-record",
+            "mm-table-list", "mm-table-search", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-saved-views", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template", "mm-batch-edit", "mm-new-record",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json", "mm-duplicate-record", "mm-delete-record",
             "mm-close", "mm-remote", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel", "mm-tab-find", "mm-find-panel", "mm-tab-diagnostics", "mm-diagnostics-panel",
             "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary", "mm-changes-copy", "mm-changes-paste",
@@ -50,12 +50,14 @@ namespace Nesh.MasterMemoryDebugger
         readonly MasterDebuggerHeaderController header;
         readonly MasterDebuggerNavigationController navigation;
         readonly MasterDebuggerShortcutController shortcuts;
+        readonly MasterSavedViewsController savedViews;
         readonly ScrollView logView;
         readonly Button logToggle;
         MasterMemoryRemoteState remoteState;
         readonly Button undoButton;
         readonly Button redoButton;
         MasterMemoryTableDescriptor shownTable;
+        MasterSavedView pendingSavedView;
         readonly MasterTableListController tableList;
         readonly MasterRecordListController recordList;
         readonly MasterTableTabsController tableTabs;
@@ -132,6 +134,13 @@ namespace Nesh.MasterMemoryDebugger
             logView.style.display = DisplayStyle.None;
             shortcuts = new MasterDebuggerShortcutController(
                 root, dialog, tableList, searchCompletion, recordList, editor, find, Undo, Redo);
+            savedViews = new MasterSavedViewsController(
+                Required<Button>(root, "mm-saved-views"),
+                dialog,
+                () => shownTable,
+                recordList.CaptureViewState,
+                LoadSavedView,
+                SetStatus);
 
             Bind(root, "mm-close", RuntimeMasterMemoryDebugger.Close);
             Bind(root, "mm-tab-data", () => SelectTab(MasterDebuggerTab.Data));
@@ -242,6 +251,7 @@ namespace Nesh.MasterMemoryDebugger
             patches.Dispose();
             diagnostics.Dispose();
             shortcuts.Dispose();
+            savedViews.Dispose();
             tableTabs.Dispose();
         }
 
@@ -251,8 +261,25 @@ namespace Nesh.MasterMemoryDebugger
         {
             find.MarkStale();
             tableList.Reload();
+            ReapplyPendingSavedView();
             tableTabs.Refresh();
             RefreshHeader();
+        }
+
+        void ReapplyPendingSavedView()
+        {
+            var view = pendingSavedView;
+            if (view == null || !MasterMemoryDebugRegistry.TryGetTable(view.TableName, out var table)) return;
+            if (shownTable == null || shownTable.TableName != view.TableName) return;
+
+            if (shownTable != table)
+            {
+                tableList.RestoreSelection(table);
+                ShowTable(table);
+            }
+            recordList.ApplyViewState(view.ToRecordState());
+            searchCompletion.Refresh();
+            if (MasterMemoryDebugRemote.IsTableLoaded(view.TableName)) pendingSavedView = null;
         }
 
         /// <summary>A pinned tab was clicked.</summary>
@@ -324,6 +351,29 @@ namespace Nesh.MasterMemoryDebugger
                     ? "Add a record with default values (it exists as an override: a rebuilt database and TryGetOverride see it)"
                     : reason;
             if (!ready) SetStatus($"Loading {table?.TableName} from the game…", false);
+        }
+
+        void LoadSavedView(MasterSavedView view)
+        {
+            if (view == null || !MasterMemoryDebugRegistry.TryGetTable(view.TableName, out var table))
+            {
+                SetStatus($"Saved view table \"{view?.TableName ?? "?"}\" is not registered.", true);
+                return;
+            }
+
+            RunAfterEditGuard(() =>
+            {
+                SelectTab(MasterDebuggerTab.Data);
+                if (shownTable != table)
+                {
+                    tableList.RestoreSelection(table);
+                    ShowTable(table);
+                }
+                recordList.ApplyViewState(view.ToRecordState());
+                searchCompletion.Refresh();
+                pendingSavedView = MasterMemoryDebugRemote.IsTableLoaded(table.TableName) ? null : view.Clone();
+                SetStatus($"Saved view \"{view.Name}\" loaded.", false);
+            }, () => { });
         }
 
         void OnRecordSelected(MasterMemoryRecordDescriptor record)

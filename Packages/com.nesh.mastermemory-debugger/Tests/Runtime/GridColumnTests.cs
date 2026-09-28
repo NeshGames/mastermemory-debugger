@@ -122,6 +122,34 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void SavedViewLayout_ShouldIgnoreRemovedColumnsAndKeepNewColumnDefaults()
+        {
+            var source = MasterRecordListController.CreateColumns(Table<TestSkill>());
+            var name = source.Single(x => x.Key == "Name");
+            name.Visible = false;
+            name.Frozen = true;
+            name.Width = 222f;
+            name.UserSized = true;
+            var serialized = MasterGridLayout.Capture(source);
+
+            var target = MasterRecordListController.CreateColumns(Table<TestSkill>());
+            target.RemoveAll(x => x.Key == "Damage");
+            var future = new MasterGridColumn("FutureField", "Future", 123f, null);
+            target.Add(future);
+
+            MasterGridLayout.ApplySerialized(serialized, target);
+
+            var restored = target.Single(x => x.Key == "Name");
+            Assert.IsFalse(restored.Visible);
+            Assert.IsTrue(restored.Frozen);
+            Assert.AreEqual(222f, restored.Width);
+            Assert.IsTrue(restored.UserSized);
+            Assert.IsTrue(future.Visible);
+            Assert.IsFalse(future.Frozen);
+            Assert.AreEqual(123f, future.Width);
+        }
+
+        [Test]
         public void Tsv_ShouldContainTheShownColumnsInGridOrder()
         {
             var table = Table<TestSkill>();

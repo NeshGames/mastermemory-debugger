@@ -189,13 +189,16 @@ Apply/Merge now always presents the shared-engine impact preview before commit. 
 
 Persist development-only table browsing state:
 
-- [ ] Table.
-- [ ] Query.
-- [ ] Sort.
-- [ ] Visible/frozen columns.
-- [ ] Modified-only toggle.
-- [ ] Named save/load/delete UI.
-- [ ] Keep storage development/debug-only and version-tolerant.
+- [x] Table.
+- [x] Query.
+- [x] Sort.
+- [x] Visible/frozen columns and user-sized widths.
+- [x] Modified-only toggle.
+- [x] Named save/load/delete UI.
+- [x] Keep storage development/debug-only and version-tolerant.
+
+Saved Views implementation is complete, including schema-tolerant column/sort restore and remote lazy-table reapply.
+Execution/UI smoke validation remains part of P0.2.
 
 **Definition of done**
 

@@ -41,6 +41,7 @@
                         <ui:VisualElement name="mm-search-toolbar" class="mm-debugger__search-toolbar">
                             <ui:TextField name="mm-search" class="mm-debugger__search" />
                             <ui:Toggle name="mm-modified-only" label="Modified Only" class="mm-debugger__modified-only" />
+                            <ui:Button name="mm-saved-views" text="Views…" tooltip="Save or restore table, query, sort and column layout" class="mm-debugger__button" />
                             <ui:Button name="mm-columns" text="Columns ▾" tooltip="Show, hide and freeze columns" class="mm-debugger__button mm-debugger__columns-button" />
                             <ui:Button name="mm-new-record" text="+ New…" tooltip="Add a record with default values (it exists as an override: a rebuilt database and TryGetOverride see it)" class="mm-debugger__button" />
                             <ui:Button name="mm-batch-edit" text="Batch Edit…" tooltip="Set, add to or multiply a field of every record that matches the search (one undo step)" class="mm-debugger__button" />
