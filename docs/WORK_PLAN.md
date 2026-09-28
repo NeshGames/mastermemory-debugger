@@ -209,9 +209,9 @@ Execution/UI smoke validation remains part of P0.2.
 
 SchemaHash describes structure, not the exact original data contents.
 
-- [ ] Decide whether a data fingerprint is needed in addition to project MasterVersion.
-- [ ] Prefer a project-supplied provider or cached/streamed hash; do not force an expensive full-table hash on every UI action.
-- [ ] If implemented, include it in Patch/remote identity checks without weakening SchemaHash.
+- [x] Decide whether a data fingerprint is needed in addition to project MasterVersion.
+- [x] Keep fingerprinting optional/project-owned; do not force an expensive full-table hash.
+- [x] Decision: do not add an automatic fingerprint now. Use meaningful MasterVersion + SchemaHash + field preconditions; only revisit with a project-supplied cached identity provider.
 
 **Definition of done**
 
@@ -225,18 +225,18 @@ SchemaHash describes structure, not the exact original data contents.
 
 These features create cross-cutting complexity in override markers, rebuild, Patch format, Remote, validation, history and UI.
 
-- [ ] Review real project usage.
-- [ ] If editing existing records is the only required workflow, remove Add/Duplicate/Delete as one deliberate breaking change.
-- [ ] If retained, keep them as first-class Patch operations covered by the shared engine and tests.
-- [ ] Document the decision in `docs/ARCHITECTURE.md`.
+- [x] Review current released behavior and the post-hardening implementation cost.
+- [x] Decision: retain Add/Duplicate/Delete; do not remove an already released capability during architecture cleanup.
+- [x] Keep them as first-class Patch operations covered by the shared engine and tests.
+- [x] Document the decision in `docs/ARCHITECTURE.md`.
 
 **Do not extend record-creation behavior before this decision.**
 
 ### 11. Decide the scope of Remote Operations
 
-- [ ] Keep the generic operation framework only if there are concrete project operations using it.
-- [ ] Avoid growing it into a second RPC framework without a real use case.
-- [ ] If retained, document request/replay/context/revision semantics.
+- [x] Retain the operation framework as a narrow development command surface.
+- [x] Explicitly forbid growing it into a second general-purpose RPC framework.
+- [x] Document request/replay/context/revision semantics in `docs/ARCHITECTURE.md`.
 
 ---
 
