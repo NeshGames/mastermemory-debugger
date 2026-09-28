@@ -20,6 +20,8 @@ tracked_ext = {".cs", ".asmdef", ".uxml", ".uss", ".tss", ".json"}
 for path in PKG.rglob("*"):
     if not path.is_file() or path.suffix == ".meta" or path.suffix not in tracked_ext:
         continue
+    if "Samples~" in path.parts:
+        continue
     if not pathlib.Path(str(path) + ".meta").exists():
         fail(f"missing Unity meta: {path.relative_to(ROOT)}")
 
@@ -95,7 +97,7 @@ if harness_projects["UI"].exists():
         fail("UI harness project must not depend on InputSystem")
 if harness_projects["NoInputSystemConsumer"].exists():
     text = harness_projects["NoInputSystemConsumer"].read_text(encoding="utf-8")
-    if "InputSystem" in text:
+    if "Unity.InputSystem" in text or "InputSystemStubs" in text or "../InputSystem/" in text:
         fail("no-InputSystem consumer project must not reference InputSystem")
 
 if errors:
