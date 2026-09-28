@@ -18,6 +18,8 @@ Nesh.MasterMemoryDebugger.InputSystem -> UI + Unity.InputSystem
 
 The Input System adapter is guarded by a package version define and `ENABLE_INPUT_SYSTEM`; projects without the package do not acquire a hard dependency.
 
+This split intentionally changes the public assembly layout from the 0.14.x single `Nesh.MasterMemoryDebugger.Runtime` assembly. The old Runtime asmdef GUID is retained by `Core`, so GUID-based Core references survive the rename. Name-based references to `Nesh.MasterMemoryDebugger.Runtime` must migrate, and consumers that use Remote/UI APIs must explicitly reference those assemblies because Unity custom-assembly references are not transitive. This is an intentional hardening migration and must be called out in the user-facing README/release notes.
+
 ## Runtime composition
 
 `MasterMemoryDebugRuntime` is the public static facade used by game code. Mutable services are owned by `MasterMemoryDebugSession`, which owns the override store and MasterMemory adapter.
@@ -40,7 +42,7 @@ Local patch loading and remote transactional patching share this engine. Remote 
 
 ## Remote protocol v6
 
-Welcome contains table metadata, schema hash, overrides and operations, but no table records. A client sends `TableRequest`; the server emits ordered `TableChunk` frames of roughly 1 MiB through bounded connection queues. UI loads a table when first opened. CLI metadata/patch/operation commands do not download all master records.
+Welcome contains table metadata, schema hash and operations, but **no table records or override payloads**. A client sends `TableRequest`; the server emits ordered `TableChunk` frames of roughly 1 MiB through bounded connection queues. The chunks contain the selected table's original records plus its override snapshot. Live `Changes` received before that table finishes loading are buffered and replayed after the snapshot so the newest state wins. UI loads a table when first opened. Validation failures can trigger loading of the affected table so Open can resolve the actual record. CLI metadata/patch/operation commands do not download all master records.
 
 ## Identity
 

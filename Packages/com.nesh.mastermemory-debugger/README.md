@@ -66,7 +66,22 @@ Package Manager → `+` → **Add package from git URL...**
 
    URL 最後的 `#v0.14.0` 鎖定版本（建議）；拿掉則會安裝 `main` 的最新內容。各版本見 [Releases](https://github.com/NeshGames/mastermemory-debugger/releases) 與 `CHANGELOG.md`。
 
-Runtime assembly (`Nesh.MasterMemoryDebugger.Runtime`) 會自動參考 NuGetForUnity 安裝的 `MasterMemory.dll`。
+### Assembly migration（architecture-hardening / 下一版）
+
+Runtime 已從 0.14.x 的單一 `Nesh.MasterMemoryDebugger.Runtime` 拆成明確的 assembly 邊界：
+
+- `Nesh.MasterMemoryDebugger.Core`：Registry、Override、Reflection、Patch、Settings；不依賴 Input System。
+- `Nesh.MasterMemoryDebugger.Remote`：Remote protocol / server / client；依賴 Core。
+- `Nesh.MasterMemoryDebugger.UI`：UI Toolkit debugger 與 Remote Editor host；依賴 Core + Remote。
+- `Nesh.MasterMemoryDebugger.InputSystem`：可選的 Input System adapter；只有安裝並啟用 Input System 時才編譯。
+
+這是為了移除 Core/UI 對 `Unity.InputSystem` 的硬依賴並建立可驗證的依賴方向，屬於**有意的 assembly-level breaking migration**。從 0.14.x 升級、且專案有自訂 `.asmdef` 時請注意：
+
+- 若舊 asmdef 用名稱引用 `Nesh.MasterMemoryDebugger.Runtime`，請依實際使用的 API 改成顯式引用 `Core`、`Remote`、`UI`。
+- 舊 Runtime asmdef 的 GUID 保留給 `Core`，因此使用 GUID 的既有 Core 參照可延續；但若程式碼使用 `MasterMemoryDebugRemote`、`RuntimeMasterMemoryDebugger`、`MasterMemoryRemoteEditor` 等 Remote/UI API，仍需直接加入對應 assembly reference。
+- 沒有自訂 asmdef、使用 Unity 預設 assembly 的一般專案不需要做這個 migration。
+
+MasterMemory / MessagePack 仍由 NuGetForUnity 提供；各 assembly 維持相同的 `Nesh.MasterMemoryDebugger` namespace。
 
 ## Package Architecture
 
@@ -80,12 +95,10 @@ Project MasterDataService ── MasterMemoryDebugRuntime.TryGetOverride()
 MemoryDatabase
 
 UPM Package
- ├─ Registry          MasterMemoryDebugRegistry（由專案註冊 Table）
- ├─ Reflection Cache  MasterDataReflectionCache（第一次遇到型別時掃描一次）
- ├─ Override Store    MasterDataOverrideStore
- ├─ Patch             MasterDataPatchService / Serializer / Storage / Exporter
+ ├─ Core              Registry / Reflection / Override / Patch / Settings
+ ├─ Remote            Protocol / Server / Client / Operations
  ├─ UI Toolkit        RuntimeMasterMemoryDebugger + Controllers + UXML/USS
- └─ Settings          MasterMemoryDebuggerSettings（Project Settings）
+ └─ InputSystem       Optional input adapter
 ```
 
 Package 不會直接接管 Gameplay 的資料存取，也不會修改 MasterMemory 的 table / index / record instance。

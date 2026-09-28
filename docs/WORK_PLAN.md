@@ -55,18 +55,21 @@ environment cannot execute the repository's full .NET/Unity toolchain directly.
 
 ### 2. Final CI / consistency pass
 
-- [ ] Run `python3 Tools/verify-architecture.py`.
-- [ ] Run the full harness through GitHub Actions/PR CI.
-- [ ] Fix every compile/test failure caused by the architecture rewrite.
-- [ ] Review the final diff for accidental API or serialization compatibility breaks.
-- [ ] Verify all newly added package files/folders have valid `.meta` files.
+- [x] Run `python3 Tools/verify-architecture.py` (GitHub CI).
+- [x] Run the full harness through GitHub Actions on the hardening branch.
+- [x] Fix every compile/test failure caused by the architecture rewrite.
+- [x] Review the final diff for accidental API or serialization compatibility breaks.
+  - Protocol v6 intentionally makes Welcome metadata-only; table records **and override snapshots** are lazy/chunked.
+  - The Core / Remote / UI assembly split is an intentional migration from the 0.14.x `Nesh.MasterMemoryDebugger.Runtime` assembly and is documented in the package README / architecture guide.
+- [x] Verify all newly added package files/folders have valid `.meta` files.
+- [ ] Run the required PR CI against the latest `main`.
 - [ ] Confirm package import/asmdef resolution in Unity 6000.6.
 
 **Definition of done**
 
-- GitHub CI green.
+- Hardening-branch GitHub CI is green at `de887ff6` (architecture verification, version consistency, all outside-Unity builds/tests).
 - Unity opens the project with no asmdef/compiler errors.
-- Existing public API behavior remains compatible unless intentionally documented.
+- Existing public API behavior remains compatible unless intentionally documented; the assembly split is the documented exception.
 
 ---
 

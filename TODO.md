@@ -6,7 +6,11 @@ Released changes are in [CHANGELOG.md](Packages/com.nesh.mastermemory-debugger/C
 
 ## Immediate next step
 
-- [ ] Make the outside-Unity harness compile the new Core / Remote / UI / optional InputSystem assembly topology separately.
+- [x] Make the outside-Unity harness compile the new Core / Remote / UI / optional InputSystem assembly topology separately.
+- [x] Get the hardening branch's outside-Unity CI fully green.
+- [x] Verify new package files/folders have Unity `.meta` files and document the intentional assembly migration.
+- [ ] Open the package in Unity 6000.6 and run the smoke test / asmdef import check.
+- [ ] Run the required pull-request CI against the latest `main`.
 
 ## Device verification
 
