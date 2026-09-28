@@ -239,6 +239,7 @@ var rebuild = MasterMemoryDebugRebuild.AutoRebuild(originalDatabase, db => maste
 
 - 標題列的頁籤：**Data**（瀏覽與編輯）、**Changes**（所有修改的總覽）、**Patches**（Patch 管理，見下方）、**Find**（在所有 Table 搜尋值）、**Validation**（MasterMemory 驗證結果）。
 - Data 頁的版面和一般資料庫檢視工具相同：左側 Table 清單、中間資料表格、右側 Record 詳細資料；兩條分隔線都可以拖曳調整寬度。
+- 左側 Table 清單上方可輸入 Table 的程式名稱篩選（不區分大小寫）。在搜尋欄按 ↑／↓ 切換符合的 Table，Enter 選取，Esc 清除搜尋。
 
 ### Record 表格
 
