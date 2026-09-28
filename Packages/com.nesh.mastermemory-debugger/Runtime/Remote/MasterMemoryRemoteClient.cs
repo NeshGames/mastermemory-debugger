@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Threading;
 
@@ -34,6 +35,7 @@ namespace Nesh.MasterMemoryDebugger
             public bool Loaded;
             public string RequestId;
             public int NextChunkIndex;
+            public long StartedTimestamp;
         }
 
         public MasterMemoryRemoteClient(string host, int port, string pairingCode)
@@ -268,6 +270,7 @@ namespace Nesh.MasterMemoryDebugger
             state.Loading = true;
             state.RequestId = Guid.NewGuid().ToString("N");
             state.NextChunkIndex = 0;
+            state.StartedTimestamp = Stopwatch.GetTimestamp();
             state.Records.Clear();
             state.DisplayNames?.Clear();
             Connection.Send(MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableRequest
@@ -333,6 +336,9 @@ namespace Nesh.MasterMemoryDebugger
                 state.Records, state.DisplayNames);
             if (!string.IsNullOrEmpty(state.Manifest.Group))
                 MasterMemoryDebugRegistry.SetTableGroup(state.Manifest.Group, state.Manifest.TableName);
+            var elapsedMs = (Stopwatch.GetTimestamp() - state.StartedTimestamp) * 1000.0 / Stopwatch.Frequency;
+            MasterMemoryDiagnostics.Record("Remote", "TableLoad", elapsedMs,
+                $"{chunk.TableName} records={state.Records.Count} chunks={state.NextChunkIndex}");
             SetState(MasterMemoryRemoteState.Connected,
                 $"Connected to {Host}:{Port}: {chunk.TableName} loaded ({state.Records.Count} records).");
         }

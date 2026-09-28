@@ -11,6 +11,7 @@
                     <ui:Button name="mm-tab-patches" text="Patches" tooltip="Save, apply, merge, import and export patches" class="mm-debugger__tab" />
                     <ui:Button name="mm-tab-find" text="Find" tooltip="Find a value in every table" class="mm-debugger__tab" />
                     <ui:Button name="mm-tab-validation" text="Validation" tooltip="MasterMemory Validate() failures of the rebuilt database" class="mm-debugger__tab" />
+                    <ui:Button name="mm-tab-diagnostics" text="Diagnostics" tooltip="Schema, remote protocol and recent operation timings" class="mm-debugger__tab" />
                 </ui:VisualElement>
                 <ui:VisualElement class="mm-debugger__spacer" />
                 <ui:Label name="mm-master-version" class="mm-debugger__header-info" />
@@ -89,6 +90,9 @@
 
             <!-- built by MasterValidationController -->
             <ui:VisualElement name="mm-validation-panel" class="mm-debugger__panel mm-debugger__changes-panel" />
+
+            <!-- built by MasterDiagnosticsController -->
+            <ui:VisualElement name="mm-diagnostics-panel" class="mm-debugger__panel mm-debugger__changes-panel" />
 
             <ui:ScrollView name="mm-log" mode="Vertical" class="mm-debugger__log" />
             <ui:VisualElement class="mm-debugger__status-row">

@@ -17,7 +17,7 @@ namespace Nesh.MasterMemoryDebugger
             "mm-window", "mm-status", "mm-master-version", "mm-override-count", "mm-dialog-layer",
             "mm-table-list", "mm-table-search", "mm-search-toolbar", "mm-search", "mm-search-completion", "mm-modified-only", "mm-record-grid", "mm-record-count", "mm-columns", "mm-columns-popup", "mm-copy-rows", "mm-label-template", "mm-batch-edit", "mm-new-record",
             "mm-inspector-title", "mm-record-state", "mm-inspector", "mm-apply", "mm-revert", "mm-reset-record", "mm-copy-json", "mm-duplicate-record", "mm-delete-record",
-            "mm-close", "mm-remote", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel", "mm-tab-find", "mm-find-panel",
+            "mm-close", "mm-remote", "mm-language", "mm-table-tabs", "mm-tab-data", "mm-tab-changes", "mm-tab-patches", "mm-patches-panel", "mm-tab-validation", "mm-validation-panel", "mm-tab-find", "mm-find-panel", "mm-tab-diagnostics", "mm-diagnostics-panel",
             "mm-scale-down", "mm-scale-up", "mm-main", "mm-changes-panel", "mm-changes-list", "mm-changes-summary", "mm-changes-copy", "mm-changes-paste",
             "mm-log", "mm-log-toggle", "mm-undo", "mm-redo",
         };
@@ -33,6 +33,7 @@ namespace Nesh.MasterMemoryDebugger
             Patches,
             Find,
             Validation,
+            Diagnostics,
         }
 
         // Kept across open / close so the debugger reopens where it was.
@@ -58,10 +59,12 @@ namespace Nesh.MasterMemoryDebugger
         readonly Button patchesTab;
         readonly Button validationTab;
         readonly Button findTab;
+        readonly Button diagnosticsTab;
         readonly MasterChangesController changes;
         readonly MasterPatchesController patches;
         readonly MasterValidationController validation;
         readonly MasterFindController find;
+        readonly MasterDiagnosticsController diagnostics;
         Tab currentTab;
         readonly ScrollView logView;
         readonly Button logToggle;
@@ -134,6 +137,7 @@ namespace Nesh.MasterMemoryDebugger
             patchesTab = Required<Button>(root, "mm-tab-patches");
             validationTab = Required<Button>(root, "mm-tab-validation");
             findTab = Required<Button>(root, "mm-tab-find");
+            diagnosticsTab = Required<Button>(root, "mm-tab-diagnostics");
             changes = new MasterChangesController(
                 Required<VisualElement>(root, "mm-changes-panel"),
                 Required<ScrollView>(root, "mm-changes-list"),
@@ -146,6 +150,7 @@ namespace Nesh.MasterMemoryDebugger
             patches = new MasterPatchesController(patchesPanel, dialog, SetStatus, Session.PatchName);
             validation = new MasterValidationController(Required<VisualElement>(root, "mm-validation-panel"), OpenRecord);
             find = new MasterFindController(Required<VisualElement>(root, "mm-find-panel"), OpenRecord, Session.FindQuery, Session.FindWholeValue);
+            diagnostics = new MasterDiagnosticsController(Required<VisualElement>(root, "mm-diagnostics-panel"));
             logView = Required<ScrollView>(root, "mm-log");
             logToggle = Required<Button>(root, "mm-log-toggle");
             remoteButton = Required<Button>(root, "mm-remote");
@@ -159,6 +164,7 @@ namespace Nesh.MasterMemoryDebugger
             Bind(root, "mm-tab-patches", () => SelectTab(Tab.Patches));
             Bind(root, "mm-tab-validation", () => SelectTab(Tab.Validation));
             Bind(root, "mm-tab-find", () => SelectTab(Tab.Find));
+            Bind(root, "mm-tab-diagnostics", () => SelectTab(Tab.Diagnostics));
             Bind(root, "mm-log-toggle", ToggleLog);
             Bind(root, "mm-remote", () => MasterRemoteDialog.Show(dialog, SetStatus));
             Bind(root, "mm-undo", Undo);
@@ -261,6 +267,7 @@ namespace Nesh.MasterMemoryDebugger
             searchCompletion.Dispose();
             editor.Dispose();
             patches.Dispose();
+            diagnostics.Dispose();
             tableTabs.Dispose();
         }
 
@@ -407,6 +414,8 @@ namespace Nesh.MasterMemoryDebugger
             else validation.Hide();
             if (tab == Tab.Find) find.Show();
             else find.Hide();
+            if (tab == Tab.Diagnostics) diagnostics.Show();
+            else diagnostics.Hide();
             recordList.CloseColumnsPopup();
             RefreshHeader();
         }
@@ -732,6 +741,7 @@ namespace Nesh.MasterMemoryDebugger
             patchesTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Patches);
             validationTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Validation);
             findTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Find);
+            diagnosticsTab.EnableInClassList("mm-debugger__tab--selected", currentTab == Tab.Diagnostics);
             var newFailures = MasterMemoryDebugValidation.NewFailureCount;
             validationTab.text = newFailures > 0 ? $"Validation ({newFailures} new)" : "Validation";
             validationTab.EnableInClassList("mm-debugger__tab--alert", newFailures > 0);

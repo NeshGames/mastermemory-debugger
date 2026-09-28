@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Nesh.MasterMemoryDebugger
 {
@@ -61,6 +62,7 @@ namespace Nesh.MasterMemoryDebugger
             bool forceIdentity)
         {
             if (patch == null) throw new ArgumentNullException(nameof(patch));
+            var watch = Stopwatch.StartNew();
             var plan = new MasterDataPatchPlan();
 
             if (patch.FormatVersion <= 0 || patch.FormatVersion > MasterDataPatch.CurrentFormatVersion)
@@ -134,6 +136,9 @@ namespace Nesh.MasterMemoryDebugger
                 plan.Changes.Clear();
                 plan.FieldCount = 0;
             }
+            watch.Stop();
+            MasterMemoryDiagnostics.Record("Patch", "Preflight", watch.Elapsed.TotalMilliseconds,
+                $"targets={plan.Targets.Count} errors={plan.Errors.Count} replace={replaceExisting}");
             return plan;
         }
 
@@ -141,7 +146,11 @@ namespace Nesh.MasterMemoryDebugger
         {
             if (plan == null) throw new ArgumentNullException(nameof(plan));
             if (!plan.Succeeded) throw new InvalidOperationException("Patch preflight failed.");
+            var watch = Stopwatch.StartNew();
             MasterMemoryDebugRuntime.Session.OverrideStore.ApplyAtomic(plan.Changes);
+            watch.Stop();
+            MasterMemoryDiagnostics.Record("Patch", "Commit", watch.Elapsed.TotalMilliseconds,
+                $"targets={plan.Targets.Count} changes={plan.Changes.Count}");
         }
 
         static void PlanRecord(
