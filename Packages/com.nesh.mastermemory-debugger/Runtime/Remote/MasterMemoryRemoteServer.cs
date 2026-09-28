@@ -13,7 +13,7 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     internal sealed class MasterMemoryRemoteServer : MasterMemoryRemotePeer
     {
-        const int MaxOperationResults = 4096;
+        const int MaxReplayResults = 4096;
         readonly TcpListener listener;
         readonly Thread acceptThread;
         readonly ConcurrentQueue<TcpClient> accepted = new ConcurrentQueue<TcpClient>();
@@ -26,10 +26,11 @@ namespace Nesh.MasterMemoryDebugger
         bool validationChanged;
         bool operationsChanged;
         readonly string serverEpoch = Guid.NewGuid().ToString("N");
-        readonly Dictionary<string, MasterMemoryRemoteProtocol.OperationResult> operationResults =
-            new Dictionary<string, MasterMemoryRemoteProtocol.OperationResult>(StringComparer.Ordinal);
-        readonly Dictionary<string, Tuple<string, MasterMemoryRemoteProtocol.PatchResponse>> patchResults =
-            new Dictionary<string, Tuple<string, MasterMemoryRemoteProtocol.PatchResponse>>(StringComparer.Ordinal);        readonly HashSet<Type> checkedTypes = new HashSet<Type>();
+        readonly MasterMemoryReplayCache<MasterMemoryRemoteProtocol.OperationResult> operationResults =
+            new MasterMemoryReplayCache<MasterMemoryRemoteProtocol.OperationResult>(MaxReplayResults);
+        readonly MasterMemoryReplayCache<Tuple<string, MasterMemoryRemoteProtocol.PatchResponse>> patchResults =
+            new MasterMemoryReplayCache<Tuple<string, MasterMemoryRemoteProtocol.PatchResponse>>(MaxReplayResults);
+        readonly HashSet<Type> checkedTypes = new HashSet<Type>();
         readonly MasterMemoryRemoteDiscovery.Responder discovery;
         string lastError;
 
@@ -397,18 +398,8 @@ namespace Nesh.MasterMemoryDebugger
             if (string.IsNullOrEmpty(request.RequestId) || request.RequestId.Length > 64) return;
             if (!operationResults.TryGetValue(request.RequestId, out var result))
             {
-                if (operationResults.Count >= MaxOperationResults)
-                    result = new MasterMemoryRemoteProtocol.OperationResult
-                    {
-                        RequestId = request.RequestId,
-                        Status = (byte)MasterMemoryRemoteOperationStatus.Busy,
-                        Message = "Remote operation limit reached; restart the Remote server to continue.",
-                    };
-                else
-                {
-                    result = MasterMemoryDebugRemote.ExecuteOperation(request);
-                    operationResults.Add(request.RequestId, result);
-                }
+                result = MasterMemoryDebugRemote.ExecuteOperation(request);
+                operationResults.Add(request.RequestId, result);
             }
             Connection?.Send(MasterMemoryRemoteProtocol.Encode(result));
         }
@@ -437,15 +428,6 @@ namespace Nesh.MasterMemoryDebugger
                         MasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
                     };
                 }
-                else if (patchResults.Count >= MaxOperationResults)
-                    response = new MasterMemoryRemoteProtocol.PatchResponse
-                    {
-                        RequestId = request.RequestId,
-                        Status = MasterMemoryRemoteProtocol.PatchStatus.Failed,
-                        Message = "Patch request limit reached; restart the Remote server.",
-                        ServerEpoch = serverEpoch,
-                        MasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
-                    };
                 else
                 {
                     var plan = MasterMemoryRemotePatch.Build(request, serverEpoch);

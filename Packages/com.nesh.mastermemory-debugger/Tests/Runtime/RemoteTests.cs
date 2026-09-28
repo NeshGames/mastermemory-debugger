@@ -99,6 +99,24 @@ namespace Nesh.MasterMemoryDebugger.Tests
 
         static byte[] Pack<T>(T record) => MasterMemoryRemotePeer.Serialize(typeof(T), record);
 
+        [Test]
+        public void ReplayCache_ShouldEvictTheOldestRequest()
+        {
+            var cache = new MasterMemoryReplayCache<int>(2);
+            cache.Add("a", 1);
+            cache.Add("b", 2);
+            Assert.IsTrue(cache.TryGetValue("a", out _));
+
+            cache.Add("c", 3);
+
+            Assert.IsFalse(cache.TryGetValue("a", out _));
+            Assert.IsTrue(cache.TryGetValue("b", out var b));
+            Assert.AreEqual(2, b);
+            Assert.IsTrue(cache.TryGetValue("c", out var c));
+            Assert.AreEqual(3, c);
+            Assert.AreEqual(2, cache.Count);
+        }
+
         // ------------------------------------------------------------------ game side (server)
 
         NetworkStream ConnectRaw(string code)
