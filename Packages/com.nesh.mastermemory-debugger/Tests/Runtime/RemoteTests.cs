@@ -552,6 +552,12 @@ namespace Nesh.MasterMemoryDebugger.Tests
                 DisplayNames = new System.Collections.Generic.List<string> { "skill 1001", "skill 1002", "skill 1003" },
             };
             foreach (var record in Database.TestSkillTable.All) skillChunk.Records.Add(Pack(record));
+            skillChunk.Overrides.Add(new MasterMemoryRemoteProtocol.Change
+            {
+                Kind = MasterMemoryRemoteProtocol.ChangeKind.Set,
+                TableName = nameof(TestSkill),
+                Record = Pack(Database.TestSkillTable.FindById(1003) with { Damage = 50 }),
+            });
             MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(skillChunk));
             PumpUntil(() => MasterMemoryDebugRemote.IsTableLoaded(nameof(TestSkill)), "the skill table");
             var skills = Table<TestSkill>();
@@ -712,7 +718,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.AreEqual(1, read.Tables[0].RecordCount);
             Assert.IsTrue(read.Tables[0].HasCustomDisplayName);
             Assert.AreEqual(0, read.Tables[0].Records.Count);
-            Assert.IsTrue(read.Overrides[0].IsSet);
+            Assert.AreEqual(0, read.Overrides.Count, "Welcome v6 does not carry override payloads");
             Assert.AreEqual("epoch", read.ServerEpoch);
             Assert.AreEqual("battle:1", read.Operations[0].Context);
             var request = new MasterMemoryRemoteProtocol.OperationRequest
@@ -732,9 +738,14 @@ namespace Nesh.MasterMemoryDebugger.Tests
                 Records = { new byte[] { 1, 2 } },
                 DisplayNames = new System.Collections.Generic.List<string> { "a" },
             };
+            tableChunk.Overrides.Add(new MasterMemoryRemoteProtocol.Change
+            {
+                IsSet = true, TableName = "T", Record = new byte[] { 3 },
+            });
             var readChunk = MasterMemoryRemoteProtocol.DecodeTableChunk(MasterMemoryRemoteProtocol.Encode(tableChunk));
             CollectionAssert.AreEqual(new byte[] { 1, 2 }, readChunk.Records[0]);
             Assert.AreEqual("a", readChunk.DisplayNames[0]);
+            CollectionAssert.AreEqual(new byte[] { 3 }, readChunk.Overrides[0].Record);
             Assert.Throws<System.IO.InvalidDataException>(() => MasterMemoryRemoteProtocol.DecodeHello(MasterMemoryRemoteProtocol.EncodeReject("no")));
         }
 
@@ -929,6 +940,21 @@ namespace Nesh.MasterMemoryDebugger.Tests
                 new MasterMemoryRemoteProtocol.Failure { TableName = nameof(TestSkill), Key = "1001", Message = "Exists failed", IsNew = true },
             }));
             PumpUntil(() => !MasterMemoryDebugValidation.IsPending, "the results");
+
+            var request = MasterMemoryRemoteProtocol.DecodeTableRequest(
+                ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.TableRequest));
+            Assert.AreEqual(nameof(TestSkill), request.TableName);
+            var chunk = new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = request.RequestId,
+                TableName = request.TableName,
+                ChunkIndex = 0,
+                IsLast = true,
+            };
+            foreach (var record in Database.TestSkillTable.All) chunk.Records.Add(Pack(record));
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(chunk));
+            PumpUntil(() => MasterMemoryDebugRemote.IsTableLoaded(nameof(TestSkill)), "the validation table");
+
             var failures = MasterMemoryDebugValidation.Run();
             Assert.AreEqual(1, failures.Count);
             Assert.AreEqual(typeof(TestSkill), failures[0].RecordType);

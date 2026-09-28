@@ -74,7 +74,7 @@ namespace Nesh.MasterMemoryDebugger
         {
             /// <summary>Client → server: protocol version and pairing code.</summary>
             Hello = 1,
-            /// <summary>Server → client: every table, its records and the current overrides.</summary>
+            /// <summary>Server → client: table metadata, labels and operations. Records and overrides are lazy.</summary>
             Welcome = 2,
             /// <summary>Server → client: the connection is refused (wrong code, busy, other version).</summary>
             Reject = 3,
@@ -182,6 +182,7 @@ namespace Nesh.MasterMemoryDebugger
             public string Error;
             public List<byte[]> Records = new List<byte[]>();
             public List<string> DisplayNames;
+            public List<Change> Overrides = new List<Change>();
         }
 
         public sealed class Welcome
@@ -299,7 +300,6 @@ namespace Nesh.MasterMemoryDebugger
                 w.Write(table.RecordCount);
                 w.Write(table.HasCustomDisplayName);
             }
-            WriteChanges(w, message.Overrides);
             WriteOperations(w, message.Operations);
         });
 
@@ -324,6 +324,7 @@ namespace Nesh.MasterMemoryDebugger
                 w.Write(chunk.DisplayNames.Count);
                 foreach (var name in chunk.DisplayNames) w.Write(name ?? string.Empty);
             }
+            WriteChanges(w, chunk.Overrides);
         });
 
         public static byte[] EncodeReject(string reason) => Write(MessageType.Reject, w => w.Write(reason ?? string.Empty));
@@ -453,7 +454,6 @@ namespace Nesh.MasterMemoryDebugger
                     HasCustomDisplayName = r.ReadBoolean(),
                 });
             }
-            message.Overrides = ReadChanges(r);
             message.Operations = ReadOperations(r);
             return message;
         });
@@ -484,6 +484,7 @@ namespace Nesh.MasterMemoryDebugger
                 for (var i = 0; i < names; i++) chunk.DisplayNames.Add(r.ReadString());
                 if (names != count) throw new InvalidDataException("Table chunk display-name count does not match records.");
             }
+            chunk.Overrides = ReadChanges(r);
             return chunk;
         });
 

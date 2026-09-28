@@ -247,8 +247,9 @@ namespace Nesh.MasterMemoryDebugger
             var plan = MasterDataPatchEngine.Build(
                 patch,
                 replaceExisting: replaceExisting,
-                requireOriginalPreconditions: true,
-                forceIdentity: force);
+                requireOriginalPreconditions: false,
+                forceIdentity: force,
+                allowPartial: true);
             result.Warnings.AddRange(plan.Warnings);
             foreach (var error in plan.Errors)
                 result.Errors.Add($"{error.Code}: {error.TableName} {error.Key} {error.Field} {error.Message}".Trim());
@@ -313,8 +314,9 @@ namespace Nesh.MasterMemoryDebugger
             var plan = MasterDataPatchEngine.Build(
                 patch,
                 replaceExisting: replaceExisting,
-                requireOriginalPreconditions: true,
-                forceIdentity: force);
+                requireOriginalPreconditions: false,
+                forceIdentity: force,
+                allowPartial: true);
             result.Warnings.AddRange(plan.Warnings);
 
             if (!plan.Succeeded)

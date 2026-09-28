@@ -59,7 +59,8 @@ namespace Nesh.MasterMemoryDebugger
             MasterDataPatch patch,
             bool replaceExisting,
             bool requireOriginalPreconditions,
-            bool forceIdentity)
+            bool forceIdentity,
+            bool allowPartial = false)
         {
             if (patch == null) throw new ArgumentNullException(nameof(patch));
             var watch = Stopwatch.StartNew();
@@ -91,12 +92,14 @@ namespace Nesh.MasterMemoryDebugger
                 var table = MasterDataPatchService.FindTable(patchTable);
                 if (table == null)
                 {
-                    Error(plan, patchTable.TableName, "", "", "TABLE_NOT_FOUND", "Table is not registered.");
+                    if (allowPartial) plan.Warnings.Add($"Table '{patchTable.TableName}' is not registered, skipped.");
+                    else Error(plan, patchTable.TableName, "", "", "TABLE_NOT_FOUND", "Table is not registered.");
                     continue;
                 }
                 if (!string.IsNullOrEmpty(patchTable.RecordType) && patchTable.RecordType != table.RecordType.FullName)
                 {
-                    Error(plan, patchTable.TableName, "", "", "TYPE_MISMATCH", "Patch record type differs from the table.");
+                    if (allowPartial) plan.Warnings.Add($"{patchTable.TableName}: patch record type differs from the table, skipped.");
+                    else Error(plan, patchTable.TableName, "", "", "TYPE_MISMATCH", "Patch record type differs from the table.");
                     continue;
                 }
 
@@ -105,12 +108,15 @@ namespace Nesh.MasterMemoryDebugger
                 {
                     try
                     {
-                        PlanRecord(plan, table, originals, record, seen, replaceExisting, requireOriginalPreconditions);
+                        PlanRecord(plan, table, originals, record, seen, replaceExisting, requireOriginalPreconditions, allowPartial);
                     }
                     catch (Exception e)
                     {
-                        Error(plan, table.TableName, record.PrimaryKey?.ToCanonicalString() ?? "", "",
-                            "INVALID_RECORD", (e.InnerException ?? e).Message);
+                        var key = record.PrimaryKey?.ToCanonicalString() ?? "";
+                        if (allowPartial)
+                            plan.Warnings.Add($"{table.TableName} {key}: invalid record ({(e.InnerException ?? e).Message}), skipped.");
+                        else
+                            Error(plan, table.TableName, key, "", "INVALID_RECORD", (e.InnerException ?? e).Message);
                     }
                 }
             }
@@ -160,16 +166,44 @@ namespace Nesh.MasterMemoryDebugger
             MasterDataPatchRecord patch,
             HashSet<MasterDataOverrideKey> seen,
             bool replaceExisting,
-            bool requireOriginalPreconditions)
+            bool requireOriginalPreconditions,
+            bool allowPartial)
         {
             var keyText = MasterDataPatchService.NormalizePrimaryKeyJson(table, patch.PrimaryKey);
             originals.TryGetValue(keyText, out var original);
+
+            if (original == null && patch.Deleted)
+            {
+                if (allowPartial)
+                    plan.Warnings.Add($"{table.TableName} {keyText}: the deleted record does not exist, skipped.");
+                else
+                    Error(plan, table.TableName, keyText, "", "NOT_FOUND", "Deleted record does not exist.");
+                return;
+            }
+            if (original == null && !patch.Added)
+            {
+                if (allowPartial)
+                    plan.Warnings.Add($"{table.TableName} {keyText}: record does not exist, skipped.");
+                else
+                    Error(plan, table.TableName, keyText, "", "NOT_FOUND", "Record does not exist.");
+                return;
+            }
+
+            if (allowPartial && patch.Added && original != null)
+                plan.Warnings.Add($"{table.TableName} {keyText}: the added record exists in the master data now; its values are applied as changes.");
 
             object keyRecord = null;
             if (original == null)
             {
                 if (!MasterMemoryRecordFactory.CanAdd(table, out var reason))
-                    throw new FormatException(reason);
+                {
+                    if (allowPartial)
+                        plan.Warnings.Add($"{table.TableName} {keyText}: the added record is skipped ({reason})");
+                    else
+                        Error(plan, table.TableName, keyText, "", "CANNOT_ADD", reason);
+                    return;
+                }
+
                 keyRecord = MasterMemoryRecordFactory.CreateDefault(table);
                 foreach (var field in table.TypeDescriptor.PrimaryKeyFields)
                     field.SetValueUnchecked(keyRecord,
@@ -178,56 +212,75 @@ namespace Nesh.MasterMemoryDebugger
 
             var key = table.GetPrimaryKey(original ?? keyRecord);
             var overrideKey = new MasterDataOverrideKey(table.RecordType, key);
-            if (!seen.Add(overrideKey)) throw new FormatException("Duplicate patch target.");
+            if (!seen.Add(overrideKey))
+            {
+                if (allowPartial)
+                    plan.Warnings.Add($"{table.TableName} {keyText}: duplicate patch target, skipped.");
+                else
+                    Error(plan, table.TableName, keyText, "", "DUPLICATE_TARGET", "Duplicate patch target.");
+                return;
+            }
 
             var store = MasterMemoryDebugRuntime.Store;
             var actualDeleted = store.IsDeleted(table.RecordType, key);
             var actualOverride = store.TryGet(table.RecordType, key, out var overridden);
             var expectedOverride = actualDeleted ? MasterDataOverrideStore.Deleted : actualOverride ? overridden : null;
 
-            // replaceExisting plans against a clean override layer, but still CAS-checks the actual old layer at commit.
             var isDeleted = replaceExisting ? false : actualDeleted;
             var hasOverride = replaceExisting ? false : actualOverride;
-            var current = hasOverride ? overridden : original;
+            var current = allowPartial ? original : hasOverride ? overridden : original;
             var errorsBefore = plan.Errors.Count;
             object next = null;
             var kind = MasterDataPatchOperationKind.Change;
+            var appliedFields = 0;
 
             if (patch.Deleted)
             {
                 kind = MasterDataPatchOperationKind.Delete;
-                if (original == null || isDeleted || patch.Changes.Count != 0)
+                if (!allowPartial && (isDeleted || patch.Changes.Count != 0))
+                {
                     Error(plan, table.TableName, keyText, "", "INVALID_DELETE",
                         "Delete needs an existing, non-deleted original and no field changes.");
+                }
                 else
+                {
+                    if (allowPartial && patch.Changes.Count != 0)
+                        plan.Warnings.Add($"{table.TableName} {keyText}: field changes on a deleted record are ignored.");
                     next = MasterDataOverrideStore.Deleted;
+                }
             }
-            else if (patch.Added)
+            else if (patch.Added && original == null)
             {
                 kind = MasterDataPatchOperationKind.Add;
-                if (original != null || hasOverride || isDeleted)
+                if (!allowPartial && (hasOverride || isDeleted))
                     Error(plan, table.TableName, keyText, "", "ALREADY_EXISTS", "Added record already exists.");
-                else if (!MasterMemoryRecordFactory.CanAdd(table, out var reason))
-                    Error(plan, table.TableName, keyText, "", "CANNOT_ADD", reason);
                 else
                 {
                     next = keyRecord;
-                    ApplyFields(plan, table, patch, keyText, null, null, next, true, requireOriginalPreconditions);
+                    appliedFields = ApplyFields(plan, table, patch, keyText, null, null, next, true,
+                        requireOriginalPreconditions, allowPartial);
                 }
             }
             else
             {
-                if (current == null || isDeleted)
+                if (!allowPartial && isDeleted)
                     Error(plan, table.TableName, keyText, "", "NOT_FOUND", "Record does not exist or is deleted.");
                 else if (patch.Changes.Count == 0)
-                    Error(plan, table.TableName, keyText, "", "EMPTY_CHANGE", "Existing record needs at least one field change.");
+                {
+                    if (!allowPartial)
+                        Error(plan, table.TableName, keyText, "", "EMPTY_CHANGE", "Existing record needs at least one field change.");
+                    else
+                        return;
+                }
                 else
                 {
                     next = MasterDataCloneUtility.Clone(current);
-                    ApplyFields(plan, table, patch, keyText, original, current, next, false, requireOriginalPreconditions);
+                    appliedFields = ApplyFields(plan, table, patch, keyText, original, current, next, false,
+                        requireOriginalPreconditions, allowPartial);
+                    if (allowPartial && appliedFields == 0) return;
                     if (!Equals(table.GetPrimaryKey(next), key))
                         Error(plan, table.TableName, keyText, "", "KEY_CHANGED", "Patch changed the primary key.");
-                    if (original != null && MasterDataDiffUtility.GetChanges(original, next).Count == 0)
+                    if (!allowPartial && original != null && MasterDataDiffUtility.GetChanges(original, next).Count == 0)
                     {
                         next = null;
                         kind = MasterDataPatchOperationKind.Reset;
@@ -254,16 +307,16 @@ namespace Nesh.MasterMemoryDebugger
                 NextOverride = next,
                 HadOverride = actualOverride,
                 WasDeleted = actualDeleted,
-                FieldCount = patch.Changes.Count,
+                FieldCount = appliedFields,
                 Kind = kind,
                 Change = change,
             };
             plan.Targets.Add(target);
             plan.Changes.Add(change);
-            plan.FieldCount += patch.Changes.Count;
+            plan.FieldCount += appliedFields;
         }
 
-        static void ApplyFields(
+        static int ApplyFields(
             MasterDataPatchPlan plan,
             MasterMemoryTableDescriptor table,
             MasterDataPatchRecord patch,
@@ -272,20 +325,43 @@ namespace Nesh.MasterMemoryDebugger
             object current,
             object next,
             bool added,
-            bool requireOriginalPreconditions)
+            bool requireOriginalPreconditions,
+            bool allowPartial)
         {
+            var applied = 0;
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var change in patch.Changes)
             {
                 if (!seen.Add(change.Field))
                 {
-                    Error(plan, table.TableName, keyText, change.Field, "DUPLICATE_FIELD", "Field occurs more than once.");
+                    if (allowPartial)
+                        plan.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' occurs more than once, later value skipped.");
+                    else
+                        Error(plan, table.TableName, keyText, change.Field, "DUPLICATE_FIELD", "Field occurs more than once.");
                     continue;
                 }
-                if (!table.TypeDescriptor.TryGetField(change.Field, out var field)
-                    || (added ? field.IsPrimaryKey || !field.HasSetter : field.IsKey || !field.CanEdit))
+
+                if (!table.TypeDescriptor.TryGetField(change.Field, out var field))
                 {
-                    Error(plan, table.TableName, keyText, change.Field, "FIELD_NOT_EDITABLE", "Field is unknown or not editable.");
+                    if (allowPartial)
+                        plan.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' does not exist, skipped.");
+                    else
+                        Error(plan, table.TableName, keyText, change.Field, "FIELD_NOT_EDITABLE", "Field is unknown or not editable.");
+                    continue;
+                }
+
+                var writable = added ? !field.IsPrimaryKey && field.HasSetter : !field.IsKey && field.CanEdit;
+                if (!writable)
+                {
+                    if (allowPartial)
+                    {
+                        if (added)
+                            plan.Warnings.Add($"{table.TableName} {keyText} (added): field '{change.Field}' does not exist or can not be written, skipped.");
+                        else
+                            plan.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' is read-only, skipped.");
+                    }
+                    else
+                        Error(plan, table.TableName, keyText, change.Field, "FIELD_NOT_EDITABLE", "Field is unknown or not editable.");
                     continue;
                 }
 
@@ -312,21 +388,46 @@ namespace Nesh.MasterMemoryDebugger
                     else if (!added && change.HasOriginal)
                     {
                         var baseline = field.GetValue(original);
-                        var expected = MasterDataValueUtility.FromJson(change.Original, field.FieldType, baseline);
-                        if (!MasterDataValueUtility.AreEqual(expected, baseline))
-                            plan.Warnings.Add(
-                                $"{table.TableName} {keyText}.{field.Name}: original value changed in master data.");
+                        if (allowPartial)
+                        {
+                            try
+                            {
+                                var expected = MasterDataValueUtility.FromJson(change.Original, field.FieldType, baseline);
+                                if (!MasterDataValueUtility.AreEqual(expected, baseline))
+                                    plan.Warnings.Add(
+                                        $"{table.TableName} {keyText}.{field.Name}: original value changed in master data.");
+                            }
+                            catch (Exception)
+                            {
+                            }
+                        }
+                        else
+                        {
+                            var expected = MasterDataValueUtility.FromJson(change.Original, field.FieldType, baseline);
+                            if (!MasterDataValueUtility.AreEqual(expected, baseline))
+                                plan.Warnings.Add(
+                                    $"{table.TableName} {keyText}.{field.Name}: original value changed in master data.");
+                        }
                     }
 
                     var value = MasterDataValueUtility.FromJson(change.Value, field.FieldType, before);
                     if (added) field.SetValueUnchecked(next, value);
                     else field.SetValue(next, value);
+                    applied++;
                 }
                 catch (Exception e)
                 {
-                    Error(plan, table.TableName, keyText, change.Field, "INVALID_VALUE", (e.InnerException ?? e).Message);
+                    if (allowPartial)
+                    {
+                        var suffix = added ? " (added)" : "";
+                        plan.Warnings.Add(
+                            $"{table.TableName} {keyText}{suffix}: field '{change.Field}' has an invalid value ({(e.InnerException ?? e).Message}), skipped.");
+                    }
+                    else
+                        Error(plan, table.TableName, keyText, change.Field, "INVALID_VALUE", (e.InnerException ?? e).Message);
                 }
             }
+            return applied;
         }
 
         static void Error(MasterDataPatchPlan plan, string table, string key, string field, string code, string message)

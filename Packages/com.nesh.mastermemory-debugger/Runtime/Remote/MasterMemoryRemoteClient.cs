@@ -31,6 +31,10 @@ namespace Nesh.MasterMemoryDebugger
             public Type KeyType;
             public readonly List<object> Records = new List<object>();
             public List<string> DisplayNames;
+            public readonly List<MasterMemoryRemoteProtocol.Change> PendingOverrides =
+                new List<MasterMemoryRemoteProtocol.Change>();
+            public readonly List<MasterMemoryRemoteProtocol.Change> DeferredChanges =
+                new List<MasterMemoryRemoteProtocol.Change>();
             public bool Loading;
             public bool Loaded;
             public string RequestId;
@@ -156,7 +160,7 @@ namespace Nesh.MasterMemoryDebugger
                         Connection = null;
                         break;
                     case MasterMemoryRemoteProtocol.MessageType.Changes:
-                        ApplyRemote(MasterMemoryRemoteProtocol.DecodeChanges(payload));
+                        ApplyIncomingChanges(MasterMemoryRemoteProtocol.DecodeChanges(payload));
                         break;
                     case MasterMemoryRemoteProtocol.MessageType.ValidationState:
                         validation.OnState(MasterMemoryRemoteProtocol.DecodeValidationState(payload));
@@ -273,6 +277,8 @@ namespace Nesh.MasterMemoryDebugger
             state.StartedTimestamp = Stopwatch.GetTimestamp();
             state.Records.Clear();
             state.DisplayNames?.Clear();
+            state.PendingOverrides.Clear();
+            state.DeferredChanges.Clear();
             Connection.Send(MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableRequest
             {
                 RequestId = state.RequestId,
@@ -327,6 +333,7 @@ namespace Nesh.MasterMemoryDebugger
                 return;
             }
 
+            state.PendingOverrides.AddRange(chunk.Overrides);
             if (!chunk.IsLast) return;
 
             state.Loading = false;
@@ -336,11 +343,29 @@ namespace Nesh.MasterMemoryDebugger
                 state.Records, state.DisplayNames);
             if (!string.IsNullOrEmpty(state.Manifest.Group))
                 MasterMemoryDebugRegistry.SetTableGroup(state.Manifest.Group, state.Manifest.TableName);
+            if (state.PendingOverrides.Count > 0) ApplyRemote(state.PendingOverrides);
+            if (state.DeferredChanges.Count > 0) ApplyRemote(state.DeferredChanges);
+            state.PendingOverrides.Clear();
+            state.DeferredChanges.Clear();
+            MasterMemoryDebugValidation.NotifyChanged();
             var elapsedMs = (Stopwatch.GetTimestamp() - state.StartedTimestamp) * 1000.0 / Stopwatch.Frequency;
             MasterMemoryDiagnostics.Record("Remote", "TableLoad", elapsedMs,
                 $"{chunk.TableName} records={state.Records.Count} chunks={state.NextChunkIndex}");
             SetState(MasterMemoryRemoteState.Connected,
                 $"Connected to {Host}:{Port}: {chunk.TableName} loaded ({state.Records.Count} records).");
+        }
+
+        void ApplyIncomingChanges(List<MasterMemoryRemoteProtocol.Change> changes)
+        {
+            var immediate = new List<MasterMemoryRemoteProtocol.Change>();
+            foreach (var change in changes)
+            {
+                if (remoteTables.TryGetValue(change.TableName, out var table) && !table.Loaded)
+                    table.DeferredChanges.Add(change);
+                else
+                    immediate.Add(change);
+            }
+            if (immediate.Count > 0) ApplyRemote(immediate);
         }
 
         void RequestValidation() => Connection?.Send(MasterMemoryRemoteProtocol.EncodeValidateRequest());
@@ -416,6 +441,12 @@ namespace Nesh.MasterMemoryDebugger
                 results = failures;
                 pending = false;
                 stale = false;
+                var requested = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var failure in failures)
+                {
+                    if (!string.IsNullOrEmpty(failure.TableName) && requested.Add(failure.TableName))
+                        client.EnsureTableLoaded(failure.TableName);
+                }
                 MasterMemoryDebugValidation.NotifyChanged();
             }
         }
