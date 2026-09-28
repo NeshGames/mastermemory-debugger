@@ -162,9 +162,10 @@ namespace Nesh.MasterMemoryDebugger
             public string Group;
             public int RecordCount;
             public bool HasCustomDisplayName;
-            // Kept as a convenience for decoded TableChunk data and tests; Welcome v6 never carries these.
+            // Kept as conveniences for decoded TableChunk data and tests; Welcome v6 never carries these.
             public List<byte[]> Records = new List<byte[]>();
             public List<string> DisplayNames;
+            public List<Change> Overrides = new List<Change>();
         }
 
         public sealed class TableRequest

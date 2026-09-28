@@ -91,6 +91,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
                 Assert.AreEqual(next++, chunk.ChunkIndex);
                 Assert.IsTrue(string.IsNullOrEmpty(chunk.Error), chunk.Error);
                 result.Records.AddRange(chunk.Records);
+                result.Overrides.AddRange(chunk.Overrides);
                 if (result.DisplayNames != null && chunk.DisplayNames != null) result.DisplayNames.AddRange(chunk.DisplayNames);
                 if (chunk.IsLast) break;
             }
@@ -182,7 +183,8 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var first = (TestSkill)MasterMemoryRemotePeer.Deserialize(typeof(TestSkill), loadedSkills.Records[0]);
             Assert.AreEqual("Fireball", first.Name);
             Assert.AreEqual(typeof(TestSkill), Type.GetType(skills.RecordType));
-            Assert.AreEqual(1, welcome.Overrides.Count);
+            Assert.AreEqual(0, welcome.Overrides.Count, "Welcome v6 carries no override payload");
+            Assert.AreEqual(1, loadedSkills.Overrides.Count, "the requested table carries its override snapshot");
 
             // game edits → tool
             MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 777 });
