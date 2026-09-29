@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Runtime.CompilerServices;
 
 namespace Nesh.MasterMemoryDebugger
 {
@@ -196,27 +195,7 @@ namespace Nesh.MasterMemoryDebugger
         /// </summary>
         public static MasterDataJsonObject CreatePrimaryKeyJson(MasterMemoryTableDescriptor table, object record)
         {
-            var json = new MasterDataJsonObject();
-            var keyFields = table.TypeDescriptor.PrimaryKeyFields;
-            if (keyFields.Count > 0)
-            {
-                foreach (var field in keyFields)
-                {
-                    json.Add(field.Name, MasterDataValueUtility.ToJson(field.GetValue(record)));
-                }
-                return json;
-            }
-
-            var key = table.GetPrimaryKey(record);
-            if (key is ITuple tuple)
-            {
-                for (var i = 0; i < tuple.Length; i++) json.Add("Item" + (i + 1), MasterDataValueUtility.ToJson(tuple[i]));
-            }
-            else
-            {
-                json.Add("key", MasterDataValueUtility.ToJson(key));
-            }
-            return json;
+            return MasterDataPatchResolver.CreatePrimaryKeyJson(table, record);
         }
 
         // ------------------------------------------------------------------ preview / apply
@@ -357,177 +336,12 @@ namespace Nesh.MasterMemoryDebugger
 
         public static bool IsSameMasterVersion(string a, string b)
         {
-            return string.Equals(
-                string.IsNullOrEmpty(a) ? MasterMemoryDebugRegistry.UnknownMasterVersion : a,
-                string.IsNullOrEmpty(b) ? MasterMemoryDebugRegistry.UnknownMasterVersion : b,
-                StringComparison.Ordinal);
+            return MasterDataPatchResolver.IsSameMasterVersion(a, b);
         }
 
-        internal static MasterMemoryTableDescriptor FindTable(MasterDataPatchTable patchTable)
-        {
-            if (patchTable.TableName != null && MasterMemoryDebugRegistry.TryGetTable(patchTable.TableName, out var table)) return table;
-            foreach (var t in MasterMemoryDebugRegistry.Tables)
-            {
-                if (patchTable.RecordType != null && t.RecordType.FullName == patchTable.RecordType) return t;
-            }
-            return null;
-        }
 
-        internal static void ApplyTable(MasterDataPatchTable patchTable, MasterMemoryTableDescriptor table, MasterDataPatchApplyResult result)
-        {
-            var originals = BuildOriginalLookupByKeyJson(table);
-            var store = MasterMemoryDebugRuntime.Store;
 
-            foreach (var patchRecord in patchTable.Records)
-            {
-                string keyText;
-                try
-                {
-                    keyText = NormalizePrimaryKeyJson(table, patchRecord.PrimaryKey);
-                }
-                catch (Exception e)
-                {
-                    result.Warnings.Add($"{table.TableName}: invalid primary key {patchRecord.PrimaryKey.ToCanonicalString()} ({e.Message}), skipped.");
-                    continue;
-                }
 
-                var hasOriginal = originals.TryGetValue(keyText, out var original);
-                if (patchRecord.Deleted)
-                {
-                    if (!hasOriginal)
-                    {
-                        result.Warnings.Add($"{table.TableName} {keyText}: the deleted record does not exist, skipped.");
-                        continue;
-                    }
-                    store.Delete(table.RecordType, table.GetPrimaryKey(original));
-                    result.AppliedRecords++;
-                    result.DeletedRecords++;
-                    continue;
-                }
-                if (!hasOriginal)
-                {
-                    if (!patchRecord.Added)
-                    {
-                        result.Warnings.Add($"{table.TableName} {keyText}: record does not exist, skipped.");
-                        continue;
-                    }
-                    ApplyAddedRecord(patchRecord, table, keyText, result);
-                    continue;
-                }
-                if (patchRecord.Added)
-                {
-                    result.Warnings.Add($"{table.TableName} {keyText}: the added record exists in the master data now; its values are applied as changes.");
-                }
-
-                var copy = MasterDataCloneUtility.Clone(original);
-                var applied = 0;
-                foreach (var change in patchRecord.Changes)
-                {
-                    if (!table.TypeDescriptor.TryGetField(change.Field, out var field))
-                    {
-                        result.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' does not exist, skipped.");
-                        continue;
-                    }
-                    if (!field.CanEdit)
-                    {
-                        result.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' is read-only, skipped.");
-                        continue;
-                    }
-                    try
-                    {
-                        // nested objects are read into a copy of the original value (members missing in the patch are kept)
-                        var currentOriginal = field.GetValue(original);
-                        var value = MasterDataValueUtility.FromJson(change.Value, field.FieldType, currentOriginal);
-                        if (change.HasOriginal)
-                        {
-                            var patchOriginal = TryFromJson(change.Original, field.FieldType, currentOriginal, out var ok);
-                            if (ok && !MasterDataValueUtility.AreEqual(patchOriginal, currentOriginal))
-                            {
-                                result.Warnings.Add(
-                                    $"{table.TableName} {keyText}.{field.Name}: original value changed in master data " +
-                                    $"(patch: {MasterDataValueUtility.Format(patchOriginal)}, current: {MasterDataValueUtility.Format(currentOriginal)}).");
-                            }
-                        }
-                        field.SetValue(copy, value);
-                        applied++;
-                    }
-                    catch (Exception e)
-                    {
-                        result.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' has an invalid value ({e.Message}), skipped.");
-                    }
-                }
-
-                if (applied > 0)
-                {
-                    store.Set(table.RecordType, table.GetPrimaryKey(original), copy);
-                    result.AppliedRecords++;
-                    result.AppliedFields += applied;
-                }
-            }
-        }
-
-        static void ApplyAddedRecord(MasterDataPatchRecord patchRecord, MasterMemoryTableDescriptor table, string keyText, MasterDataPatchApplyResult result)
-        {
-            if (!MasterMemoryRecordFactory.CanAdd(table, out var reason))
-            {
-                result.Warnings.Add($"{table.TableName} {keyText}: the added record is skipped ({reason})");
-                return;
-            }
-
-            object record;
-            try
-            {
-                record = MasterMemoryRecordFactory.CreateDefault(table);
-                foreach (var field in table.TypeDescriptor.PrimaryKeyFields)
-                {
-                    field.SetValueUnchecked(record, MasterDataValueUtility.FromJson(patchRecord.PrimaryKey[field.Name], field.FieldType));
-                }
-            }
-            catch (Exception e)
-            {
-                result.Warnings.Add($"{table.TableName} {keyText}: the added record can not be created ({(e.InnerException ?? e).Message}), skipped.");
-                return;
-            }
-
-            var applied = 0;
-            foreach (var change in patchRecord.Changes)
-            {
-                // an added record also sets its secondary keys (a rebuilt database indexes them)
-                if (!table.TypeDescriptor.TryGetField(change.Field, out var field) || field.IsPrimaryKey || !field.HasSetter)
-                {
-                    result.Warnings.Add($"{table.TableName} {keyText} (added): field '{change.Field}' does not exist or can not be written, skipped.");
-                    continue;
-                }
-                try
-                {
-                    field.SetValueUnchecked(record, MasterDataValueUtility.FromJson(change.Value, field.FieldType, field.GetValue(record)));
-                    applied++;
-                }
-                catch (Exception e)
-                {
-                    result.Warnings.Add($"{table.TableName} {keyText} (added): field '{change.Field}' has an invalid value ({(e.InnerException ?? e).Message}), skipped.");
-                }
-            }
-
-            MasterMemoryDebugRuntime.Store.Set(table.RecordType, table.GetPrimaryKey(record), record);
-            result.AppliedRecords++;
-            result.AddedRecords++;
-            result.AppliedFields += applied;
-        }
-
-        static object TryFromJson(object json, Type type, object baseValue, out bool ok)
-        {
-            try
-            {
-                ok = true;
-                return MasterDataValueUtility.FromJson(json, type, baseValue);
-            }
-            catch (Exception)
-            {
-                ok = false;
-                return null;
-            }
-        }
 
         static Dictionary<object, object> BuildOriginalLookupByKey(MasterMemoryTableDescriptor table)
         {
@@ -540,30 +354,7 @@ namespace Nesh.MasterMemoryDebugger
             return lookup;
         }
 
-        internal static Dictionary<string, object> BuildOriginalLookupByKeyJson(MasterMemoryTableDescriptor table)
-        {
-            var lookup = new Dictionary<string, object>(StringComparer.Ordinal);
-            foreach (var record in table.GetAllRecords())
-            {
-                if (record == null) continue;
-                lookup[CreatePrimaryKeyJson(table, record).ToCanonicalString()] = record;
-            }
-            return lookup;
-        }
 
         /// <summary>Re-reads key values with the member types so that e.g. 1001.0 and 1001 match.</summary>
-        internal static string NormalizePrimaryKeyJson(MasterMemoryTableDescriptor table, MasterDataJsonObject key)
-        {
-            var keyFields = table.TypeDescriptor.PrimaryKeyFields;
-            if (keyFields.Count == 0) return key.ToCanonicalString();
-
-            var normalized = new MasterDataJsonObject();
-            foreach (var field in keyFields)
-            {
-                if (!key.TryGetValue(field.Name, out var json)) throw new FormatException($"'{field.Name}' is missing");
-                normalized.Add(field.Name, MasterDataValueUtility.ToJson(MasterDataValueUtility.FromJson(json, field.FieldType)));
-            }
-            return normalized.ToCanonicalString();
-        }
     }
 }

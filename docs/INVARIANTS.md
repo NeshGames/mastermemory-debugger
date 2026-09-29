@@ -15,3 +15,4 @@
 13. Runtime reflection must remain IL2CPP-safe; no runtime code generation.
 14. Use `MasterMemoryReferences.Register` when automatic `IValidatable.Exists` discovery is not stable enough.
 15. New package source/assets/folders require Unity `.meta` files.
+16. Patch dependencies remain one-way: `MasterDataPatchService -> MasterDataPatchEngine -> MasterDataPatchResolver`; the service facade must not write the override store directly.

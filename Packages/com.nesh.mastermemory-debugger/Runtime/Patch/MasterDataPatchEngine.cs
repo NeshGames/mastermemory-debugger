@@ -70,7 +70,7 @@ namespace Nesh.MasterMemoryDebugger
                 Error(plan, "", "", "", "UNSUPPORTED_FORMAT", "Unsupported patch format version.");
 
             var currentVersion = MasterMemoryDebugRegistry.GetMasterVersion();
-            if (!MasterDataPatchService.IsSameMasterVersion(patch.MasterVersion, currentVersion))
+            if (!MasterDataPatchResolver.IsSameMasterVersion(patch.MasterVersion, currentVersion))
             {
                 if (forceIdentity) plan.Warnings.Add(
                     $"Master version differs (patch: {patch.MasterVersion ?? MasterMemoryDebugRegistry.UnknownMasterVersion}, current: {currentVersion}). Force loaded.");
@@ -89,7 +89,7 @@ namespace Nesh.MasterMemoryDebugger
             var seen = new HashSet<MasterDataOverrideKey>();
             foreach (var patchTable in patch.Tables)
             {
-                var table = MasterDataPatchService.FindTable(patchTable);
+                var table = MasterDataPatchResolver.FindTable(patchTable);
                 if (table == null)
                 {
                     if (allowPartial) plan.Warnings.Add($"Table '{patchTable.TableName}' is not registered, skipped.");
@@ -103,7 +103,7 @@ namespace Nesh.MasterMemoryDebugger
                     continue;
                 }
 
-                var originals = MasterDataPatchService.BuildOriginalLookupByKeyJson(table);
+                var originals = MasterDataPatchResolver.BuildOriginalLookupByKeyJson(table);
                 foreach (var record in patchTable.Records)
                 {
                     try
@@ -169,7 +169,7 @@ namespace Nesh.MasterMemoryDebugger
             bool requireOriginalPreconditions,
             bool allowPartial)
         {
-            var keyText = MasterDataPatchService.NormalizePrimaryKeyJson(table, patch.PrimaryKey);
+            var keyText = MasterDataPatchResolver.NormalizePrimaryKeyJson(table, patch.PrimaryKey);
             originals.TryGetValue(keyText, out var original);
 
             if (original == null && patch.Deleted)

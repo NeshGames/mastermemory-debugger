@@ -40,6 +40,8 @@ MasterDataOverrideStore.ApplyAtomic
 
 Local patch loading and remote transactional patching share this engine. Remote adds request identity, SHA/PlanSHA and post-commit state hashes only.
 
+`MasterDataPatchService` is the public create/preview/apply facade. The engine must not depend back on that facade: shared master-version, table and primary-key resolution lives in the internal `MasterDataPatchResolver`. This keeps the dependency direction one-way (`Service -> Engine -> Resolver`) and prevents a second mutation implementation from accumulating in the facade.
+
 ## Remote protocol v6
 
 Welcome contains table metadata, schema hash and operations, but **no table records or override payloads**. A client sends `TableRequest`; the server emits ordered `TableChunk` frames of roughly 1 MiB through bounded connection queues. The chunks contain the selected table's original records plus its override snapshot. Live `Changes` received before that table finishes loading are buffered and replayed after the snapshot so the newest state wins. UI loads a table when first opened. Validation failures can trigger loading of the affected table so Open can resolve the actual record. CLI metadata/patch/operation commands do not download all master records.

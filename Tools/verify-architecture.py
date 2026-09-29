@@ -59,6 +59,12 @@ remote_patch = (PKG/"Runtime/Remote/MasterMemoryRemotePatch.cs").read_text(encod
 if "MasterDataPatchEngine.Build" not in patch_service: fail("local patch apply bypasses MasterDataPatchEngine")
 if "MasterDataPatchEngine.Build" not in remote_patch: fail("remote patch apply bypasses MasterDataPatchEngine")
 
+patch_engine = (PKG/"Runtime/Patch/MasterDataPatchEngine.cs").read_text(encoding="utf-8")
+if "MasterDataPatchService." in patch_engine:
+    fail("MasterDataPatchEngine must not depend back on the public MasterDataPatchService facade")
+if re.search(r"MasterMemoryDebugRuntime\.Store\.(?:Set|Delete|Clear)\s*\(", patch_service):
+    fail("MasterDataPatchService must not mutate the override store directly; use MasterDataPatchEngine")
+
 protocol = (PKG/"Runtime/Remote/MasterMemoryRemoteProtocol.cs").read_text(encoding="utf-8")
 m = re.search(r"public const int Version\s*=\s*(\d+)", protocol)
 if not m or int(m.group(1)) < 6: fail("remote protocol must remain v6+")

@@ -245,6 +245,23 @@ These features create cross-cutting complexity in override markers, rebuild, Pat
 
 ---
 
+## P3 — Post-hardening dependency cleanup
+
+### 12. Break the Patch facade / engine dependency cycle
+
+- [x] Move master-version, table and primary-key resolution into `MasterDataPatchResolver`.
+- [x] Make `MasterDataPatchEngine` independent of the public `MasterDataPatchService` facade.
+- [x] Remove the obsolete pre-engine `ApplyTable` / `ApplyAddedRecord` mutation path from the service.
+- [x] Add an architecture check that blocks engine-to-facade coupling and direct override-store writes from the service.
+
+**Definition of done**
+
+- Patch mutation has one path: `MasterDataPatchService -> MasterDataPatchEngine -> MasterDataOverrideStore.ApplyAtomic`.
+- Public `MasterDataPatchService.CreatePrimaryKeyJson` / `IsSameMasterVersion` remain source-compatible facade methods.
+- Existing Patch tests and the full harness remain green.
+
+---
+
 ## Real Unity / device verification
 
 These cannot be proven by the outside-Unity harness.
