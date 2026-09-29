@@ -24,6 +24,10 @@ and Play Mode) as well.
 - [ ] **Batch Edit…**: `Damage` × 1.1 on a search; enum field shows a dropdown.
 - [ ] Ctrl+Z undoes the batch edit, Ctrl+Y redoes it; Undo / Redo buttons enable and disable.
 - [ ] **Copy** and **Labels TSV** paste correctly into a spreadsheet.
+- [ ] Custom value type (a project that registers a converter, for example a fixed-point number): the grid shows the
+      converter's text; the inspector's text field applies a valid value on Enter and turns red without applying for
+      text it can not read; a `Nullable<T>` member's toggle and a list's `+ Add` / `×` work; **Batch Edit…** offers only
+      Set; sorting the column follows the converter's order; a patch saved and applied brings the exact value back.
 
 ## Other tabs
 
@@ -47,6 +51,8 @@ and Play Mode) as well.
 - [ ] With a game operation registered, the tool's Remote dialog lists it; click once and see its result and old/new
       fingerprints. Change its target or candidate revision before clicking an older list item: the game rejects the stale
       request. Leaving the owner removes the operation from the tool.
+- [ ] With the same converter registered in the game and the tool: a custom value edited in the tool reaches the game
+      unchanged; `patch-apply` from the CLI with the value as a JSON string applies it in the game.
 
 ## Remote CLI and patch safety
 

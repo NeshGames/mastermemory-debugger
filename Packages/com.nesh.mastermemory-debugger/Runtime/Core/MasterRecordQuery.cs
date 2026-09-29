@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -13,7 +14,8 @@ namespace Nesh.MasterMemoryDebugger
     /// <item>any other text: matches the primary key, the display name or a string member (contains, case-insensitive)</item>
     /// </list>
     /// && binds tighter than ||. Values with spaces are quoted: <c>Name="Ice Blast"</c>. <c>Field=null</c> matches null values.
-    /// Conditions read the current value (override when present).
+    /// Values of members with a converter are read with it; <c>&gt; &gt;= &lt; &lt;=</c> need a converter that is an
+    /// <see cref="IComparer"/>. Conditions read the current value (override when present).
     /// </summary>
     public sealed class MasterRecordQuery
     {
@@ -38,6 +40,7 @@ namespace Nesh.MasterMemoryDebugger
             public double Real;
             public bool Boolean;
             public object EnumValue;
+            public object CustomValue;
         }
 
         abstract class QueryNode
@@ -364,6 +367,18 @@ namespace Nesh.MasterMemoryDebugger
                         error = $"{field.Name}: '{value}' is not one of {string.Join(", ", Enum.GetNames(field.ValueType))}";
                         return null;
                     }
+                case MasterDataValueKind.Custom:
+                    if (IsOrdering(op) && !(field.Converter is IComparer))
+                    {
+                        error = $"{field.Name}: values of {field.ValueType.Name} can only be compared with = or !=";
+                        return null;
+                    }
+                    if (!field.Converter.TryParse(value, out condition.CustomValue, out var parseError))
+                    {
+                        error = $"{field.Name}: {parseError}";
+                        return null;
+                    }
+                    return condition;
                 default:
                     // strings, vectors, colors, complex: text comparison
                     return condition;
@@ -429,6 +444,11 @@ namespace Nesh.MasterMemoryDebugger
                 case MasterDataValueKind.Enum:
                 case MasterDataValueKind.FlagsEnum:
                     comparison = Convert.ToInt64(value, CultureInfo.InvariantCulture).CompareTo(Convert.ToInt64(condition.EnumValue, CultureInfo.InvariantCulture));
+                    break;
+                case MasterDataValueKind.Custom:
+                    comparison = condition.Field.Converter is IComparer comparer
+                        ? comparer.Compare(value, condition.CustomValue)
+                        : MasterDataValueUtility.AreEqual(value, condition.CustomValue) ? 0 : 1;
                     break;
                 default:
                     comparison = string.Compare(MasterDataValueUtility.Format(value), condition.Text, StringComparison.OrdinalIgnoreCase);

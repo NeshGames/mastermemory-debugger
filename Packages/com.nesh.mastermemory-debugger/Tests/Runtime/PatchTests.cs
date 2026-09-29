@@ -52,6 +52,32 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.IsFalse(MasterDataPatchStorage.Rename("missing", "unit-test-renamed"));
         }
 
+        [Test]
+        public void CustomValues_ShouldBeSavedAsTextAndApplied()
+        {
+            var walk = RegisterTunings()[0];
+            MasterMemoryDebugRuntime.SetOverride(1, walk with { Speed = TestFixed.FromRaw(12500), Limit = TestFixed.FromRaw(1) });
+
+            var changes = MasterDataPatchService.CreatePatch().Tables.Single(x => x.TableName == nameof(TestTuning)).Records.Single().Changes;
+            var speed = changes.Single(x => x.Field == "Speed");
+            Assert.AreEqual("2.5", speed.Original);
+            Assert.AreEqual("12.5", speed.Value);
+            var limit = changes.Single(x => x.Field == "Limit");
+            Assert.IsNull(limit.Original);
+            Assert.AreEqual("0.001", limit.Value);
+
+            // a patch written by hand may give the number itself
+            var json = MasterDataPatchService.CreatePatchJson().Replace("\"12.5\"", "12.5");
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            var result = MasterDataPatchService.Apply(MasterDataPatchSerializer.FromJson(json));
+
+            CollectionAssert.IsEmpty(result.Warnings);
+            Assert.AreEqual(2, result.AppliedFields);
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestTuning, int>(1, out var loaded));
+            Assert.AreEqual(12500, loaded.Speed.Raw);
+            Assert.AreEqual(1, loaded.Limit.Value.Raw);
+        }
+
         void ApplySampleOverrides()
         {
             MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 185, Name = "Big \"Fire\"\nball", UnlockLevel = null });

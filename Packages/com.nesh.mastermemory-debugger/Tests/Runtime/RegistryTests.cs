@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using NUnit.Framework;
 
 namespace Nesh.MasterMemoryDebugger.Tests
@@ -89,6 +92,73 @@ namespace Nesh.MasterMemoryDebugger.Tests
 
             MasterMemoryDebugRegistry.ClearTableGroups();
             Assert.AreEqual(1, MasterMemoryDebugRegistry.GetGroupedTables().Count);
+        }
+
+        struct LateValue
+        {
+        }
+
+        [Test]
+        public void RegisterConverter_SameType_ShouldThrow()
+        {
+            var error = Assert.Throws<InvalidOperationException>(() => MasterDataValueConverters.Register(new TestFixedConverter()));
+            StringAssert.Contains("already registered", error.Message);
+        }
+
+        [Test]
+        public void RegisterConverter_AfterTheTables_ShouldThrow()
+        {
+            RegisterTestDatabase();
+            var error = Assert.Throws<InvalidOperationException>(() => MasterDataValueConverters.Register(new UnusedConverter(typeof(LateValue))));
+            StringAssert.Contains("before the tables", error.Message);
+            Assert.IsFalse(MasterDataValueConverters.TryGet(typeof(LateValue), out _));
+        }
+
+        [Test]
+        public void RegisterConverter_OffTheMainThread_ShouldThrow()
+        {
+            var error = Assert.Throws<AggregateException>(() => Task.Run(() => MasterDataValueConverters.Register(new UnusedConverter(typeof(LateValue)))).Wait());
+            Assert.IsInstanceOf<InvalidOperationException>(error.InnerException);
+            StringAssert.Contains("main thread", error.InnerException.Message);
+        }
+
+        [TestCase(typeof(int))]
+        [TestCase(typeof(string))]
+        [TestCase(typeof(UnityEngine.Vector3))]
+        [TestCase(typeof(TestElement))]
+        [TestCase(typeof(LateValue?))]
+        [TestCase(typeof(LateValue[]))]
+        [TestCase(typeof(List<LateValue>))]
+        [TestCase(typeof(KeyValuePair<,>))]
+        [TestCase(typeof(IComparable))]
+        public void RegisterConverter_UnsupportedType_ShouldThrow(Type type)
+        {
+            Assert.Throws<ArgumentException>(() => MasterDataValueConverters.Register(new UnusedConverter(type)));
+        }
+
+        [Test]
+        public void ConverterToken_ShouldOnlyRemoveItsOwnRegistration()
+        {
+            FixedConverter.Dispose();
+            var converter = new TestFixedConverter();
+            var first = MasterDataValueConverters.Register(converter);
+            first.Dispose();
+            using (MasterDataValueConverters.Register(converter))
+            {
+                first.Dispose();
+                Assert.IsTrue(MasterDataValueConverters.TryGet(typeof(TestFixed), out _), "a disposed token stays disposed");
+            }
+            Assert.IsFalse(MasterDataValueConverters.TryGet(typeof(TestFixed), out _));
+
+            // a new play session starts without converters; the tokens of the last one leave its registrations alone
+            var lastSession = MasterDataValueConverters.Register(converter);
+            MasterDataValueConverters.ResetForTests();
+            Assert.IsFalse(MasterDataValueConverters.TryGet(typeof(TestFixed), out _));
+            using (MasterDataValueConverters.Register(new TestFixedConverter()))
+            {
+                lastSession.Dispose();
+                Assert.IsTrue(MasterDataValueConverters.TryGet(typeof(TestFixed), out _));
+            }
         }
 
         [Test]

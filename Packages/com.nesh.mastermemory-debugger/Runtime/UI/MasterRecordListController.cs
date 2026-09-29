@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine.UIElements;
@@ -508,6 +509,10 @@ namespace Nesh.MasterMemoryDebugger
         {
             if (a == null) return b == null ? 0 : -1;
             if (b == null) return 1;
+            if (a.GetType() == b.GetType() && MasterDataValueConverters.TryGet(a.GetType(), out var converter) && converter is IComparer comparer)
+            {
+                return comparer.Compare(a, b);
+            }
             if (a.GetType() == b.GetType() && a is IComparable comparable)
             {
                 try

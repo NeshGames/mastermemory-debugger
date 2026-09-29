@@ -21,8 +21,10 @@ namespace Nesh.MasterMemoryDebugger.Tests
         [SetUp]
         public void SetUp()
         {
-            // the test records have no [MessagePackObject]
-            MasterMemoryDebugRemote.SerializerOptions = MessagePackSerializerOptions.Standard.WithResolver(ContractlessStandardResolver.Instance);
+            // the test records have no [MessagePackObject]; TestFixed is written as its raw, like a game's fixed-point type
+            MasterMemoryDebugRemote.SerializerOptions = MessagePackSerializerOptions.Standard.WithResolver(CompositeResolver.Create(
+                new MessagePack.Formatters.IMessagePackFormatter[] { new TestFixedFormatter() },
+                new IFormatterResolver[] { ContractlessStandardResolver.Instance }));
         }
 
         [TearDown]
@@ -195,6 +197,31 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var rejected = MasterMemoryRemotePatch.Build(request, "epoch");
             Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Invalid, rejected.Response.Status);
             Assert.IsTrue(rejected.Response.Errors.Exists(x => x.Code == "ORIGINAL_MISMATCH"));
+        }
+
+        [Test]
+        public void PatchPlan_ShouldReadCustomValuesFromText()
+        {
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            var walk = RegisterTunings()[0];
+            MasterMemoryDebugRuntime.SetOverride(1, walk with { Speed = TestFixed.FromRaw(125) });
+            var json = MasterDataPatchService.CreatePatchJson();
+            StringAssert.Contains("\"0.125\"", json);
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            var request = new MasterMemoryRemoteProtocol.PatchRequest
+            { RequestId = "custom", ServerEpoch = "epoch", MasterVersion = "v1", PatchJson = json };
+
+            var plan = MasterMemoryRemotePatch.Build(request, "epoch");
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, plan.Response.Status);
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, MasterMemoryRemotePatch.Apply(plan, plan.Response.PlanSha).Status);
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestTuning, int>(1, out var tuning));
+            Assert.AreEqual(125, tuning.Speed.Raw);
+
+            request.RequestId = "invalid";
+            request.PatchJson = json.Replace("\"0.125\"", "\"fast\"");
+            var invalid = MasterMemoryRemotePatch.Build(request, "epoch");
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Invalid, invalid.Response.Status);
+            Assert.IsTrue(invalid.Response.Errors.Exists(x => x.Code == "INVALID_VALUE" && x.Field == "Speed"));
         }
 
         [Test]
@@ -390,6 +417,34 @@ namespace Nesh.MasterMemoryDebugger.Tests
             game.Close();
             PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Failed, "the disconnect");
             Assert.AreEqual(3, Table<TestSkill>().CreateRecordSnapshot().Count);
+        }
+
+        [Test]
+        public void Client_ShouldEditCustomValuesAndSendTheirRaw()
+        {
+            RegisterTunings();
+            var welcome = MasterMemoryRemoteServer.CreateWelcome();
+            MasterMemoryDebugRegistry.ClearTables();
+            MasterMemoryDebugRemote.IsToolMode = true;
+
+            rawServer = new TcpListener(IPAddress.Loopback, 0);
+            rawServer.Start();
+            MasterMemoryDebugRemote.Connect("127.0.0.1", ((IPEndPoint)rawServer.LocalEndpoint).Port, "42");
+            PumpUntil(() => rawServer.Pending(), "the connection");
+            var game = rawServer.AcceptTcpClient().GetStream();
+            Receive(game, "the hello");
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(welcome));
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected, "the tables");
+
+            var table = Table<TestTuning>();
+            var speed = table.TypeDescriptor.Fields.Single(x => x.Name == "Speed");
+            Assert.IsTrue(speed.CanEdit, "the tool edits the members of its converters");
+            var records = table.CreateRecordSnapshot();
+            Assert.AreEqual(10000, ((TestTuning)records[1].Original).Speed.Raw, "the game's raw");
+
+            MasterMemoryBatchEdit.Apply(records.Take(1), speed, MasterMemoryBatchOperation.Set, "0.001");
+            var changes = MasterMemoryRemoteProtocol.DecodeChanges(Receive(game, "the tool's change"));
+            Assert.AreEqual(1, ((TestTuning)MasterMemoryRemotePeer.Deserialize(typeof(TestTuning), changes.Single().Record)).Speed.Raw);
         }
 
         [Test]

@@ -2,6 +2,16 @@
 
 All notable changes to this package are documented in this file.
 
+## [0.15.0] - 2026-09-29
+
+### Added
+
+- Value converters for custom value types such as fixed-point numbers (`IMasterDataValueConverter`, base class `MasterDataValueConverter<T>`, `MasterDataValueConverters.Register` / `TryGet`). Members of the type, its `Nullable<T>` members and arrays / lists of it become editable: the grid, Changes, Find and queries use the converter's text; the inspector edits it in a text field that applies text it can read and only marks the rest invalid; Batch Edit sets it (Set only; Add and Multiply are refused) and Paste TSV imports it; patches store the text and read a JSON string or a JSON number from its original text, never through double.
+- A converter that is also an `IComparer` orders sorting and the `> >= < <=` query conditions; without it queries only compare with `=` / `!=`. A converter that is also an `IMasterDataValueDrawer` provides its own inspector editor.
+- `MasterDataValueKind.Custom` (added after the existing kinds), `MasterMemoryFieldDescriptor.Converter` / `ElementConverter`.
+- `MasterDataValueConverters.Register` returns a token that removes the converter when disposed (an empty token when the debugger is disabled). It throws `InvalidOperationException` for a type that already has a converter, after a table was registered (tables keep their member descriptors), and off the main thread; `ArgumentException` for simple, `Nullable<T>`, array, list and open types. Registrations are cleared at `SubsystemRegistration`.
+- The remote protocol (v5) and the patch format are unchanged. Register the same converters in the game (it reads patch values) and the remote editor tool (it edits them); the type's MessagePack formatter belongs in `MasterMemoryDebugRemote.SerializerOptions`.
+
 ## [0.14.0] - 2026-09-28
 
 ### Added

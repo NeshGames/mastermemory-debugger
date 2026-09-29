@@ -7,8 +7,8 @@ using UnityEngine.UIElements;
 namespace Nesh.MasterMemoryDebugger
 {
     /// <summary>
-    /// Creates runtime UI Toolkit editors for simple member types, lists of them and nested objects.
-    /// Unsupported types fall back to a read-only label instead of failing.
+    /// Creates runtime UI Toolkit editors for simple member types (types with a converter included), lists of them and
+    /// nested objects. Unsupported types fall back to a read-only label instead of failing.
     /// </summary>
     internal static class MasterFieldDrawerFactory
     {
@@ -48,7 +48,7 @@ namespace Nesh.MasterMemoryDebugger
             if (field.IsObject) return CreateObjectEditor(value, onChanged, depth);
             if (field.IsNullable) return CreateNullableEditor(field, value, onChanged);
 
-            var editor = CreateValueEditor(field.Kind, field.ValueType, value, onChanged);
+            var editor = CreateValueEditor(field.Kind, field.ValueType, field.Converter, value, onChanged);
             return editor ?? CreateReadOnly(value);
         }
 
@@ -98,7 +98,7 @@ namespace Nesh.MasterMemoryDebugger
                     indexLabel.AddToClassList("mm-debugger__list-index");
                     row.Add(indexLabel);
 
-                    var editor = CreateValueEditor(field.ElementKind, field.ElementType, items[index], newValue =>
+                    var editor = CreateValueEditor(field.ElementKind, field.ElementType, field.ElementConverter, items[index], newValue =>
                     {
                         items[index] = newValue;
                         Publish();
@@ -191,7 +191,7 @@ namespace Nesh.MasterMemoryDebugger
             hasValue.AddToClassList("mm-debugger__nullable-toggle");
 
             object lastValue = value ?? Activator.CreateInstance(field.ValueType);
-            var inner = CreateValueEditor(field.Kind, field.ValueType, lastValue, newValue =>
+            var inner = CreateValueEditor(field.Kind, field.ValueType, field.Converter, lastValue, newValue =>
             {
                 lastValue = newValue;
                 onChanged(newValue);
@@ -210,10 +210,15 @@ namespace Nesh.MasterMemoryDebugger
             return container;
         }
 
-        static VisualElement CreateValueEditor(MasterDataValueKind kind, Type type, object value, Action<object> onChanged)
+        static VisualElement CreateValueEditor(MasterDataValueKind kind, Type type, IMasterDataValueConverter converter, object value, Action<object> onChanged)
         {
             switch (kind)
             {
+                case MasterDataValueKind.Custom when converter != null:
+                {
+                    var custom = (converter as IMasterDataValueDrawer)?.CreateEditor(value, onChanged);
+                    return custom != null ? Prepare(custom) : CreateTextConverterEditor(converter, value, onChanged);
+                }
                 case MasterDataValueKind.String:
                 {
                     // multiline + wrapping shows long values completely; Enter still applies (handled by the controller)
@@ -351,6 +356,26 @@ namespace Nesh.MasterMemoryDebugger
                     return;
                 }
                 field.RemoveFromClassList(InvalidClass);
+                onChanged(parsed);
+            });
+            return field;
+        }
+
+        /// <summary>A value with a converter, edited as its text. Like <see cref="CreateTextEnumEditor"/>, text it can not read is only marked.</summary>
+        static VisualElement CreateTextConverterEditor(IMasterDataValueConverter converter, object value, Action<object> onChanged)
+        {
+            var hint = converter.ValueType.Name;
+            var field = Prepare(new TextField { value = value == null ? string.Empty : converter.Format(value), tooltip = hint });
+            field.RegisterValueChangedCallback(evt =>
+            {
+                if (!converter.TryParse(evt.newValue, out var parsed, out var error))
+                {
+                    field.AddToClassList(InvalidClass);
+                    field.tooltip = error;
+                    return;
+                }
+                field.RemoveFromClassList(InvalidClass);
+                field.tooltip = hint;
                 onChanged(parsed);
             });
             return field;

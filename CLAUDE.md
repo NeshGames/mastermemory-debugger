@@ -31,7 +31,7 @@ Packages/com.nesh.mastermemory-debugger/
     Core/        registry of tables, override runtime, history (undo), rebuild + validation, batch edit, TSV import,
                  localization, references (IValidatable Exists), queries
     Override/    thread-safe override store (EntryChanged feeds undo history and remote sync)
-    Reflection/  reflection cache (no Emit), clone, diff, value formatting / JSON values
+    Reflection/  reflection cache (no Emit), clone, diff, value formatting / JSON values, value converters of custom types
     Patch/       patch model, JSON, storage, service (create / apply), compare, export / import, WebGL bridge
     Remote/      remote editing: protocol, TCP connection, server (game), client (tool), discovery (UDP), launcher
     UI/          controllers of the UI Toolkit debugger; UI/Layout holds the UXML / USS / theme (NOT in Resources)

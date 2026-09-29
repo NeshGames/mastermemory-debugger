@@ -12,6 +12,13 @@ namespace Nesh.MasterMemoryDebugger.Tests
             public int Value { get; set; }
         }
 
+        sealed class ClassValue
+        {
+            public ClassValue(string text)
+            {
+            }
+        }
+
         [TearDown]
         public void TearDown()
         {
@@ -68,6 +75,32 @@ namespace Nesh.MasterMemoryDebugger.Tests
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, (int[])MasterDataValueUtility.FromJson(parsed, typeof(int[])));
             Assert.IsNull(MasterDataValueUtility.FromJson(null, typeof(int[])));
             Assert.Throws<FormatException>(() => MasterDataValueUtility.FromJson("x", typeof(int[])));
+        }
+
+        [Test]
+        public void ListsOfCustomValues_ShouldBeEditableAndSavedAsText()
+        {
+            var curve = MasterDataReflectionCache.Get<TestTuning>().Fields.Single(x => x.Name == "Curve");
+            Assert.IsTrue(curve.IsList);
+            Assert.IsTrue(curve.CanEdit);
+            Assert.AreEqual(MasterDataValueKind.Custom, curve.ElementKind);
+            Assert.IsInstanceOf<TestFixedConverter>(curve.ElementConverter);
+            using (MasterDataValueConverters.Register(new UnusedConverter(typeof(ClassValue))))
+            {
+                Assert.IsNull(MasterDataValueUtility.CreateDefaultElement(typeof(ClassValue)), "+ Add of a class without a parameterless constructor");
+            }
+
+            var walk = RegisterTunings()[0];
+            MasterMemoryDebugRuntime.SetOverride(1, walk with { Curve = new[] { TestFixed.FromRaw(500), TestFixed.FromRaw(750) } });
+            var change = MasterDataPatchService.CreatePatch().Tables.Single().Records.Single().Changes.Single();
+            CollectionAssert.AreEqual(new object[] { "0.5", "0.75" }, (List<object>)change.Value);
+
+            var json = MasterDataPatchService.CreatePatchJson();
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            MasterDataPatchService.Apply(MasterDataPatchSerializer.FromJson(json));
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestTuning, int>(1, out var loaded));
+            CollectionAssert.AreEqual(new long[] { 500, 750 }, loaded.Curve.Select(x => x.Raw));
+            Assert.AreEqual("[2] 0.5, 0.75", MasterDataValueUtility.Format(loaded.Curve));
         }
 
         [Test]

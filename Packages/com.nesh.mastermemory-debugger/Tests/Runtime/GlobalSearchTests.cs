@@ -60,6 +60,14 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void Find_ShouldMatchCustomValuesAsTheirText()
+        {
+            RegisterTunings();
+            CollectionAssert.AreEqual(new[] { "TestTuning 2 Limit" }, Describe(MasterMemoryGlobalSearch.Find("12.25", wholeValue: true)));
+            CollectionAssert.AreEqual(new[] { "TestTuning 1 Curve[0]" }, Describe(MasterMemoryGlobalSearch.Find("0.5", wholeValue: true)));
+        }
+
+        [Test]
         public void WholeValue_ShouldOnlyFindEqualValues()
         {
             CollectionAssert.IsNotEmpty(MasterMemoryGlobalSearch.Find("ball").Hits);

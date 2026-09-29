@@ -76,6 +76,28 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.AreEqual(3, MasterDataValueUtility.FromJson(new MasterDataJsonNumber("3.0"), typeof(int)));
         }
 
+        [Test]
+        public void CustomValues_ShouldBeWrittenAsTextAndReadFromStringsOrNumbers()
+        {
+            using (MasterDataValueConverters.Register(new TestFixedConverter()))
+            {
+                Assert.AreEqual("-12.345", MasterDataValueUtility.ToJson(TestFixed.FromRaw(-12345)));
+
+                // 2^53 + 1 thousandths: a double can not hold every digit
+                const long raw = 9007199254740993;
+                var number = ((List<object>)MasterDataJson.Parse("[9007199254740.993]"))[0];
+                Assert.AreEqual(raw, ((TestFixed)MasterDataValueUtility.FromJson(number, typeof(TestFixed))).Raw, "a JSON number");
+                Assert.AreEqual(raw, ((TestFixed)MasterDataValueUtility.FromJson("9007199254740.993", typeof(TestFixed))).Raw, "a JSON string");
+                Assert.AreEqual(2500, ((TestFixed)MasterDataValueUtility.FromJson("2.5", typeof(TestFixed?))).Raw);
+                Assert.IsNull(MasterDataValueUtility.FromJson(null, typeof(TestFixed?)));
+
+                Assert.Throws<System.FormatException>(() => MasterDataValueUtility.FromJson("fast", typeof(TestFixed)));
+                Assert.Throws<System.FormatException>(() => MasterDataValueUtility.FromJson(true, typeof(TestFixed)));
+                Assert.Throws<System.FormatException>(() => MasterDataValueUtility.FromJson(null, typeof(TestFixed)));
+            }
+            Assert.Throws<System.NotSupportedException>(() => MasterDataValueUtility.ToJson(TestFixed.FromRaw(1)), "without the converter");
+        }
+
         static void AssertRoundTrip<T>(T value)
         {
             var json = MasterDataJson.Serialize(new List<object> { MasterDataValueUtility.ToJson(value) });

@@ -83,6 +83,24 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void CustomValues_ShouldImportTheirText()
+        {
+            var walk = RegisterTunings()[0];
+            MasterMemoryDebugRuntime.SetOverride(1, walk with { Speed = TestFixed.FromRaw(3000), Limit = TestFixed.FromRaw(4000) });
+            var copied = MasterMemoryChangeSummary.ToTsv(MasterMemoryChangeSummary.Build());
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+
+            var plan = MasterMemoryTsvImport.Read(copied.Replace("\tSpeed\t2.5\t3\n", "\tSpeed\t2.5\t3.125\n"));
+            Assert.AreEqual(0, plan.Failed, string.Join("\n", plan.Problems));
+            Assert.AreEqual(0, plan.Outdated);
+            Assert.AreEqual(2, plan.Changes.Count);
+
+            MasterMemoryTsvImport.Apply(plan);
+            Assert.AreEqual(3125, Current<TestTuning>(1).Speed.Raw);
+            Assert.AreEqual(4000, Current<TestTuning>(1).Limit.Value.Raw);
+        }
+
+        [Test]
         public void TextWithoutTitleLine_ShouldBeRejected()
         {
             Assert.IsNotNull(MasterMemoryTsvImport.Read("TestSkill\t1001\tDamage\t5").InvalidFormat);

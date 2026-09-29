@@ -105,6 +105,56 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.AreEqual(3, query.Errors.Count);
         }
 
+        sealed class NotComparable : MasterDataValueConverter<TestFixed>
+        {
+            readonly TestFixedConverter inner = new TestFixedConverter();
+            public override string Format(TestFixed value) => inner.Format(value);
+            public override bool TryParse(string text, out TestFixed value, out string error) => inner.TryParse(text, out value, out error);
+        }
+
+        [Test]
+        public void CustomValues_ShouldBeReadAndComparedWithTheirConverter()
+        {
+            RegisterTunings();
+            var tunings = Table<TestTuning>().CreateRecordSnapshot();
+            int[] Tunings(string text, out MasterRecordQuery query)
+            {
+                query = MasterRecordQuery.Parse(text, MasterDataReflectionCache.Get<TestTuning>());
+                var result = new List<MasterMemoryRecordDescriptor>();
+                MasterRecordListController.Filter(tunings, query, false, int.MaxValue, result);
+                return result.Select(x => (int)x.PrimaryKey).ToArray();
+            }
+
+            CollectionAssert.AreEqual(new[] { 2 }, Tunings("Speed>2.5", out _), "10 > 2.5 (as text it is not)");
+            CollectionAssert.AreEqual(new[] { 1, 3 }, Tunings("Speed<=2.5", out _));
+            CollectionAssert.AreEqual(new[] { 1 }, Tunings("Speed=2.50", out _), "the value is read, not compared as typed");
+            CollectionAssert.AreEqual(new[] { 1, 3 }, Tunings("Limit=null", out _));
+            CollectionAssert.AreEqual(new[] { 2 }, Tunings("Limit>12", out _));
+            Tunings("Speed>fast", out var invalid);
+            Assert.AreEqual(1, invalid.Errors.Count);
+
+            // without a comparer, values can only be equal or not
+            MasterMemoryDebugRegistry.ClearTables();
+            FixedConverter.Dispose();
+            using (MasterDataValueConverters.Register(new NotComparable()))
+            {
+                var ordering = MasterRecordQuery.Parse("Speed>1", MasterDataReflectionCache.Get<TestTuning>());
+                Assert.AreEqual(1, ordering.Errors.Count);
+                StringAssert.Contains("= or !=", ordering.Errors[0]);
+                CollectionAssert.IsEmpty(MasterRecordQuery.Parse("Speed!=2.5", MasterDataReflectionCache.Get<TestTuning>()).Errors);
+            }
+        }
+
+        [Test]
+        public void Sort_ShouldOrderCustomValuesWithTheirComparer()
+        {
+            RegisterTunings();
+            var table = Table<TestTuning>();
+            var records = table.CreateRecordSnapshot();
+            MasterRecordListController.SortBy(records, "Speed", table, false);
+            CollectionAssert.AreEqual(new[] { 3, 1, 2 }, records.Select(x => (int)x.PrimaryKey), "-1, 2.5, 10 (as text: -1, 10, 2.5)");
+        }
+
         [Test]
         public void Sort_ShouldOrderByColumn()
         {
