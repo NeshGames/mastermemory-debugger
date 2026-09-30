@@ -1,0 +1,16 @@
+{
+    "name": "Nesh.MasterMemoryDebugger.Remote",
+    "rootNamespace": "Nesh.MasterMemoryDebugger",
+    "references": [
+        "Nesh.MasterMemoryDebugger.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

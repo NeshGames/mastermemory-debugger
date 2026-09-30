@@ -33,7 +33,8 @@ namespace Nesh.MasterMemoryDebugger
 
     /// <summary>
     /// Changes one field of many records at once (the records found by the search), as overrides:
-    /// <c>Damage × 1.1</c>, <c>Cooldown = 2</c>, <c>Price + 100</c>. Keys, lists and complex members can not be batch edited.
+    /// <c>Damage × 1.1</c>, <c>Cooldown = 2</c>, <c>Price + 100</c>. Keys, lists and complex members can not be batch edited;
+    /// members with a converter (<see cref="MasterDataValueKind.Custom"/>) only support Set.
     /// A record whose values all end up equal to the original loses its override.
     /// </summary>
     public static class MasterMemoryBatchEdit
@@ -49,6 +50,7 @@ namespace Nesh.MasterMemoryDebugger
                 case MasterDataValueKind.Boolean:
                 case MasterDataValueKind.Enum:
                 case MasterDataValueKind.FlagsEnum:
+                case MasterDataValueKind.Custom:
                     return true;
                 default:
                     return IsNumber(field);
@@ -97,6 +99,8 @@ namespace Nesh.MasterMemoryDebugger
                     case MasterDataValueKind.FlagsEnum:
                         value = MasterDataValueUtility.ParseEnum(field.ValueType, trimmed.Replace('|', ','));
                         return true;
+                    case MasterDataValueKind.Custom:
+                        return field.Converter.TryParse(trimmed, out value, out error);
                     default:
                         if (IsInteger(field.Kind))
                         {

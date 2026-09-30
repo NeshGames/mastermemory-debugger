@@ -68,7 +68,7 @@ namespace Nesh.MasterMemoryDebugger
         [SerializeField] bool remoteServer = false;
 
         [Tooltip("TCP port the game listens on for the remote editor tool.")]
-        [SerializeField, Range(1024, 65535)] int remotePort = MasterMemoryDebugRemote.DefaultPort;
+        [SerializeField, Range(1024, 65535)] int remotePort = MasterMemoryDebugDefaults.RemotePort;
 
         [Tooltip("Code the tool must enter. Empty = a random 6 digit code at every start (shown in the Remote dialog and the log).")]
         [SerializeField] string remotePairingCode = "";

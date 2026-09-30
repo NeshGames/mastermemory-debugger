@@ -160,6 +160,8 @@ namespace Nesh.MasterMemoryDebugger
                     return "Enum names joined with |: " + string.Join(", ", Enum.GetNames(field.ValueType)) + "." + nullable;
                 case MasterDataValueKind.String:
                     return "The text, as typed.";
+                case MasterDataValueKind.Custom:
+                    return $"Set: the new value, as shown ({field.ValueType.Name})." + nullable;
                 default:
                     return "Set: the new value.  Add: a number to add (negative to subtract).  Multiply: 1.1 = +10%; integers are rounded." + nullable;
             }

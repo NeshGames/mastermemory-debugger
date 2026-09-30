@@ -18,7 +18,18 @@ namespace Nesh.MasterMemoryDebugger
 
         static readonly Dictionary<Type, bool> s_editableObjects = new Dictionary<Type, bool>();
 
+        /// <summary>
+        /// How values of <paramref name="type"/> are shown and edited: a built-in kind, <see cref="MasterDataValueKind.Custom"/>
+        /// for a type with a registered converter (<see cref="MasterDataValueConverters"/>), otherwise Complex.
+        /// </summary>
         public static MasterDataValueKind GetKind(Type type)
+        {
+            var kind = GetBuiltInKind(type);
+            if (kind == MasterDataValueKind.Complex && MasterDataValueConverters.TryGet(type, out _)) return MasterDataValueKind.Custom;
+            return kind;
+        }
+
+        internal static MasterDataValueKind GetBuiltInKind(Type type)
         {
             if (type == typeof(string)) return MasterDataValueKind.String;
             if (type == typeof(bool)) return MasterDataValueKind.Boolean;
@@ -86,10 +97,11 @@ namespace Nesh.MasterMemoryDebugger
             return array;
         }
 
-        /// <summary>Default value of a new list element ("" for strings).</summary>
+        /// <summary>Default value of a new list element ("" for strings, null for classes with a converter).</summary>
         public static object CreateDefaultElement(Type elementType)
         {
             if (elementType == typeof(string)) return string.Empty;
+            if (!elementType.IsValueType) return null;
             if (elementType.IsEnum)
             {
                 var values = Enum.GetValues(elementType);
@@ -130,6 +142,11 @@ namespace Nesh.MasterMemoryDebugger
             return result;
         }
 
+        internal static void ClearEditableObjects()
+        {
+            lock (s_editableObjects) s_editableObjects.Clear();
+        }
+
         static bool IsObjectCandidate(Type type)
         {
             if (type.IsPrimitive || type.IsEnum || type.IsPointer || type.IsByRef || type.IsArray) return false;
@@ -163,6 +180,7 @@ namespace Nesh.MasterMemoryDebugger
 
         static string Format(object value, int depth)
         {
+            if (value != null && MasterDataValueConverters.TryGet(value.GetType(), out var converter)) return converter.Format(value);
             switch (value)
             {
                 case null: return "null";
@@ -294,13 +312,14 @@ namespace Nesh.MasterMemoryDebugger
         // ------------------------------------------------------------------ json
 
         /// <summary>
-        /// Converts a simple value, a list of simple values or a nested object (a JSON object of its editable members) to a
-        /// JSON value. Other complex values are not supported.
+        /// Converts a simple value, a value with a converter, a list of them or a nested object (a JSON object of its editable
+        /// members) to a JSON value. Other complex values are not supported.
         /// </summary>
         public static object ToJson(object value) => ToJson(value, 0);
 
         static object ToJson(object value, int depth)
         {
+            if (value != null && MasterDataValueConverters.TryGet(value.GetType(), out var converter)) return converter.ToJson(value);
             switch (value)
             {
                 case null: return null;
@@ -366,6 +385,7 @@ namespace Nesh.MasterMemoryDebugger
                 throw new FormatException($"null is not a valid {type.Name} value.");
             }
             type = underlying ?? type;
+            if (MasterDataValueConverters.TryGet(type, out var converter)) return converter.FromJson(json);
 
             if (TryGetEditableListElement(type, out var elementType))
             {

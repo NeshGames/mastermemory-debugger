@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Threading;
 
@@ -20,6 +21,26 @@ namespace Nesh.MasterMemoryDebugger
         string status;
         volatile bool disposed;
         readonly ValidationSource validation;
+        readonly Dictionary<string, RemoteTableState> remoteTables =
+            new Dictionary<string, RemoteTableState>(StringComparer.Ordinal);
+
+        sealed class RemoteTableState
+        {
+            public MasterMemoryRemoteProtocol.Table Manifest;
+            public Type RecordType;
+            public Type KeyType;
+            public readonly List<object> Records = new List<object>();
+            public List<string> DisplayNames;
+            public readonly List<MasterMemoryRemoteProtocol.Change> PendingOverrides =
+                new List<MasterMemoryRemoteProtocol.Change>();
+            public readonly List<MasterMemoryRemoteProtocol.Change> DeferredChanges =
+                new List<MasterMemoryRemoteProtocol.Change>();
+            public bool Loading;
+            public bool Loaded;
+            public string RequestId;
+            public int NextChunkIndex;
+            public long StartedTimestamp;
+        }
 
         public MasterMemoryRemoteClient(string host, int port, string pairingCode)
         {
@@ -139,7 +160,7 @@ namespace Nesh.MasterMemoryDebugger
                         Connection = null;
                         break;
                     case MasterMemoryRemoteProtocol.MessageType.Changes:
-                        ApplyRemote(MasterMemoryRemoteProtocol.DecodeChanges(payload));
+                        ApplyIncomingChanges(MasterMemoryRemoteProtocol.DecodeChanges(payload));
                         break;
                     case MasterMemoryRemoteProtocol.MessageType.ValidationState:
                         validation.OnState(MasterMemoryRemoteProtocol.DecodeValidationState(payload));
@@ -152,6 +173,9 @@ namespace Nesh.MasterMemoryDebugger
                         break;
                     case MasterMemoryRemoteProtocol.MessageType.OperationResult:
                         MasterMemoryDebugRemote.ReceiveOperationResult(MasterMemoryRemoteProtocol.DecodeOperationResult(payload));
+                        break;
+                    case MasterMemoryRemoteProtocol.MessageType.TableChunk:
+                        ReceiveTableChunk(MasterMemoryRemoteProtocol.DecodeTableChunk(payload));
                         break;
                 }
             }
@@ -166,12 +190,14 @@ namespace Nesh.MasterMemoryDebugger
         {
             if (welcome.Version != MasterMemoryRemoteProtocol.Version)
             {
-                SetState(MasterMemoryRemoteState.Failed, $"The game uses protocol version {welcome.Version}, this tool {MasterMemoryRemoteProtocol.Version}.");
+                SetState(MasterMemoryRemoteState.Failed,
+                    $"The game uses protocol version {welcome.Version}, this tool {MasterMemoryRemoteProtocol.Version}.");
                 return;
             }
 
             var skipped = new List<string>();
             var masterVersion = welcome.MasterVersion;
+            remoteTables.Clear();
             MasterMemoryDebugRegistry.ClearTables();
             MasterMemoryDebugRegistry.ClearTableGroups();
             MasterMemoryDebugRegistry.SetMasterVersionProvider(() => masterVersion);
@@ -179,26 +205,44 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugLocalization.LoadTsv(welcome.LabelsTsv);
             MasterMemoryReferences.ClearCache();
 
-            foreach (var table in welcome.Tables)
+            foreach (var manifest in welcome.Tables)
             {
-                var recordType = Type.GetType(table.RecordType);
-                var keyType = Type.GetType(table.KeyType);
+                var recordType = Type.GetType(manifest.RecordType);
+                var keyType = Type.GetType(manifest.KeyType);
                 if (recordType == null || keyType == null)
                 {
-                    skipped.Add($"{table.TableName} (type {(recordType == null ? table.RecordType : table.KeyType)} is not in this build)");
+                    skipped.Add($"{manifest.TableName} (type {(recordType == null ? manifest.RecordType : manifest.KeyType)} is not in this build)");
                     continue;
                 }
+
                 try
                 {
-                    var records = new List<object>(table.Records.Count);
-                    foreach (var bytes in table.Records) records.Add(Deserialize(recordType, bytes));
-                    MasterMemoryDebugRegistry.RegisterRemoteTable(table.TableName, table.MemoryTableName, recordType, keyType, records, table.DisplayNames);
-                    if (!string.IsNullOrEmpty(table.Group)) MasterMemoryDebugRegistry.SetTableGroup(table.Group, table.TableName);
+                    var state = new RemoteTableState
+                    {
+                        Manifest = manifest,
+                        RecordType = recordType,
+                        KeyType = keyType,
+                        DisplayNames = manifest.HasCustomDisplayName ? new List<string>() : null,
+                    };
+                    remoteTables.Add(manifest.TableName, state);
+                    MasterMemoryDebugRegistry.RegisterRemoteTable(
+                        manifest.TableName, manifest.MemoryTableName, recordType, keyType,
+                        state.Records, state.DisplayNames);
+                    if (!string.IsNullOrEmpty(manifest.Group))
+                        MasterMemoryDebugRegistry.SetTableGroup(manifest.Group, manifest.TableName);
                 }
                 catch (Exception e)
                 {
-                    skipped.Add($"{table.TableName} ({(e.InnerException ?? e).Message})");
+                    skipped.Add($"{manifest.TableName} ({(e.InnerException ?? e).Message})");
                 }
+            }
+
+            if (!string.IsNullOrEmpty(welcome.SchemaHash)
+                && !string.Equals(welcome.SchemaHash, MasterMemoryDebugRegistry.GetSchemaHash(), StringComparison.Ordinal))
+            {
+                SetState(MasterMemoryRemoteState.Failed,
+                    "The remote editor schema differs from the game. Build the tool from the same project revision.");
+                return;
             }
 
             StartSyncing();
@@ -209,13 +253,119 @@ namespace Nesh.MasterMemoryDebugger
             MasterMemoryDebugValidation.Add(validation);
 
             HasConnected = true;
-            var text = $"Connected to {Host}:{Port}: {welcome.Tables.Count - skipped.Count} tables, master {masterVersion}";
+            var text = $"Connected to {Host}:{Port}: {welcome.Tables.Count - skipped.Count} table manifests, master {masterVersion}";
             if (skipped.Count > 0)
             {
-                MasterMemoryDebugLog.Warning("Remote: tables not shown: " + string.Join(", ", skipped) + ". Build the tool from the same project version as the game.");
+                MasterMemoryDebugLog.Warning(
+                    "Remote: tables not shown: " + string.Join(", ", skipped)
+                    + ". Build the tool from the same project version as the game.");
                 text += $" ({skipped.Count} tables skipped, see Console)";
             }
             SetState(MasterMemoryRemoteState.Connected, text);
+        }
+
+        internal bool EnsureTableLoaded(string tableName)
+        {
+            if (!remoteTables.TryGetValue(tableName, out var state)) return true;
+            if (state.Loaded) return true;
+            if (state.Loading) return false;
+            if (Connection == null || state != null && State != MasterMemoryRemoteState.Connected) return false;
+
+            state.Loading = true;
+            state.RequestId = Guid.NewGuid().ToString("N");
+            state.NextChunkIndex = 0;
+            state.StartedTimestamp = Stopwatch.GetTimestamp();
+            state.Records.Clear();
+            state.DisplayNames?.Clear();
+            state.PendingOverrides.Clear();
+            state.DeferredChanges.Clear();
+            Connection.Send(MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableRequest
+            {
+                RequestId = state.RequestId,
+                TableName = tableName,
+            }));
+            SetState(MasterMemoryRemoteState.Connected,
+                $"Loading {tableName} ({state.Manifest.RecordCount} records) from {Host}:{Port}…");
+            return false;
+        }
+
+        internal bool IsTableLoaded(string tableName) =>
+            !remoteTables.TryGetValue(tableName, out var state) || state.Loaded;
+
+        void ReceiveTableChunk(MasterMemoryRemoteProtocol.TableChunk chunk)
+        {
+            if (!remoteTables.TryGetValue(chunk.TableName, out var state)
+                || !state.Loading || chunk.RequestId != state.RequestId)
+                return;
+
+            if (chunk.ChunkIndex != state.NextChunkIndex)
+            {
+                state.Loading = false;
+                MasterMemoryDebugLog.Warning(
+                    $"Remote: {chunk.TableName} chunk {chunk.ChunkIndex} arrived; expected {state.NextChunkIndex}.");
+                SetState(MasterMemoryRemoteState.Connected, $"Remote table {chunk.TableName} transfer failed; select it to retry.");
+                return;
+            }
+            state.NextChunkIndex++;
+
+            if (!string.IsNullOrEmpty(chunk.Error))
+            {
+                state.Loading = false;
+                MasterMemoryDebugLog.Warning($"Remote: {chunk.TableName} could not be loaded: {chunk.Error}");
+                SetState(MasterMemoryRemoteState.Connected, $"Remote table {chunk.TableName} transfer failed; select it to retry.");
+                return;
+            }
+
+            try
+            {
+                for (var i = 0; i < chunk.Records.Count; i++)
+                {
+                    state.Records.Add(Deserialize(state.RecordType, chunk.Records[i]));
+                    if (state.DisplayNames != null)
+                        state.DisplayNames.Add(chunk.DisplayNames != null ? chunk.DisplayNames[i] : string.Empty);
+                }
+            }
+            catch (Exception e)
+            {
+                state.Loading = false;
+                MasterMemoryDebugLog.Warning($"Remote: {chunk.TableName} could not be deserialized: {(e.InnerException ?? e).Message}");
+                SetState(MasterMemoryRemoteState.Connected, $"Remote table {chunk.TableName} transfer failed; select it to retry.");
+                return;
+            }
+
+            state.PendingOverrides.AddRange(chunk.Overrides);
+            if (!chunk.IsLast) return;
+
+            state.Loading = false;
+            state.Loaded = true;
+            MasterMemoryDebugRegistry.RegisterRemoteTable(
+                state.Manifest.TableName, state.Manifest.MemoryTableName, state.RecordType, state.KeyType,
+                state.Records, state.DisplayNames);
+            if (!string.IsNullOrEmpty(state.Manifest.Group))
+                MasterMemoryDebugRegistry.SetTableGroup(state.Manifest.Group, state.Manifest.TableName);
+            if (state.PendingOverrides.Count > 0) ApplyRemote(state.PendingOverrides);
+            if (state.DeferredChanges.Count > 0) ApplyRemote(state.DeferredChanges);
+            state.PendingOverrides.Clear();
+            state.DeferredChanges.Clear();
+            MasterMemoryDebugValidation.NotifyChanged();
+            var elapsedMs = (Stopwatch.GetTimestamp() - state.StartedTimestamp) * 1000.0 / Stopwatch.Frequency;
+            MasterMemoryDiagnostics.Record("Remote", "TableLoad", elapsedMs,
+                $"{chunk.TableName} records={state.Records.Count} chunks={state.NextChunkIndex}");
+            SetState(MasterMemoryRemoteState.Connected,
+                $"Connected to {Host}:{Port}: {chunk.TableName} loaded ({state.Records.Count} records).");
+        }
+
+        void ApplyIncomingChanges(List<MasterMemoryRemoteProtocol.Change> changes)
+        {
+            var immediate = new List<MasterMemoryRemoteProtocol.Change>();
+            foreach (var change in changes)
+            {
+                if (remoteTables.TryGetValue(change.TableName, out var table) && !table.Loaded)
+                    table.DeferredChanges.Add(change);
+                else
+                    immediate.Add(change);
+            }
+            if (immediate.Count > 0) ApplyRemote(immediate);
         }
 
         void RequestValidation() => Connection?.Send(MasterMemoryRemoteProtocol.EncodeValidateRequest());
@@ -291,6 +441,12 @@ namespace Nesh.MasterMemoryDebugger
                 results = failures;
                 pending = false;
                 stale = false;
+                var requested = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var failure in failures)
+                {
+                    if (!string.IsNullOrEmpty(failure.TableName) && requested.Add(failure.TableName))
+                        client.EnsureTableLoaded(failure.TableName);
+                }
                 MasterMemoryDebugValidation.NotifyChanged();
             }
         }

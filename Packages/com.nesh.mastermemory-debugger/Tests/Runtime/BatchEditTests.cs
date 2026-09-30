@@ -120,6 +120,29 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void CustomValues_ShouldOnlyBeSet()
+        {
+            RegisterTunings();
+            var table = Table<TestTuning>();
+            MasterMemoryFieldDescriptor Tuning(string name) => table.TypeDescriptor.Fields.Single(x => x.Name == name);
+            var records = table.CreateRecordSnapshot();
+            TestTuning Walk() => MasterMemoryDebugRuntime.TryGetOverride<TestTuning, int>(1, out var value) ? value : null;
+
+            Assert.IsTrue(MasterMemoryBatchEdit.CanEdit(Tuning("Speed")));
+            var result = MasterMemoryBatchEdit.Apply(records, Tuning("Speed"), MasterMemoryBatchOperation.Set, " 0.125 ");
+            Assert.IsNull(result.InvalidValue);
+            Assert.AreEqual(3, result.Changed);
+            Assert.AreEqual(125, Walk().Speed.Raw);
+            MasterMemoryBatchEdit.Apply(records.Take(1), Tuning("Limit"), MasterMemoryBatchOperation.Set, "7");
+            Assert.AreEqual(7000, Walk().Limit.Value.Raw);
+
+            Assert.IsNotNull(MasterMemoryBatchEdit.Apply(records, Tuning("Speed"), MasterMemoryBatchOperation.Add, "1").InvalidValue, "Add needs a number field");
+            Assert.IsNotNull(MasterMemoryBatchEdit.Apply(records, Tuning("Speed"), MasterMemoryBatchOperation.Multiply, "2").InvalidValue);
+            Assert.IsNotNull(MasterMemoryBatchEdit.Apply(records, Tuning("Speed"), MasterMemoryBatchOperation.Set, "0.0001").InvalidValue, "text the converter can not read");
+            Assert.AreEqual(125, Walk().Speed.Raw);
+        }
+
+        [Test]
         public void BatchEdit_ShouldBeOneUndoStep()
         {
             using (MasterMemoryDebugHistory.Record("batch"))

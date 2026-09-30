@@ -107,7 +107,14 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var referencing = Measure("referenced by", () => MasterMemoryReferences.FindReferencing(incoming[0], MasterMemoryReferences.GetReferencedValue(incoming[0], boss)));
             Assert.AreEqual(RecordCount / 5, referencing.Count);
 
-            Measure("validate (MasterMemory)", () => MasterMemoryDebugRebuild.Validate(database));
+            // MasterMemory compiles Exists expressions per record; Mono makes 50,000 external validations
+            // very slow. Keep the debugger operations above at full size and validate a representative subset.
+            var validationDatabase = new MemoryDatabase(
+                TestEnemyLevelTable: database.TestEnemyLevelTable,
+                TestSkillTable: new TestSkillTable(database.TestSkillTable.All.Take(128).ToArray()));
+            var validation = Measure("validate (128 MasterMemory records)",
+                () => MasterMemoryDebugRebuild.Validate(validationDatabase));
+            Assert.IsFalse(validation.IsValidationFailed, validation.FormatFailedResults());
 
             // remote editing: what the game sends when the tool connects, and what the tool does with it
             MasterMemoryDebugRemote.SerializerOptions = MessagePack.MessagePackSerializerOptions.Standard.WithResolver(MessagePack.Resolvers.ContractlessStandardResolver.Instance);
@@ -118,7 +125,9 @@ namespace Nesh.MasterMemoryDebugger.Tests
                 TestContext.Progress.WriteLine($"remote: welcome size {bytes.Length / 1024} KB");
                 var decoded = Measure("remote: decode", () => MasterMemoryRemoteProtocol.DecodeWelcome(bytes));
                 var skillTable = decoded.Tables.Single(x => x.TableName == nameof(TestSkill));
-                Measure("remote: deserialize records", () => skillTable.Records.Select(x => MasterMemoryRemotePeer.Deserialize(typeof(TestSkill), x)).ToList());
+                Assert.AreEqual(RecordCount, skillTable.RecordCount);
+                Assert.AreEqual(0, skillTable.Records.Count, "Welcome v6 is metadata-only");
+                Assert.Less(bytes.Length, 128 * 1024, "the initial remote handshake must not scale with table record count");
             }
             finally
             {

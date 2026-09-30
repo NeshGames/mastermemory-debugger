@@ -57,7 +57,7 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     public static class MasterMemoryDebugRemote
     {
-        public const int DefaultPort = 7788;
+        public const int DefaultPort = MasterMemoryDebugDefaults.RemotePort;
 
         static MasterMemoryRemotePeer s_peer;
         static MasterMemoryRemoteRunner s_runner;
@@ -131,6 +131,20 @@ namespace Nesh.MasterMemoryDebugger
 
         /// <summary>Game: the port listened on (0 when off).</summary>
         public static int ServerPort => (s_peer as MasterMemoryRemoteServer)?.Port ?? 0;
+
+        /// <summary>
+        /// Remote tool: requests a table the first time it is opened. Local/game tables are always ready.
+        /// Returns true when the table data is already available.
+        /// </summary>
+        internal static bool EnsureTableLoaded(MasterMemoryTableDescriptor table)
+        {
+            if (table == null || !(s_peer is MasterMemoryRemoteClient client)) return true;
+            return client.EnsureTableLoaded(table.TableName);
+        }
+
+        internal static bool IsTableLoaded(string tableName) =>
+            !(s_peer is MasterMemoryRemoteClient client) || client.IsTableLoaded(tableName);
+
         /// <summary>Tool: operations advertised by the connected game.</summary>
         public static IReadOnlyList<MasterMemoryRemoteOperationView> Operations => s_remoteOperations;
         /// <summary>Tool: the last operation result; null until one arrives.</summary>

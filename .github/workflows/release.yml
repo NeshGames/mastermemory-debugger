@@ -1,7 +1,5 @@
 name: Release
 
-# Tags and releases the package when the version in package.json changes on main.
-# Run it by hand with a tag (for example v0.4.0) to create the release of an existing tag.
 on:
   push:
     branches: [main]
@@ -9,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to create a release for (for example v0.4.0). Empty = the version in package.json.
+        description: Existing tag to create a release for (for example v0.4.0). Empty = package.json version.
         required: false
         default: ""
 
@@ -21,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Create the tag and release
         env:
@@ -35,6 +35,7 @@ jobs:
               echo "::error::Tag $tag does not exist."
               exit 1
             fi
+            git show "$tag:$package/CHANGELOG.md" > changelog-source.md
           else
             version=$(jq -r .version "$package/package.json")
             tag="v$version"
@@ -42,17 +43,17 @@ jobs:
               echo "$tag already exists."
               exit 0
             fi
+            cp "$package/CHANGELOG.md" changelog-source.md
           fi
           if gh release view "$tag" > /dev/null 2>&1; then
             echo "The release of $tag already exists."
             exit 0
           fi
-          # notes: the CHANGELOG section of this version (the CHANGELOG of main lists every version)
           awk -v v="$version" '
             index($0, "## [" v "]") == 1 { found = 1; next }
             found && /^## \[/ { exit }
             found { print }
-          ' "$package/CHANGELOG.md" > notes.md
+          ' changelog-source.md > notes.md
           if [ ! -s notes.md ]; then
             echo "::error::CHANGELOG.md has no section for $version"
             exit 1

@@ -142,6 +142,52 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void CustomValueMembers_ShouldBeEditableOnlyWithAConverter()
+        {
+            var speed = Field<TestTuning>("Speed");
+            Assert.AreEqual(MasterDataValueKind.Custom, speed.Kind);
+            Assert.IsInstanceOf<TestFixedConverter>(speed.Converter);
+            Assert.IsTrue(speed.CanEdit);
+            var limit = Field<TestTuning>("Limit");
+            Assert.IsTrue(limit.IsNullable);
+            Assert.AreEqual(MasterDataValueKind.Custom, limit.Kind);
+            Assert.AreSame(speed.Converter, limit.Converter, "Nullable members use the converter of the underlying type");
+            Assert.IsTrue(limit.CanEdit);
+            Assert.AreEqual("-12.5", MasterDataValueUtility.Format(TestFixed.FromRaw(-12500)), "shown as the converter's text");
+
+            // disposing the token drops the converter and the descriptors built with it
+            FixedConverter.Dispose();
+            speed = Field<TestTuning>("Speed");
+            Assert.AreEqual(MasterDataValueKind.Complex, speed.Kind);
+            Assert.IsNull(speed.Converter);
+            Assert.IsFalse(speed.CanEdit, "a private raw can not be written member by member");
+            Assert.IsFalse(Field<TestTuning>("Limit").CanEdit);
+
+            using (MasterDataValueConverters.Register(new TestFixedConverter()))
+            {
+                Assert.AreEqual(MasterDataValueKind.Custom, Field<TestTuning>("Speed").Kind, "registering drops the cached descriptors too");
+            }
+        }
+
+        struct TypedId
+        {
+            public int Value;
+
+            public TypedId(int value) => Value = value;
+        }
+
+        [Test]
+        public void Converter_ShouldTurnANestedObjectIntoAValue()
+        {
+            Assert.IsTrue(MasterDataValueUtility.IsEditableObject(typeof(TypedId)));
+            using (MasterDataValueConverters.Register(new UnusedConverter(typeof(TypedId))))
+            {
+                Assert.IsFalse(MasterDataValueUtility.IsEditableObject(typeof(TypedId)), "edited as its text, not member by member");
+            }
+            Assert.IsTrue(MasterDataValueUtility.IsEditableObject(typeof(TypedId)), "a nested object again without the converter");
+        }
+
+        [Test]
         public void AreEqual_ShouldCompareCollectionsByElement()
         {
             Assert.IsTrue(MasterDataValueUtility.AreEqual(new[] { 1, 2 }, new[] { 1, 2 }));

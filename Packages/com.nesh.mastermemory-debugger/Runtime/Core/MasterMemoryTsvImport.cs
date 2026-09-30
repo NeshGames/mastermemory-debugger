@@ -68,7 +68,7 @@ namespace Nesh.MasterMemoryDebugger
     /// MasterMemoryTsvImport.Apply(plan);
     /// </code>
     /// Keys are matched as shown in the debugger (<c>1001</c>, <c>(2, 1)</c> for composite keys). Keys, lists and complex
-    /// members can not be imported.
+    /// members can not be imported; members with a converter are read with it (<see cref="MasterMemoryBatchEdit.CanEdit"/>).
     /// </summary>
     public static class MasterMemoryTsvImport
     {

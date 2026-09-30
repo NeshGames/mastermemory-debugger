@@ -1,5 +1,9 @@
 using System;
+using System.Collections;
+using System.Globalization;
 using MasterMemory;
+using MessagePack;
+using MessagePack.Formatters;
 using Nesh.MasterMemoryDebugger.Tests.Generated;
 using Nesh.MasterMemoryDebugger.Tests.Generated.Tables;
 
@@ -95,8 +99,99 @@ namespace Nesh.MasterMemoryDebugger.Tests
         public int Price { get; private set; }
     }
 
+    /// <summary>
+    /// Fixed-point number in thousandths with a private raw, like a game's Fix64: no writable member, no ToString, not
+    /// comparable, so only <see cref="TestFixedConverter"/> makes it editable.
+    /// </summary>
+    public readonly struct TestFixed
+    {
+        readonly long raw;
+
+        TestFixed(long raw)
+        {
+            this.raw = raw;
+        }
+
+        public static TestFixed FromRaw(long raw) => new TestFixed(raw);
+
+        public long Raw => raw;
+    }
+
+    /// <summary>Canonical decimal text with at most 3 decimals; values are ordered by their raw.</summary>
+    public sealed class TestFixedConverter : MasterDataValueConverter<TestFixed>, IComparer
+    {
+        const decimal Scale = 1000m;
+
+        public override string Format(TestFixed value) => (value.Raw / Scale).ToString("0.###", CultureInfo.InvariantCulture);
+
+        public override bool TryParse(string text, out TestFixed value, out string error)
+        {
+            value = default;
+            if (!decimal.TryParse(text.Trim(), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var number))
+            {
+                error = $"'{text}' is not a number";
+                return false;
+            }
+            var scaled = number * Scale;
+            if (scaled != decimal.Truncate(scaled) || scaled < long.MinValue || scaled > long.MaxValue)
+            {
+                error = $"'{text}' is not a TestFixed (3 decimals)";
+                return false;
+            }
+            value = TestFixed.FromRaw((long)scaled);
+            error = null;
+            return true;
+        }
+
+        public int Compare(object x, object y) => ((TestFixed)x).Raw.CompareTo(((TestFixed)y).Raw);
+    }
+
+    /// <summary>Writes the raw, as a game's resolver does for its fixed-point type.</summary>
+    public sealed class TestFixedFormatter : IMessagePackFormatter<TestFixed>
+    {
+        public void Serialize(ref MessagePackWriter writer, TestFixed value, MessagePackSerializerOptions options) => writer.Write(value.Raw);
+
+        public TestFixed Deserialize(ref MessagePackReader reader, MessagePackSerializerOptions options) => TestFixed.FromRaw(reader.ReadInt64());
+    }
+
+    /// <summary>A converter whose conversions are never called: for the registration rules.</summary>
+    public sealed class UnusedConverter : IMasterDataValueConverter
+    {
+        public UnusedConverter(Type valueType)
+        {
+            ValueType = valueType;
+        }
+
+        public Type ValueType { get; }
+        public string Format(object value) => throw new NotSupportedException();
+        public bool TryParse(string text, out object value, out string error) => throw new NotSupportedException();
+        public object ToJson(object value) => throw new NotSupportedException();
+        public object FromJson(object json) => throw new NotSupportedException();
+    }
+
+    /// <summary>Registered manually (<see cref="DebuggerTestBase"/>): members of a type with a converter.</summary>
+    public sealed record TestTuning
+    {
+        [PrimaryKey]
+        public int Id { get; init; }
+
+        public string Name { get; init; }
+        public TestFixed Speed { get; init; }
+        public TestFixed? Limit { get; init; }
+        public TestFixed[] Curve { get; init; }
+    }
+
     public static class TestData
     {
+        static TestFixed Fixed(long raw) => TestFixed.FromRaw(raw);
+
+        public static TestTuning[] CreateTunings() => new[]
+        {
+            new TestTuning { Id = 1, Name = "Walk", Speed = Fixed(2500), Curve = new[] { Fixed(500), Fixed(1000) } },
+            new TestTuning { Id = 2, Name = "Run", Speed = Fixed(10000), Limit = Fixed(12250), Curve = new[] { Fixed(1000), Fixed(2500) } },
+            new TestTuning { Id = 3, Name = "Back", Speed = Fixed(-1000), Curve = new TestFixed[0] },
+        };
+
         public static MemoryDatabase CreateDatabase()
         {
             // tables expect data sorted by primary key

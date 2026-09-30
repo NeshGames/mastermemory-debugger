@@ -36,6 +36,9 @@ namespace Nesh.MasterMemoryDebugger
         public int FormatVersion = CurrentFormatVersion;
         public string MasterVersion;
 
+        /// <summary>Deterministic hash of the registered table schema at export time.</summary>
+        public string SchemaHash;
+
         /// <summary>UTC time in ISO 8601 format.</summary>
         public string ExportedAt;
 

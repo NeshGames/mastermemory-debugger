@@ -25,13 +25,47 @@ namespace Nesh.MasterMemoryDebugger
 
             foreach (var patchTable in s_pending.Tables)
             {
-                if (MasterDataPatchService.FindTable(patchTable) != table) continue;
+                if (MasterDataPatchResolver.FindTable(patchTable) != table) continue;
                 if (!s_appliedTables.Add(table.TableName)) return;
 
-                var result = new MasterDataPatchApplyResult();
-                MasterDataPatchService.ApplyTable(patchTable, table, result);
-                foreach (var warning in result.Warnings) MasterMemoryDebugLog.Warning(warning);
-                MasterMemoryDebugLog.Info($"Auto loaded patch for {table.TableName}: {result.AppliedRecords} records.");
+                // The full registry may not exist yet, so a saved SchemaHash cannot be compared here.
+                // Keep the released table-by-table compatibility behavior, but route mutation through the shared engine.
+                var tablePatch = new MasterDataPatch
+                {
+                    FormatVersion = s_pending.FormatVersion,
+                    MasterVersion = s_pending.MasterVersion,
+                    ExportedAt = s_pending.ExportedAt,
+                };
+                tablePatch.Tables.Add(patchTable);
+                var plan = MasterDataPatchEngine.Build(
+                    tablePatch,
+                    replaceExisting: false,
+                    requireOriginalPreconditions: false,
+                    forceIdentity: false,
+                    allowPartial: true);
+
+                foreach (var warning in plan.Warnings) MasterMemoryDebugLog.Warning(warning);
+                if (!plan.Succeeded)
+                {
+                    foreach (var error in plan.Errors)
+                    {
+                        MasterMemoryDebugLog.Warning(
+                            $"Auto load {table.TableName}: {error.Code} {error.Key} {error.Field} {error.Message}".Trim());
+                    }
+                    return;
+                }
+
+                try
+                {
+                    MasterDataPatchEngine.Commit(plan);
+                }
+                catch (InvalidOperationException e)
+                {
+                    MasterMemoryDebugLog.Warning($"Auto load {table.TableName}: {e.Message}");
+                    return;
+                }
+
+                MasterMemoryDebugLog.Info($"Auto loaded patch for {table.TableName}: {plan.Targets.Count} records.");
                 return;
             }
         }

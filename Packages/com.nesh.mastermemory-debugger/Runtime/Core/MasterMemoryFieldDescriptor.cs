@@ -31,6 +31,8 @@ namespace Nesh.MasterMemoryDebugger
         Vector2Int,
         Vector3Int,
         Color,
+        /// <summary>A type with a registered converter (<see cref="MasterMemoryFieldDescriptor.Converter"/>), edited as its text.</summary>
+        Custom,
     }
 
     /// <summary>A public property or field of a MasterMemory record.</summary>
@@ -38,6 +40,8 @@ namespace Nesh.MasterMemoryDebugger
     {
         readonly Func<object, object> getter;
         readonly Action<object, object> setter;
+        readonly IMasterDataValueConverter converter;
+        readonly IMasterDataValueConverter elementConverter;
 
         // 0 = not evaluated yet, 1 = false, 2 = true (evaluated lazily: nested types may refer to their own type)
         int isObject;
@@ -66,10 +70,12 @@ namespace Nesh.MasterMemoryDebugger
             IsNullable = underlying != null;
             ValueType = underlying ?? fieldType;
             Kind = MasterDataValueUtility.GetKind(ValueType);
+            if (Kind == MasterDataValueKind.Custom) MasterDataValueConverters.TryGet(ValueType, out converter);
             if (MasterDataValueUtility.TryGetEditableListElement(fieldType, out var elementType))
             {
                 ElementType = elementType;
                 ElementKind = MasterDataValueUtility.GetKind(elementType);
+                if (ElementKind == MasterDataValueKind.Custom) MasterDataValueConverters.TryGet(elementType, out elementConverter);
             }
         }
 
@@ -87,6 +93,9 @@ namespace Nesh.MasterMemoryDebugger
 
         public MasterDataValueKind Kind { get; }
 
+        /// <summary>The converter of <see cref="ValueType"/> when <see cref="Kind"/> is Custom; otherwise null.</summary>
+        public IMasterDataValueConverter Converter => converter;
+
         public bool IsPrimaryKey { get; }
 
         /// <summary>KeyOrder of <c>[PrimaryKey]</c>, used for composite keys.</summary>
@@ -97,8 +106,8 @@ namespace Nesh.MasterMemoryDebugger
         public bool IsKey => IsPrimaryKey || IsSecondaryKey;
 
         /// <summary>
-        /// True when the member is a non-key member with a usable setter of a supported simple type, a list of them or a
-        /// nested object (<see cref="IsObject"/>).
+        /// True when the member is a non-key member with a usable setter of a supported simple type (a type with a converter
+        /// included), a list of them or a nested object (<see cref="IsObject"/>).
         /// </summary>
         public bool CanEdit => !IsKey && setter != null && (Kind != MasterDataValueKind.Complex || IsList || IsObject);
 
@@ -127,6 +136,9 @@ namespace Nesh.MasterMemoryDebugger
         public Type ElementType { get; }
 
         public MasterDataValueKind ElementKind { get; }
+
+        /// <summary>The converter of <see cref="ElementType"/> when <see cref="ElementKind"/> is Custom; otherwise null.</summary>
+        public IMasterDataValueConverter ElementConverter => elementConverter;
 
         public bool IsList => ElementType != null;
 

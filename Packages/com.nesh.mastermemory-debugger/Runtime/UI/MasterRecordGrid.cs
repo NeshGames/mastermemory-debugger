@@ -151,9 +151,13 @@ namespace Nesh.MasterMemoryDebugger
             listView.RefreshItems();
         }
 
-        public void ClearSort()
+        public void ClearSort() => SetSort(null, false);
+
+        /// <summary>Restores a saved sort. Missing columns clear the sort so schema changes degrade gracefully.</summary>
+        public void SetSort(string key, bool descending)
         {
-            SortKey = null;
+            SortKey = !string.IsNullOrEmpty(key) && columns.Any(x => x.Key == key) ? key : null;
+            SortDescending = SortKey != null && descending;
             UpdateSortIndicators();
         }
 

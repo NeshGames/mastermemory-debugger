@@ -1,0 +1,445 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+
+namespace Nesh.MasterMemoryDebugger
+{
+    internal enum MasterDataPatchOperationKind
+    {
+        Change,
+        Add,
+        Delete,
+        Reset,
+    }
+
+    internal sealed class MasterDataPatchPlanError
+    {
+        public string TableName;
+        public string Key;
+        public string Field;
+        public string Code;
+        public string Message;
+    }
+
+    internal sealed class MasterDataPatchPlanTarget
+    {
+        public MasterMemoryTableDescriptor Table;
+        public string KeyText;
+        public object Key;
+        public object Original;
+        public object ExpectedOverride;
+        public object NextOverride;
+        public bool HadOverride;
+        public bool WasDeleted;
+        public int FieldCount;
+        public MasterDataPatchOperationKind Kind;
+        public MasterDataOverrideStore.AtomicChange Change;
+    }
+
+    /// <summary>
+    /// Fully preflighted patch transaction. No store mutation occurs until <see cref="MasterDataPatchEngine.Commit"/>.
+    /// </summary>
+    internal sealed class MasterDataPatchPlan
+    {
+        public readonly List<MasterDataPatchPlanTarget> Targets = new List<MasterDataPatchPlanTarget>();
+        public readonly List<MasterDataOverrideStore.AtomicChange> Changes = new List<MasterDataOverrideStore.AtomicChange>();
+        public readonly List<MasterDataPatchPlanError> Errors = new List<MasterDataPatchPlanError>();
+        public readonly List<string> Warnings = new List<string>();
+        public int FieldCount;
+        public bool Succeeded => Errors.Count == 0;
+    }
+
+    /// <summary>
+    /// Single source of truth for Patch semantics used by local UI/storage and remote editing.
+    /// Planning validates every target first; committing uses the override store's compare-and-swap atomic update.
+    /// </summary>
+    internal static class MasterDataPatchEngine
+    {
+        public static MasterDataPatchPlan Build(
+            MasterDataPatch patch,
+            bool replaceExisting,
+            bool requireOriginalPreconditions,
+            bool forceIdentity,
+            bool allowPartial = false)
+        {
+            if (patch == null) throw new ArgumentNullException(nameof(patch));
+            var watch = Stopwatch.StartNew();
+            var plan = new MasterDataPatchPlan();
+
+            if (patch.FormatVersion <= 0 || patch.FormatVersion > MasterDataPatch.CurrentFormatVersion)
+                Error(plan, "", "", "", "UNSUPPORTED_FORMAT", "Unsupported patch format version.");
+
+            var currentVersion = MasterMemoryDebugRegistry.GetMasterVersion();
+            if (!MasterDataPatchResolver.IsSameMasterVersion(patch.MasterVersion, currentVersion))
+            {
+                if (forceIdentity) plan.Warnings.Add(
+                    $"Master version differs (patch: {patch.MasterVersion ?? MasterMemoryDebugRegistry.UnknownMasterVersion}, current: {currentVersion}). Force loaded.");
+                else Error(plan, "", "", "", "VERSION_MISMATCH", "Patch master version differs from the current master data.");
+            }
+
+            var currentSchema = MasterMemoryDebugRegistry.GetSchemaHash();
+            if (!string.IsNullOrEmpty(patch.SchemaHash)
+                && !string.Equals(patch.SchemaHash, currentSchema, StringComparison.Ordinal))
+            {
+                if (forceIdentity) plan.Warnings.Add(
+                    $"Master schema differs (patch: {patch.SchemaHash}, current: {currentSchema}). Force loaded.");
+                else Error(plan, "", "", "", "SCHEMA_MISMATCH", "Patch schema differs from the registered master-data schema.");
+            }
+
+            var seen = new HashSet<MasterDataOverrideKey>();
+            foreach (var patchTable in patch.Tables)
+            {
+                var table = MasterDataPatchResolver.FindTable(patchTable);
+                if (table == null)
+                {
+                    if (allowPartial) plan.Warnings.Add($"Table '{patchTable.TableName}' is not registered, skipped.");
+                    else Error(plan, patchTable.TableName, "", "", "TABLE_NOT_FOUND", "Table is not registered.");
+                    continue;
+                }
+                if (!string.IsNullOrEmpty(patchTable.RecordType) && patchTable.RecordType != table.RecordType.FullName)
+                {
+                    if (allowPartial) plan.Warnings.Add($"{patchTable.TableName}: patch record type differs from the table, skipped.");
+                    else Error(plan, patchTable.TableName, "", "", "TYPE_MISMATCH", "Patch record type differs from the table.");
+                    continue;
+                }
+
+                var originals = MasterDataPatchResolver.BuildOriginalLookupByKeyJson(table);
+                foreach (var record in patchTable.Records)
+                {
+                    try
+                    {
+                        PlanRecord(plan, table, originals, record, seen, replaceExisting, requireOriginalPreconditions, allowPartial);
+                    }
+                    catch (Exception e)
+                    {
+                        var key = record.PrimaryKey?.ToCanonicalString() ?? "";
+                        if (allowPartial)
+                            plan.Warnings.Add($"{table.TableName} {key}: invalid record ({(e.InnerException ?? e).Message}), skipped.");
+                        else
+                            Error(plan, table.TableName, key, "", "INVALID_RECORD", (e.InnerException ?? e).Message);
+                    }
+                }
+            }
+
+            if (replaceExisting)
+            {
+                foreach (var entry in MasterMemoryDebugRuntime.Store.GetEntries())
+                {
+                    if (seen.Contains(entry.Key)) continue;
+                    plan.Changes.Add(new MasterDataOverrideStore.AtomicChange
+                    {
+                        RecordType = entry.Key.RecordType,
+                        Key = entry.Key.PrimaryKey,
+                        Value = null,
+                        ExpectedValue = entry.Value,
+                    });
+                }
+            }
+
+            if (plan.Errors.Count != 0)
+            {
+                plan.Targets.Clear();
+                plan.Changes.Clear();
+                plan.FieldCount = 0;
+            }
+            watch.Stop();
+            MasterMemoryDiagnostics.Record("Patch", "Preflight", watch.Elapsed.TotalMilliseconds,
+                $"targets={plan.Targets.Count} errors={plan.Errors.Count} replace={replaceExisting}");
+            return plan;
+        }
+
+        public static void Commit(MasterDataPatchPlan plan)
+        {
+            if (plan == null) throw new ArgumentNullException(nameof(plan));
+            if (!plan.Succeeded) throw new InvalidOperationException("Patch preflight failed.");
+            var watch = Stopwatch.StartNew();
+            MasterMemoryDebugRuntime.Session.OverrideStore.ApplyAtomic(plan.Changes);
+            watch.Stop();
+            MasterMemoryDiagnostics.Record("Patch", "Commit", watch.Elapsed.TotalMilliseconds,
+                $"targets={plan.Targets.Count} changes={plan.Changes.Count}");
+        }
+
+        static void PlanRecord(
+            MasterDataPatchPlan plan,
+            MasterMemoryTableDescriptor table,
+            Dictionary<string, object> originals,
+            MasterDataPatchRecord patch,
+            HashSet<MasterDataOverrideKey> seen,
+            bool replaceExisting,
+            bool requireOriginalPreconditions,
+            bool allowPartial)
+        {
+            var keyText = MasterDataPatchResolver.NormalizePrimaryKeyJson(table, patch.PrimaryKey);
+            originals.TryGetValue(keyText, out var original);
+
+            if (original == null && patch.Deleted)
+            {
+                if (allowPartial)
+                    plan.Warnings.Add($"{table.TableName} {keyText}: the deleted record does not exist, skipped.");
+                else
+                    Error(plan, table.TableName, keyText, "", "NOT_FOUND", "Deleted record does not exist.");
+                return;
+            }
+            if (original == null && !patch.Added)
+            {
+                if (allowPartial)
+                    plan.Warnings.Add($"{table.TableName} {keyText}: record does not exist, skipped.");
+                else
+                    Error(plan, table.TableName, keyText, "", "NOT_FOUND", "Record does not exist.");
+                return;
+            }
+
+            if (allowPartial && patch.Added && original != null)
+                plan.Warnings.Add($"{table.TableName} {keyText}: the added record exists in the master data now; its values are applied as changes.");
+
+            object keyRecord = null;
+            if (original == null)
+            {
+                if (!MasterMemoryRecordFactory.CanAdd(table, out var reason))
+                {
+                    if (allowPartial)
+                        plan.Warnings.Add($"{table.TableName} {keyText}: the added record is skipped ({reason})");
+                    else
+                        Error(plan, table.TableName, keyText, "", "CANNOT_ADD", reason);
+                    return;
+                }
+
+                keyRecord = MasterMemoryRecordFactory.CreateDefault(table);
+                foreach (var field in table.TypeDescriptor.PrimaryKeyFields)
+                    field.SetValueUnchecked(keyRecord,
+                        MasterDataValueUtility.FromJson(patch.PrimaryKey[field.Name], field.FieldType));
+            }
+
+            var key = table.GetPrimaryKey(original ?? keyRecord);
+            var overrideKey = new MasterDataOverrideKey(table.RecordType, key);
+            if (!seen.Add(overrideKey))
+            {
+                if (allowPartial)
+                    plan.Warnings.Add($"{table.TableName} {keyText}: duplicate patch target, skipped.");
+                else
+                    Error(plan, table.TableName, keyText, "", "DUPLICATE_TARGET", "Duplicate patch target.");
+                return;
+            }
+
+            var store = MasterMemoryDebugRuntime.Store;
+            var actualDeleted = store.IsDeleted(table.RecordType, key);
+            var actualOverride = store.TryGet(table.RecordType, key, out var overridden);
+            var expectedOverride = actualDeleted ? MasterDataOverrideStore.Deleted : actualOverride ? overridden : null;
+
+            var isDeleted = replaceExisting ? false : actualDeleted;
+            var hasOverride = replaceExisting ? false : actualOverride;
+            var current = allowPartial ? original : hasOverride ? overridden : original;
+            var errorsBefore = plan.Errors.Count;
+            object next = null;
+            var kind = MasterDataPatchOperationKind.Change;
+            var appliedFields = 0;
+
+            if (patch.Deleted)
+            {
+                kind = MasterDataPatchOperationKind.Delete;
+                if (!allowPartial && (isDeleted || patch.Changes.Count != 0))
+                {
+                    Error(plan, table.TableName, keyText, "", "INVALID_DELETE",
+                        "Delete needs an existing, non-deleted original and no field changes.");
+                }
+                else
+                {
+                    if (allowPartial && patch.Changes.Count != 0)
+                        plan.Warnings.Add($"{table.TableName} {keyText}: field changes on a deleted record are ignored.");
+                    next = MasterDataOverrideStore.Deleted;
+                }
+            }
+            else if (patch.Added && original == null)
+            {
+                kind = MasterDataPatchOperationKind.Add;
+                if (!allowPartial && (hasOverride || isDeleted))
+                    Error(plan, table.TableName, keyText, "", "ALREADY_EXISTS", "Added record already exists.");
+                else
+                {
+                    next = keyRecord;
+                    appliedFields = ApplyFields(plan, table, patch, keyText, null, null, next, true,
+                        requireOriginalPreconditions, allowPartial);
+                }
+            }
+            else
+            {
+                if (!allowPartial && isDeleted)
+                    Error(plan, table.TableName, keyText, "", "NOT_FOUND", "Record does not exist or is deleted.");
+                else if (patch.Changes.Count == 0)
+                {
+                    if (!allowPartial)
+                        Error(plan, table.TableName, keyText, "", "EMPTY_CHANGE", "Existing record needs at least one field change.");
+                    else
+                        return;
+                }
+                else
+                {
+                    next = MasterDataCloneUtility.Clone(current);
+                    appliedFields = ApplyFields(plan, table, patch, keyText, original, current, next, false,
+                        requireOriginalPreconditions, allowPartial);
+                    if (allowPartial && appliedFields == 0) return;
+                    if (!Equals(table.GetPrimaryKey(next), key))
+                        Error(plan, table.TableName, keyText, "", "KEY_CHANGED", "Patch changed the primary key.");
+                    if (!allowPartial && original != null && MasterDataDiffUtility.GetChanges(original, next).Count == 0)
+                    {
+                        next = null;
+                        kind = MasterDataPatchOperationKind.Reset;
+                    }
+                }
+            }
+
+            if (plan.Errors.Count != errorsBefore) return;
+
+            var change = new MasterDataOverrideStore.AtomicChange
+            {
+                RecordType = table.RecordType,
+                Key = key,
+                Value = next,
+                ExpectedValue = expectedOverride,
+            };
+            var target = new MasterDataPatchPlanTarget
+            {
+                Table = table,
+                KeyText = keyText,
+                Key = key,
+                Original = original,
+                ExpectedOverride = expectedOverride,
+                NextOverride = next,
+                HadOverride = actualOverride,
+                WasDeleted = actualDeleted,
+                FieldCount = appliedFields,
+                Kind = kind,
+                Change = change,
+            };
+            plan.Targets.Add(target);
+            plan.Changes.Add(change);
+            plan.FieldCount += appliedFields;
+        }
+
+        static int ApplyFields(
+            MasterDataPatchPlan plan,
+            MasterMemoryTableDescriptor table,
+            MasterDataPatchRecord patch,
+            string keyText,
+            object original,
+            object current,
+            object next,
+            bool added,
+            bool requireOriginalPreconditions,
+            bool allowPartial)
+        {
+            var applied = 0;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var change in patch.Changes)
+            {
+                if (!seen.Add(change.Field))
+                {
+                    if (allowPartial)
+                        plan.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' occurs more than once, later value skipped.");
+                    else
+                        Error(plan, table.TableName, keyText, change.Field, "DUPLICATE_FIELD", "Field occurs more than once.");
+                    continue;
+                }
+
+                if (!table.TypeDescriptor.TryGetField(change.Field, out var field))
+                {
+                    if (allowPartial)
+                        plan.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' does not exist, skipped.");
+                    else
+                        Error(plan, table.TableName, keyText, change.Field, "FIELD_NOT_EDITABLE", "Field is unknown or not editable.");
+                    continue;
+                }
+
+                var writable = added ? !field.IsPrimaryKey && field.HasSetter : !field.IsKey && field.CanEdit;
+                if (!writable)
+                {
+                    if (allowPartial)
+                    {
+                        if (added)
+                            plan.Warnings.Add($"{table.TableName} {keyText} (added): field '{change.Field}' does not exist or can not be written, skipped.");
+                        else
+                            plan.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' is read-only, skipped.");
+                    }
+                    else
+                        Error(plan, table.TableName, keyText, change.Field, "FIELD_NOT_EDITABLE", "Field is unknown or not editable.");
+                    continue;
+                }
+
+                try
+                {
+                    var before = added ? field.GetValue(next) : field.GetValue(current);
+                    if (!added && requireOriginalPreconditions)
+                    {
+                        if (!change.HasOriginal)
+                        {
+                            Error(plan, table.TableName, keyText, change.Field, "PRECONDITION_REQUIRED",
+                                "Field needs an original value.");
+                            continue;
+                        }
+                        var baseline = field.GetValue(original);
+                        var expected = MasterDataValueUtility.FromJson(change.Original, field.FieldType, baseline);
+                        if (!MasterDataValueUtility.AreEqual(expected, baseline))
+                        {
+                            Error(plan, table.TableName, keyText, change.Field, "ORIGINAL_MISMATCH",
+                                "Master-data original differs from patch original.");
+                            continue;
+                        }
+                    }
+                    else if (!added && change.HasOriginal)
+                    {
+                        var baseline = field.GetValue(original);
+                        if (allowPartial)
+                        {
+                            try
+                            {
+                                var expected = MasterDataValueUtility.FromJson(change.Original, field.FieldType, baseline);
+                                if (!MasterDataValueUtility.AreEqual(expected, baseline))
+                                    plan.Warnings.Add(
+                                        $"{table.TableName} {keyText}.{field.Name}: original value changed in master data.");
+                            }
+                            catch (Exception)
+                            {
+                            }
+                        }
+                        else
+                        {
+                            var expected = MasterDataValueUtility.FromJson(change.Original, field.FieldType, baseline);
+                            if (!MasterDataValueUtility.AreEqual(expected, baseline))
+                                plan.Warnings.Add(
+                                    $"{table.TableName} {keyText}.{field.Name}: original value changed in master data.");
+                        }
+                    }
+
+                    var value = MasterDataValueUtility.FromJson(change.Value, field.FieldType, before);
+                    if (added) field.SetValueUnchecked(next, value);
+                    else field.SetValue(next, value);
+                    applied++;
+                }
+                catch (Exception e)
+                {
+                    if (allowPartial)
+                    {
+                        var suffix = added ? " (added)" : "";
+                        plan.Warnings.Add(
+                            $"{table.TableName} {keyText}{suffix}: field '{change.Field}' has an invalid value ({(e.InnerException ?? e).Message}), skipped.");
+                    }
+                    else
+                        Error(plan, table.TableName, keyText, change.Field, "INVALID_VALUE", (e.InnerException ?? e).Message);
+                }
+            }
+            return applied;
+        }
+
+        static void Error(MasterDataPatchPlan plan, string table, string key, string field, string code, string message)
+        {
+            plan.Errors.Add(new MasterDataPatchPlanError
+            {
+                TableName = table,
+                Key = key,
+                Field = field,
+                Code = code,
+                Message = message,
+            });
+        }
+    }
+}

@@ -18,7 +18,7 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     public static class MasterMemoryDebugRuntime
     {
-        static MasterDataOverrideStore s_store = CreateStore();
+        static MasterMemoryDebugSession s_session = CreateSession();
 
         /// <summary>Raised after overrides were applied, reset or loaded from a patch.</summary>
         public static event Action OverridesChanged;
@@ -27,11 +27,14 @@ namespace Nesh.MasterMemoryDebugger
         internal static event Action<MasterDataOverrideKey, object, object> EntryChanged;
 
         /// <summary>The override store used by the debugger.</summary>
-        public static IMasterDataOverrideStore Store => s_store;
+        public static IMasterDataOverrideStore Store => s_session.Store;
+
+        /// <summary>The active debugger service lifetime. Static APIs delegate to this session.</summary>
+        public static MasterMemoryDebugSession Session => s_session;
 
         public static bool IsEnabled => MasterMemoryDebugBuild.IsEnabled;
 
-        public static int OverrideCount => MasterMemoryDebugBuild.IsEnabled ? s_store.Count : 0;
+        public static int OverrideCount => MasterMemoryDebugBuild.IsEnabled ? s_session.OverrideStore.Count : 0;
 
         public static bool TryGetOverride<TRecord, TKey>(TKey key, out TRecord value)
         {
@@ -40,7 +43,7 @@ namespace Nesh.MasterMemoryDebugger
                 value = default;
                 return false;
             }
-            return s_store.TryGet(key, out value);
+            return s_session.OverrideStore.TryGet(key, out value);
         }
 
         /// <summary>Returns the override when present, otherwise <paramref name="fallback"/>(key).</summary>
@@ -57,19 +60,19 @@ namespace Nesh.MasterMemoryDebugger
         public static void SetOverride<TRecord, TKey>(TKey key, TRecord value)
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return;
-            s_store.Set(key, value);
+            s_session.OverrideStore.Set(key, value);
         }
 
         public static bool RemoveOverride<TRecord, TKey>(TKey key)
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return false;
-            return s_store.Remove<TRecord, TKey>(key);
+            return s_session.OverrideStore.Remove<TRecord, TKey>(key);
         }
 
         public static bool IsOverridden<TRecord, TKey>(TKey key)
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return false;
-            return s_store.IsOverridden<TRecord, TKey>(key);
+            return s_session.OverrideStore.IsOverridden<TRecord, TKey>(key);
         }
 
         /// <summary>
@@ -80,13 +83,13 @@ namespace Nesh.MasterMemoryDebugger
         public static bool IsDeleted<TRecord, TKey>(TKey key)
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return false;
-            return s_store.IsDeleted<TRecord, TKey>(key);
+            return s_session.OverrideStore.IsDeleted<TRecord, TKey>(key);
         }
 
         public static void ClearAllOverrides()
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return;
-            s_store.Clear();
+            s_session.OverrideStore.Clear();
         }
 
         /// <summary>
@@ -96,7 +99,7 @@ namespace Nesh.MasterMemoryDebugger
         public static TRecord[] GetOverrides<TRecord>()
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return Array.Empty<TRecord>();
-            var entries = s_store.GetEntries(typeof(TRecord));
+            var entries = s_session.OverrideStore.GetEntries(typeof(TRecord));
             var result = new List<TRecord>(entries.Count);
             foreach (var entry in entries)
             {
@@ -110,7 +113,7 @@ namespace Nesh.MasterMemoryDebugger
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return Array.Empty<TKey>();
             var result = new List<TKey>();
-            foreach (var entry in s_store.GetEntries(typeof(TRecord)))
+            foreach (var entry in s_session.OverrideStore.GetEntries(typeof(TRecord)))
             {
                 if (entry.IsDeleted) result.Add((TKey)entry.Key.PrimaryKey);
             }
@@ -121,19 +124,20 @@ namespace Nesh.MasterMemoryDebugger
         public static List<MasterDataOverrideEntry> GetAllOverrides()
         {
             if (!MasterMemoryDebugBuild.IsEnabled) return new List<MasterDataOverrideEntry>();
-            return s_store.GetEntries();
+            return s_session.OverrideStore.GetEntries();
         }
 
         /// <summary>Groups several changes so that <see cref="OverridesChanged"/> is raised only once.</summary>
-        public static IDisposable BeginBatch() => s_store.BeginBatch();
+        public static IDisposable BeginBatch() => s_session.OverrideStore.BeginBatch();
 
-        static MasterDataOverrideStore CreateStore()
+        static MasterMemoryDebugSession CreateSession()
         {
-            var store = new MasterDataOverrideStore();
+            var session = MasterMemoryDebugSession.CreateDefault();
+            var store = session.OverrideStore;
             store.EntryChanged += MasterMemoryDebugHistory.OnEntryChanged;
             store.EntryChanged += (key, before, after) => EntryChanged?.Invoke(key, before, after);
             store.Changed += RaiseOverridesChanged;
-            return store;
+            return session;
         }
 
         static void RaiseOverridesChanged()
@@ -153,7 +157,7 @@ namespace Nesh.MasterMemoryDebugger
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
         {
-            s_store = CreateStore();
+            s_session = CreateSession();
             OverridesChanged = null;
             MasterMemoryDebugHistory.Clear();
         }

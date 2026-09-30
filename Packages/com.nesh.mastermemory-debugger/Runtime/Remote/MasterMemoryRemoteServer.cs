@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -13,22 +14,48 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     internal sealed class MasterMemoryRemoteServer : MasterMemoryRemotePeer
     {
-        const int MaxOperationResults = 4096;
+        const int MaxReplayResults = 4096;
+        internal static double HelloTimeoutSeconds = 10.0;
+
         readonly TcpListener listener;
         readonly Thread acceptThread;
         readonly ConcurrentQueue<TcpClient> accepted = new ConcurrentQueue<TcpClient>();
         readonly List<MasterMemoryRemoteConnection> closing = new List<MasterMemoryRemoteConnection>();
+        readonly Queue<MasterMemoryRemoteProtocol.TableRequest> tableRequests =
+            new Queue<MasterMemoryRemoteProtocol.TableRequest>();
         MasterMemoryRemoteConnection waitingForHello;
+        long waitingForHelloStarted;
+        TableTransfer tableTransfer;
         volatile bool stopped;
         bool validationChanged;
         bool operationsChanged;
         readonly string serverEpoch = Guid.NewGuid().ToString("N");
-        readonly Dictionary<string, MasterMemoryRemoteProtocol.OperationResult> operationResults =
-            new Dictionary<string, MasterMemoryRemoteProtocol.OperationResult>(StringComparer.Ordinal);
-        readonly Dictionary<string, Tuple<string, MasterMemoryRemoteProtocol.PatchResponse>> patchResults =
-            new Dictionary<string, Tuple<string, MasterMemoryRemoteProtocol.PatchResponse>>(StringComparer.Ordinal);        readonly HashSet<Type> checkedTypes = new HashSet<Type>();
+        readonly MasterMemoryReplayCache<MasterMemoryRemoteProtocol.OperationResult> operationResults =
+            new MasterMemoryReplayCache<MasterMemoryRemoteProtocol.OperationResult>(MaxReplayResults);
+        readonly MasterMemoryReplayCache<Tuple<string, MasterMemoryRemoteProtocol.PatchResponse>> patchResults =
+            new MasterMemoryReplayCache<Tuple<string, MasterMemoryRemoteProtocol.PatchResponse>>(MaxReplayResults);
+        readonly HashSet<Type> checkedTypes = new HashSet<Type>();
         readonly MasterMemoryRemoteDiscovery.Responder discovery;
         string lastError;
+
+        sealed class TableTransfer : IDisposable
+        {
+            public MasterMemoryRemoteProtocol.TableRequest Request;
+            public MasterMemoryTableDescriptor Table;
+            public IEnumerator<object> Records;
+            public IEnumerator<MasterDataOverrideEntry> Overrides;
+            public bool RecordsDone;
+            public bool OverridesDone;
+            public int ChunkIndex;
+            public byte[] PendingFrame;
+            public bool PendingIsLast;
+
+            public void Dispose()
+            {
+                Records?.Dispose();
+                Overrides?.Dispose();
+            }
+        }
 
         public MasterMemoryRemoteServer(int port, string pairingCode)
         {
@@ -88,6 +115,9 @@ namespace Nesh.MasterMemoryDebugger
                     StopSyncing();
                     Connection.Dispose();
                     Connection = null;
+                    tableRequests.Clear();
+                    tableTransfer?.Dispose();
+                    tableTransfer = null;
                     RaiseChanged();
                 }
                 else
@@ -95,6 +125,7 @@ namespace Nesh.MasterMemoryDebugger
                     Flush();
                     if (validationChanged) SendValidationState();
                     if (operationsChanged) SendOperations();
+                    PumpTableTransfer();
                 }
             }
             closing.RemoveAll(x => x.IsClosed);
@@ -118,6 +149,9 @@ namespace Nesh.MasterMemoryDebugger
             waitingForHello?.Dispose();
             foreach (var connection in closing) connection.Dispose();
             while (accepted.TryDequeue(out var client)) client.Close();
+            tableRequests.Clear();
+            tableTransfer?.Dispose();
+            tableTransfer = null;
             base.Dispose();
         }
 
@@ -148,11 +182,19 @@ namespace Nesh.MasterMemoryDebugger
             // a new attempt replaces one that never sent its code
             if (waitingForHello != null) Reject(waitingForHello, "Replaced by a newer connection.");
             waitingForHello = connection;
+            waitingForHelloStarted = Stopwatch.GetTimestamp();
         }
 
         void ReceiveHello()
         {
             var connection = waitingForHello;
+            var elapsed = (Stopwatch.GetTimestamp() - waitingForHelloStarted) / (double)Stopwatch.Frequency;
+            if (elapsed >= HelloTimeoutSeconds)
+            {
+                waitingForHello = null;
+                Reject(connection, "Timed out waiting for the pairing code.");
+                return;
+            }
             if (connection.IsClosed)
             {
                 waitingForHello = null;
@@ -224,14 +266,172 @@ namespace Nesh.MasterMemoryDebugger
                     case MasterMemoryRemoteProtocol.MessageType.PatchPlanRequest:
                     case MasterMemoryRemoteProtocol.MessageType.PatchApplyRequest:
                         HandlePatch(MasterMemoryRemoteProtocol.GetType(payload), payload);
-                        break;                    case MasterMemoryRemoteProtocol.MessageType.OperationRequest:
+                        break;
+                    case MasterMemoryRemoteProtocol.MessageType.OperationRequest:
                         HandleOperation(MasterMemoryRemoteProtocol.DecodeOperationRequest(payload));
+                        break;
+                    case MasterMemoryRemoteProtocol.MessageType.TableRequest:
+                        HandleTableRequest(MasterMemoryRemoteProtocol.DecodeTableRequest(payload));
                         break;
                 }
             }
             catch (Exception e)
             {
                 MasterMemoryDebugLog.Warning("Remote: invalid message from the tool: " + e.Message);
+            }
+        }
+
+        void HandleTableRequest(MasterMemoryRemoteProtocol.TableRequest request)
+        {
+            if (request == null || string.IsNullOrEmpty(request.RequestId) || request.RequestId.Length > 64
+                || string.IsNullOrEmpty(request.TableName) || request.TableName.Length > 256)
+                return;
+            if (tableRequests.Count >= 32)
+            {
+                Connection?.Send(MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableChunk
+                {
+                    RequestId = request.RequestId,
+                    TableName = request.TableName,
+                    IsLast = true,
+                    Error = "Too many table requests are pending.",
+                }));
+                return;
+            }
+            tableRequests.Enqueue(request);
+        }
+
+        void PumpTableTransfer()
+        {
+            if (Connection == null || Connection.IsClosed) return;
+
+            if (tableTransfer == null)
+            {
+                if (tableRequests.Count == 0) return;
+                var request = tableRequests.Dequeue();
+                if (!MasterMemoryDebugRegistry.TryGetTable(request.TableName, out var table))
+                {
+                    Connection.TrySend(MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableChunk
+                    {
+                        RequestId = request.RequestId,
+                        TableName = request.TableName,
+                        IsLast = true,
+                        Error = "Table is not registered.",
+                    }));
+                    return;
+                }
+                tableTransfer = new TableTransfer
+                {
+                    Request = request,
+                    Table = table,
+                    Records = table.GetAllRecords().GetEnumerator(),
+                    Overrides = MasterMemoryDebugRuntime.Store.GetEntries(table.RecordType).GetEnumerator(),
+                };
+            }
+
+            var transfer = tableTransfer;
+            if (transfer.PendingFrame != null)
+            {
+                if (!Connection.TrySend(transfer.PendingFrame)) return;
+                transfer.PendingFrame = null;
+                if (transfer.PendingIsLast)
+                {
+                    transfer.Dispose();
+                    tableTransfer = null;
+                }
+                return;
+            }
+
+            var chunk = new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = transfer.Request.RequestId,
+                TableName = transfer.Table.TableName,
+                ChunkIndex = transfer.ChunkIndex,
+                DisplayNames = transfer.Table.HasCustomDisplayName ? new List<string>() : null,
+            };
+
+            var bytes = 0;
+            try
+            {
+                while (!transfer.RecordsDone
+                    && chunk.Records.Count < 512
+                    && bytes < MasterMemoryRemoteProtocol.TargetTableChunkBytes)
+                {
+                    if (!transfer.Records.MoveNext())
+                    {
+                        transfer.RecordsDone = true;
+                        break;
+                    }
+                    var record = transfer.Records.Current;
+                    if (record == null) continue;
+                    var serialized = Serialize(transfer.Table.RecordType, record);
+                    if (serialized.Length > MasterMemoryRemoteProtocol.MaxFrameBytes - 4096)
+                        throw new InvalidOperationException("One record is too large for the remote protocol frame limit.");
+                    chunk.Records.Add(serialized);
+                    bytes += serialized.Length + 8;
+                    if (chunk.DisplayNames != null)
+                    {
+                        var name = transfer.Table.GetDisplayName(record) ?? string.Empty;
+                        chunk.DisplayNames.Add(name);
+                        bytes += name.Length * 2;
+                    }
+                }
+
+                while (transfer.RecordsDone
+                    && !transfer.OverridesDone
+                    && chunk.Overrides.Count < 512
+                    && bytes < MasterMemoryRemoteProtocol.TargetTableChunkBytes)
+                {
+                    if (!transfer.Overrides.MoveNext())
+                    {
+                        transfer.OverridesDone = true;
+                        break;
+                    }
+                    var entry = transfer.Overrides.Current;
+                    object record;
+                    try
+                    {
+                        record = MasterMemoryRemotePeer.RecordWithKey(transfer.Table, entry.Key, entry.Value);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        continue;
+                    }
+                    var serialized = Serialize(transfer.Table.RecordType, record);
+                    if (serialized.Length > MasterMemoryRemoteProtocol.MaxFrameBytes - 4096)
+                        throw new InvalidOperationException("One override is too large for the remote protocol frame limit.");
+                    chunk.Overrides.Add(new MasterMemoryRemoteProtocol.Change
+                    {
+                        Kind = entry.IsDeleted
+                            ? MasterMemoryRemoteProtocol.ChangeKind.Delete
+                            : MasterMemoryRemoteProtocol.ChangeKind.Set,
+                        TableName = transfer.Table.TableName,
+                        Record = serialized,
+                    });
+                    bytes += serialized.Length + 32;
+                }
+
+                chunk.IsLast = transfer.RecordsDone && transfer.OverridesDone;
+            }
+            catch (Exception e)
+            {
+                chunk.Records.Clear();
+                chunk.DisplayNames?.Clear();
+                chunk.Overrides.Clear();
+                chunk.IsLast = true;
+                chunk.Error = (e.InnerException ?? e).Message;
+            }
+
+            transfer.PendingFrame = MasterMemoryRemoteProtocol.Encode(chunk);
+            transfer.PendingIsLast = chunk.IsLast;
+            transfer.ChunkIndex++;
+            if (Connection.TrySend(transfer.PendingFrame))
+            {
+                transfer.PendingFrame = null;
+                if (transfer.PendingIsLast)
+                {
+                    transfer.Dispose();
+                    tableTransfer = null;
+                }
             }
         }
 
@@ -255,18 +455,8 @@ namespace Nesh.MasterMemoryDebugger
             if (string.IsNullOrEmpty(request.RequestId) || request.RequestId.Length > 64) return;
             if (!operationResults.TryGetValue(request.RequestId, out var result))
             {
-                if (operationResults.Count >= MaxOperationResults)
-                    result = new MasterMemoryRemoteProtocol.OperationResult
-                    {
-                        RequestId = request.RequestId,
-                        Status = (byte)MasterMemoryRemoteOperationStatus.Busy,
-                        Message = "Remote operation limit reached; restart the Remote server to continue.",
-                    };
-                else
-                {
-                    result = MasterMemoryDebugRemote.ExecuteOperation(request);
-                    operationResults.Add(request.RequestId, result);
-                }
+                result = MasterMemoryDebugRemote.ExecuteOperation(request);
+                operationResults.Add(request.RequestId, result);
             }
             Connection?.Send(MasterMemoryRemoteProtocol.Encode(result));
         }
@@ -295,15 +485,6 @@ namespace Nesh.MasterMemoryDebugger
                         MasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
                     };
                 }
-                else if (patchResults.Count >= MaxOperationResults)
-                    response = new MasterMemoryRemoteProtocol.PatchResponse
-                    {
-                        RequestId = request.RequestId,
-                        Status = MasterMemoryRemoteProtocol.PatchStatus.Failed,
-                        Message = "Patch request limit reached; restart the Remote server.",
-                        ServerEpoch = serverEpoch,
-                        MasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
-                    };
                 else
                 {
                     var plan = MasterMemoryRemotePatch.Build(request, serverEpoch);
@@ -403,6 +584,7 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         /// <summary>Every registered table with its original records, and the current overrides.</summary>
+        /// <summary>Metadata manifest plus current overrides. Table records are requested lazily in protocol v6.</summary>
         internal static MasterMemoryRemoteProtocol.Welcome CreateWelcome()
         {
             var welcome = new MasterMemoryRemoteProtocol.Welcome
@@ -410,49 +592,31 @@ namespace Nesh.MasterMemoryDebugger
                 Version = MasterMemoryRemoteProtocol.Version,
                 Operations = MasterMemoryDebugRemote.SnapshotOperations(),
                 MasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
+                SchemaHash = MasterMemoryDebugRegistry.GetSchemaHash(),
                 LabelsTsv = MasterMemoryDebugLocalization.ExportTsv(),
             };
             foreach (var group in MasterMemoryDebugRegistry.GetGroupedTables())
             {
                 foreach (var table in group.Tables)
                 {
-                    var message = new MasterMemoryRemoteProtocol.Table
+                    var count = 0;
+                    foreach (var record in table.GetAllRecords())
+                    {
+                        if (record != null) count++;
+                    }
+                    welcome.Tables.Add(new MasterMemoryRemoteProtocol.Table
                     {
                         TableName = table.TableName,
                         MemoryTableName = table.MemoryTableName,
                         RecordType = TypeName(table.RecordType),
                         KeyType = TypeName(table.KeyType),
                         Group = MasterMemoryDebugRegistry.GetTableGroup(table),
-                        DisplayNames = table.HasCustomDisplayName ? new List<string>() : null,
-                    };
-                    foreach (var record in table.GetAllRecords())
-                    {
-                        if (record == null) continue;
-                        message.Records.Add(Serialize(table.RecordType, record));
-                        message.DisplayNames?.Add(table.GetDisplayName(record));
-                    }
-                    welcome.Tables.Add(message);
+                        RecordCount = count,
+                        HasCustomDisplayName = table.HasCustomDisplayName,
+                    });
                 }
             }
-            foreach (var entry in MasterMemoryDebugRuntime.GetAllOverrides())
-            {
-                if (!MasterMemoryDebugRegistry.TryGetTable(entry.Key.RecordType, out var table)) continue;
-                object record;
-                try
-                {
-                    record = MasterMemoryRemotePeer.RecordWithKey(table, entry.Key, entry.Value);
-                }
-                catch (InvalidOperationException)
-                {
-                    continue;
-                }
-                welcome.Overrides.Add(new MasterMemoryRemoteProtocol.Change
-                {
-                    Kind = entry.IsDeleted ? MasterMemoryRemoteProtocol.ChangeKind.Delete : MasterMemoryRemoteProtocol.ChangeKind.Set,
-                    TableName = table.TableName,
-                    Record = Serialize(table.RecordType, record),
-                });
-            }
+
             return welcome;
         }
 

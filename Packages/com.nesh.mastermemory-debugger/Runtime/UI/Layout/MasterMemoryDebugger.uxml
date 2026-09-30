@@ -11,6 +11,7 @@
                     <ui:Button name="mm-tab-patches" text="Patches" tooltip="Save, apply, merge, import and export patches" class="mm-debugger__tab" />
                     <ui:Button name="mm-tab-find" text="Find" tooltip="Find a value in every table" class="mm-debugger__tab" />
                     <ui:Button name="mm-tab-validation" text="Validation" tooltip="MasterMemory Validate() failures of the rebuilt database" class="mm-debugger__tab" />
+                    <ui:Button name="mm-tab-diagnostics" text="Diagnostics" tooltip="Schema, remote protocol and recent operation timings" class="mm-debugger__tab" />
                 </ui:VisualElement>
                 <ui:VisualElement class="mm-debugger__spacer" />
                 <ui:Label name="mm-master-version" class="mm-debugger__header-info" />
@@ -40,6 +41,7 @@
                         <ui:VisualElement name="mm-search-toolbar" class="mm-debugger__search-toolbar">
                             <ui:TextField name="mm-search" class="mm-debugger__search" />
                             <ui:Toggle name="mm-modified-only" label="Modified Only" class="mm-debugger__modified-only" />
+                            <ui:Button name="mm-saved-views" text="Views…" tooltip="Save or restore table, query, sort and column layout" class="mm-debugger__button" />
                             <ui:Button name="mm-columns" text="Columns ▾" tooltip="Show, hide and freeze columns" class="mm-debugger__button mm-debugger__columns-button" />
                             <ui:Button name="mm-new-record" text="+ New…" tooltip="Add a record with default values (it exists as an override: a rebuilt database and TryGetOverride see it)" class="mm-debugger__button" />
                             <ui:Button name="mm-batch-edit" text="Batch Edit…" tooltip="Set, add to or multiply a field of every record that matches the search (one undo step)" class="mm-debugger__button" />
@@ -89,6 +91,9 @@
 
             <!-- built by MasterValidationController -->
             <ui:VisualElement name="mm-validation-panel" class="mm-debugger__panel mm-debugger__changes-panel" />
+
+            <!-- built by MasterDiagnosticsController -->
+            <ui:VisualElement name="mm-diagnostics-panel" class="mm-debugger__panel mm-debugger__changes-panel" />
 
             <ui:ScrollView name="mm-log" mode="Vertical" class="mm-debugger__log" />
             <ui:VisualElement class="mm-debugger__status-row">
