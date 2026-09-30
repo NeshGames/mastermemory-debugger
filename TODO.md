@@ -12,7 +12,8 @@ Released changes are in [CHANGELOG.md](Packages/com.nesh.mastermemory-debugger/C
 - [x] Integrate local v0.15.0 converters with architecture hardening; full harness passes (239 runtime + 7 CLI tests).
 - [x] Unity 6000.6 asmdef import/compile and automated tests (7 EditMode + 244 PlayMode).
 - [ ] Complete the visual/build smoke checklist in `Tools/Harness/SMOKE_TEST.md`.
-- [ ] Push/review the combined integration branch and run remote CI before release.
+- [x] Push the combined integration branch and update Draft PR #19.
+- [ ] Review Draft PR #19 and complete the manual smoke checks before merging/releasing; remote CI must pass on its current head.
 - [x] Run the required pull-request CI against the latest `main` (Draft PR #19).
 
 ## Device verification

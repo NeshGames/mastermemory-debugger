@@ -46,3 +46,10 @@ Thumbs.db
 # Debugger assets copied for a Development Build (deleted after the build)
 /Assets/MasterMemoryDebuggerBuild/
 /Assets/MasterMemoryDebuggerBuild.meta
+
+# Remote CLI builds and generated test reports
+/Tools/RemoteCli/bin/
+/Tools/RemoteCli/obj/
+/Tools/RemoteCli.Tests/bin/
+/Tools/RemoteCli.Tests/obj/
+/Tools/Harness/**/TestResults/
