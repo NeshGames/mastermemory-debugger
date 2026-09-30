@@ -7,8 +7,10 @@ finish the whole item, verify it, then make one commit.
 
 The `codex/integrate-v015-hardening` branch integrates `828e047` (v0.15.0 custom value converters)
 and `46e068b` (the latest architecture-hardening / Draft PR #19 head). Both histories are retained.
-The combined integration is published on `codex/integrate-v015-hardening` and the existing Draft PR #19
-source branch `codex/architecture-hardening-v1`. It is not merged into remote main.
+The combined integration is published on `codex/integrate-v015-hardening` and PR #19
+source branch `codex/architecture-hardening-v1`. The owner requested publication of v0.15.0 on 2026-09-30;
+PR #19 and the Release workflow track main integration and publication. Full visual/build and real-device
+checks remain outstanding and are not represented as passing release evidence.
 
 - [x] Resolve documentation and test-reset conflicts without losing converters or Saved Views state cleanup.
 - [x] Keep Core converters independent of UI; custom inspector drawers explicitly require the UI assembly.
@@ -21,7 +23,7 @@ source branch `codex/architecture-hardening-v1`. It is not merged into remote ma
 - [x] Unity 6000.6.0f1 package import/compile: 7 EditMode and 244 PlayMode tests pass (including debugger UI tests).
 - [x] Update the v0.15.0 release notes with assembly migration, protocol v6 and the converter integration.
 - [ ] Full visual/build smoke checklist in `Tools/Harness/SMOKE_TEST.md` and real-device checks below.
-- Remote CI for the combined integration is tracked by the current checks on Draft PR #19; use its head SHA
+- Remote CI for the combined integration is tracked by the current checks on PR #19; use its head SHA
   when matching a check result to the reviewed code.
 
 Unity tests ran in an isolated worktree with Unity-resolved Input System 1.20.0 and Test Framework 1.8.0.

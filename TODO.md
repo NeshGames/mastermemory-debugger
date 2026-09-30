@@ -13,7 +13,8 @@ Released changes are in [CHANGELOG.md](Packages/com.nesh.mastermemory-debugger/C
 - [x] Unity 6000.6 asmdef import/compile and automated tests (7 EditMode + 244 PlayMode).
 - [ ] Complete the visual/build smoke checklist in `Tools/Harness/SMOKE_TEST.md`.
 - [x] Push the combined integration branch and update Draft PR #19.
-- [ ] Review Draft PR #19 and complete the manual smoke checks before merging/releasing; remote CI must pass on its current head.
+- Release v0.15.0 through PR #19 with passing checks on its current head (owner requested publication on 2026-09-30).
+  Full visual/build and real-device smoke checks below remain outstanding; publication does not mark them complete.
 - [x] Run the required pull-request CI against the latest `main` (Draft PR #19).
 
 ## Device verification
