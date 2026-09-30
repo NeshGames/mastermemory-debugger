@@ -1,19 +1,34 @@
 # Test harness
 
-Builds the package and runs its tests with the .NET SDK, without Unity. `Stubs/` holds compile-only stand-ins for
-the Unity APIs the package uses (signatures only; UI Toolkit behavior is not emulated), and the real MasterMemory
-NuGet package (with its source generator) compiles the test tables.
+Builds the package and runs its tests with the .NET SDK, without Unity. The harness mirrors the Unity asmdef topology
+instead of compiling all Runtime code into one assembly:
+
+```
+Core <- Remote <- UI <- InputSystem (optional)
+```
+
+`Stubs/` contains compile-only UnityEngine/UI Toolkit APIs. `InputSystemStubs/` is a separate fake
+`Unity.InputSystem` assembly so the no-InputSystem consumer test genuinely compiles without that dependency.
+The real MasterMemory NuGet package (with its source generator) compiles the test tables.
 
 ```sh
 Tools/Harness/run.sh
 ```
 
-- Builds `Runtime/` in each scripting define configuration (no defines, Editor, Input System, legacy input,
-  WebGL, `MMDEBUGGER_DISABLE`), then `Editor/`, the sample and the editor tests.
-- Runs the tests of `Tests/Runtime` (NUnit). `RuntimeDebuggerTests` (PlayMode, needs a panel) and the editor tests
-  are only compiled; run them in the Unity Test Runner.
+The script:
 
-Requires the .NET 8 SDK. CI (`.github/workflows/ci.yml`) runs the same script on every pull request.
+- Builds Core / Remote / UI separately under no defines, Editor, legacy input, WebGL and `MMDEBUGGER_DISABLE`.
+- Builds the optional InputSystem adapter only with `MMDEBUGGER_INPUT_SYSTEM;ENABLE_INPUT_SYSTEM`.
+- Compiles a consumer with no Input System assembly/reference.
+- Compiles a second consumer with the Input System adapter enabled.
+- Builds Editor, the Basic Example sample, editor tests and the Remote CLI.
+- Runs `Tests/Runtime` (NUnit), including deterministic randomized robustness checks for Patch JSON, query parsing and remote framing. `RuntimeDebuggerTests` and editor tests are compile-only here; run them in Unity.
 
-When the package starts using a Unity API the stubs do not have, the build fails with a missing member error: add the
-member to `Stubs/` with the same signature as Unity's.
+Requires the .NET 8 SDK. CI runs the same script on every pull request, checks changed-file whitespace with `git diff --check`, and uploads Cobertura coverage artifacts for the harness and Remote CLI tests. Coverage is observability only; there is no arbitrary percentage gate.
+
+When the package starts using a Unity API the stubs do not have, the build fails with a missing member error. Add the
+member with Unity's exact signature. Input System API additions belong in `InputSystemStubs/`, not `Stubs/`.
+
+The large-table test keeps debugger operations at 50,000 records with the same 3-second limit.
+MasterMemory validation uses 128 representative records and asserts no failures: its per-record `Exists`
+expression compilation is much slower under Unity Mono, independently of debugger overhead.

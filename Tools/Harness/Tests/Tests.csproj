@@ -5,16 +5,22 @@
     <AssemblyName>Nesh.MasterMemoryDebugger.Tests</AssemblyName>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <IsPackable>false</IsPackable>
-    <DefineConstants>UNITY_EDITOR</DefineConstants>
+    <DefineConstants>UNITY_EDITOR;$(ExtraDefines)</DefineConstants>
     <NoWarn>CS8632</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(PackageRoot)Tests/Runtime/*.cs" Exclude="$(PackageRoot)Tests/Runtime/RuntimeDebuggerTests.cs" />
-    <ProjectReference Include="../Runtime/Runtime.csproj" />
+    <ProjectReference Include="../Core/Core.csproj" />
+    <ProjectReference Include="../Remote/Remote.csproj" />
+    <ProjectReference Include="../UI/UI.csproj" />
     <ProjectReference Include="../Stubs/Stubs.csproj" />
     <PackageReference Include="MasterMemory" Version="3.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 </Project>

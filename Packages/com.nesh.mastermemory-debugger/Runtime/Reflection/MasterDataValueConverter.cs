@@ -13,7 +13,7 @@ namespace Nesh.MasterMemoryDebugger
     /// <see cref="MasterDataValueConverter{T}"/> rather than implementing this directly.
     /// <para>
     /// Optional capabilities, implemented by the same object: <see cref="IComparer"/> orders the values (sorting a column,
-    /// <c>&gt; &gt;= &lt; &lt;=</c> in queries) and <see cref="IMasterDataValueDrawer"/> replaces the default text editor.
+    /// <c>&gt; &gt;= &lt; &lt;=</c> in queries) and <c>IMasterDataValueDrawer</c> (in the UI assembly) replaces the default text editor.
     /// Equality is the type's own <see cref="object.Equals(object)"/>.
     /// </para>
     /// </summary>

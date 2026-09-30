@@ -28,16 +28,6 @@ namespace Nesh.MasterMemoryDebugger
         /// </summary>
         internal static double SlowValidateSeconds = 1.0;
 
-        sealed class BuilderInfo
-        {
-            public MethodInfo ToImmutableBuilder;
-            public MethodInfo Build;
-            public MethodInfo Validate;
-            public Dictionary<Type, MethodInfo> Diff = new Dictionary<Type, MethodInfo>();
-            public Dictionary<Type, MethodInfo> Remove = new Dictionary<Type, MethodInfo>();
-        }
-
-        static readonly Dictionary<Type, BuilderInfo> s_builders = new Dictionary<Type, BuilderInfo>();
         static readonly HashSet<Type> s_reportedUnsupported = new HashSet<Type>();
 
         /// <summary>
@@ -142,41 +132,8 @@ namespace Nesh.MasterMemoryDebugger
             return failures;
         }
 
-        static BuilderInfo GetInfo(Type databaseType)
-        {
-            if (s_builders.TryGetValue(databaseType, out var info)) return info;
-
-            info = new BuilderInfo
-            {
-                ToImmutableBuilder = databaseType.GetMethod("ToImmutableBuilder", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null),
-                Validate = databaseType.GetMethod("Validate", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null),
-            };
-            if (info.Validate != null && info.Validate.ReturnType != typeof(ValidateResult)) info.Validate = null;
-
-            var builderType = info.ToImmutableBuilder?.ReturnType;
-            if (builderType != null)
-            {
-                info.Build = builderType.GetMethod("Build", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
-                foreach (var method in builderType.GetMethods(BindingFlags.Public | BindingFlags.Instance))
-                {
-                    if (method.Name != "Diff") continue;
-                    var parameters = method.GetParameters();
-                    if (parameters.Length == 1 && parameters[0].ParameterType.IsArray)
-                    {
-                        info.Diff[parameters[0].ParameterType.GetElementType()] = method;
-                    }
-                }
-                // generated per table: RemoveSkillMaster(int[] keys)
-                foreach (var recordType in info.Diff.Keys)
-                {
-                    var remove = builderType.GetMethod("Remove" + recordType.Name, BindingFlags.Public | BindingFlags.Instance);
-                    var parameters = remove?.GetParameters();
-                    if (parameters != null && parameters.Length == 1 && parameters[0].ParameterType.IsArray) info.Remove[recordType] = remove;
-                }
-            }
-            s_builders.Add(databaseType, info);
-            return info;
-        }
+        static MasterMemoryBuilderInfo GetInfo(Type databaseType) =>
+            MasterMemoryDebugRuntime.Session.MasterMemoryAdapter.GetBuilderInfo(databaseType);
 
         sealed class AutoRebuilder<TDatabase> : IDisposable, MasterMemoryDebugValidation.ISource where TDatabase : MemoryDatabaseBase
         {

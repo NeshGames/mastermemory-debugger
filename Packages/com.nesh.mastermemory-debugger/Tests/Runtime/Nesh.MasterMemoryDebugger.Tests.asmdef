@@ -2,7 +2,9 @@
     "name": "Nesh.MasterMemoryDebugger.Tests",
     "rootNamespace": "Nesh.MasterMemoryDebugger.Tests",
     "references": [
-        "Nesh.MasterMemoryDebugger.Runtime",
+        "Nesh.MasterMemoryDebugger.Core",
+        "Nesh.MasterMemoryDebugger.Remote",
+        "Nesh.MasterMemoryDebugger.UI",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

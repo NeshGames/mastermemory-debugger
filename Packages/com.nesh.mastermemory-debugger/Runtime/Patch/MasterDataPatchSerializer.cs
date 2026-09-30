@@ -44,6 +44,7 @@ namespace Nesh.MasterMemoryDebugger
             {
                 { "formatVersion", patch.FormatVersion },
                 { "masterVersion", patch.MasterVersion },
+                { "schemaHash", patch.SchemaHash },
                 { "exportedAt", patch.ExportedAt },
                 { "tables", tables },
             };
@@ -59,6 +60,7 @@ namespace Nesh.MasterMemoryDebugger
             {
                 FormatVersion = GetInt(root, "formatVersion"),
                 MasterVersion = GetString(root, "masterVersion"),
+                SchemaHash = GetString(root, "schemaHash"),
                 ExportedAt = GetString(root, "exportedAt"),
             };
 

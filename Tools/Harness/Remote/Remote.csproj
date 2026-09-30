@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>Nesh.MasterMemoryDebugger.Remote</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>$(ExtraDefines)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PackageRoot)Runtime/Remote/**/*.cs" />
+    <ProjectReference Include="../Core/Core.csproj" />
+    <ProjectReference Include="../Stubs/Stubs.csproj" />
+    <PackageReference Include="MessagePack" Version="3.1.10" />
+  </ItemGroup>
+</Project>

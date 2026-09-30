@@ -41,6 +41,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterTablePins.EndTests();
             MasterGridLayout.EndTests();
             MasterSearchHistory.EndTests();
+            MasterSavedViews.EndTests();
             MasterMemoryDebuggerSettings.SetCurrent(previousSettings);
             Object.DestroyImmediate(Settings);
         }
@@ -74,13 +75,14 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugRegistry.ClearTableGroups();
             MasterMemoryDebugRegistry.SetDisplayName<ManualItem>(null);
             MasterDataCloneUtility.ClearProviders();
-            MasterMemoryReferences.ClearCache();
+            MasterMemoryReferences.Reset();
             MasterMemoryDebugValidation.ClearForTests();
             MasterGridLayout.ResetForTests();
             MasterMemoryDebugLocalization.ResetForTests();
             MasterTablePins.ResetForTests();
             MasterSearchHistory.ResetForTests();
             MasterDataValueConverters.ResetForTests();
+            MasterSavedViews.ResetForTests();
         }
     }
 }

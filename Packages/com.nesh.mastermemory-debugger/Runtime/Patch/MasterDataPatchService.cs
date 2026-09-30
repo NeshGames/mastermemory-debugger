@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Runtime.CompilerServices;
 
 namespace Nesh.MasterMemoryDebugger
 {
@@ -10,8 +9,14 @@ namespace Nesh.MasterMemoryDebugger
         Applied,
         /// <summary>The patch was created for a different master version. Nothing was applied; retry with force.</summary>
         VersionMismatch,
+        /// <summary>The patch was created for a different registered schema. Nothing was applied; retry with force.</summary>
+        SchemaMismatch,
         /// <summary>The patch format is not supported. Nothing was applied.</summary>
         UnsupportedFormat,
+        /// <summary>Patch preflight failed. Nothing was applied.</summary>
+        Invalid,
+        /// <summary>The override layer changed after preflight. Nothing was applied.</summary>
+        Conflict,
         /// <summary>The debugger is disabled in this build. Nothing was applied.</summary>
         Disabled,
     }
@@ -21,6 +26,8 @@ namespace Nesh.MasterMemoryDebugger
         public MasterDataPatchApplyStatus Status;
         public string PatchMasterVersion;
         public string CurrentMasterVersion;
+        public string PatchSchemaHash;
+        public string CurrentSchemaHash;
         public int AppliedRecords;
         public int AppliedFields;
         /// <summary>Records added (included in <see cref="AppliedRecords"/>).</summary>
@@ -28,6 +35,7 @@ namespace Nesh.MasterMemoryDebugger
         /// <summary>Records deleted (included in <see cref="AppliedRecords"/>).</summary>
         public int DeletedRecords;
         public readonly List<string> Warnings = new List<string>();
+        public readonly List<string> Errors = new List<string>();
 
         public bool Succeeded => Status == MasterDataPatchApplyStatus.Applied;
     }
@@ -47,6 +55,7 @@ namespace Nesh.MasterMemoryDebugger
             var patch = new MasterDataPatch
             {
                 MasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
+                SchemaHash = MasterMemoryDebugRegistry.GetSchemaHash(),
                 ExportedAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
             };
             if (!MasterMemoryDebugBuild.IsEnabled) return patch;
@@ -186,30 +195,79 @@ namespace Nesh.MasterMemoryDebugger
         /// </summary>
         public static MasterDataJsonObject CreatePrimaryKeyJson(MasterMemoryTableDescriptor table, object record)
         {
-            var json = new MasterDataJsonObject();
-            var keyFields = table.TypeDescriptor.PrimaryKeyFields;
-            if (keyFields.Count > 0)
-            {
-                foreach (var field in keyFields)
-                {
-                    json.Add(field.Name, MasterDataValueUtility.ToJson(field.GetValue(record)));
-                }
-                return json;
-            }
-
-            var key = table.GetPrimaryKey(record);
-            if (key is ITuple tuple)
-            {
-                for (var i = 0; i < tuple.Length; i++) json.Add("Item" + (i + 1), MasterDataValueUtility.ToJson(tuple[i]));
-            }
-            else
-            {
-                json.Add("key", MasterDataValueUtility.ToJson(key));
-            }
-            return json;
+            return MasterDataPatchResolver.CreatePrimaryKeyJson(table, record);
         }
 
-        // ------------------------------------------------------------------ apply
+        // ------------------------------------------------------------------ preview / apply
+
+        /// <summary>
+        /// Builds the same fully validated transaction plan as <see cref="Apply"/> without mutating the override store.
+        /// </summary>
+        public static MasterDataPatchPreviewResult Preview(
+            MasterDataPatch patch,
+            bool force = false,
+            bool replaceExisting = true)
+        {
+            if (patch == null) throw new ArgumentNullException(nameof(patch));
+            var result = new MasterDataPatchPreviewResult
+            {
+                PatchMasterVersion = patch.MasterVersion ?? MasterMemoryDebugRegistry.UnknownMasterVersion,
+                CurrentMasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
+                PatchSchemaHash = patch.SchemaHash,
+                CurrentSchemaHash = MasterMemoryDebugRegistry.GetSchemaHash(),
+            };
+
+            if (!MasterMemoryDebugBuild.IsEnabled)
+            {
+                result.Status = MasterDataPatchPreviewStatus.Disabled;
+                return result;
+            }
+
+            var legacyCompatibility = string.IsNullOrEmpty(patch.SchemaHash);
+            var plan = MasterDataPatchEngine.Build(
+                patch,
+                replaceExisting: replaceExisting,
+                requireOriginalPreconditions: !legacyCompatibility,
+                forceIdentity: force,
+                allowPartial: legacyCompatibility);
+            result.Warnings.AddRange(plan.Warnings);
+            foreach (var error in plan.Errors)
+                result.Errors.Add($"{error.Code}: {error.TableName} {error.Key} {error.Field} {error.Message}".Trim());
+
+            if (!plan.Succeeded)
+            {
+                var code = plan.Errors.Count == 0 ? null : plan.Errors[0].Code;
+                result.Status = code == "UNSUPPORTED_FORMAT" ? MasterDataPatchPreviewStatus.UnsupportedFormat
+                    : code == "VERSION_MISMATCH" ? MasterDataPatchPreviewStatus.VersionMismatch
+                    : code == "SCHEMA_MISMATCH" ? MasterDataPatchPreviewStatus.SchemaMismatch
+                    : MasterDataPatchPreviewStatus.Invalid;
+                return result;
+            }
+
+            result.TargetRecords = plan.Targets.Count;
+            result.Fields = plan.FieldCount;
+            result.RemovedExistingOverrides = Math.Max(0, plan.Changes.Count - plan.Targets.Count);
+            foreach (var target in plan.Targets)
+            {
+                switch (target.Kind)
+                {
+                    case MasterDataPatchOperationKind.Add:
+                        result.AddedRecords++;
+                        break;
+                    case MasterDataPatchOperationKind.Delete:
+                        result.DeletedRecords++;
+                        break;
+                    case MasterDataPatchOperationKind.Reset:
+                        result.ResetRecords++;
+                        break;
+                    default:
+                        result.ChangedRecords++;
+                        break;
+                }
+            }
+            result.Status = MasterDataPatchPreviewStatus.Ready;
+            return result;
+        }
 
         /// <summary>
         /// Applies a patch.
@@ -223,6 +281,8 @@ namespace Nesh.MasterMemoryDebugger
             {
                 PatchMasterVersion = patch.MasterVersion ?? MasterMemoryDebugRegistry.UnknownMasterVersion,
                 CurrentMasterVersion = MasterMemoryDebugRegistry.GetMasterVersion(),
+                PatchSchemaHash = patch.SchemaHash,
+                CurrentSchemaHash = MasterMemoryDebugRegistry.GetSchemaHash(),
             };
 
             if (!MasterMemoryDebugBuild.IsEnabled)
@@ -230,213 +290,53 @@ namespace Nesh.MasterMemoryDebugger
                 result.Status = MasterDataPatchApplyStatus.Disabled;
                 return result;
             }
-            if (patch.FormatVersion > MasterDataPatch.CurrentFormatVersion || patch.FormatVersion <= 0)
+
+            var legacyCompatibility = string.IsNullOrEmpty(patch.SchemaHash);
+            var plan = MasterDataPatchEngine.Build(
+                patch,
+                replaceExisting: replaceExisting,
+                requireOriginalPreconditions: !legacyCompatibility,
+                forceIdentity: force,
+                allowPartial: legacyCompatibility);
+            result.Warnings.AddRange(plan.Warnings);
+
+            if (!plan.Succeeded)
             {
-                result.Status = MasterDataPatchApplyStatus.UnsupportedFormat;
-                result.Warnings.Add($"Unsupported patch format version {patch.FormatVersion}.");
+                foreach (var error in plan.Errors)
+                    result.Errors.Add($"{error.Code}: {error.TableName} {error.Key} {error.Field} {error.Message}".Trim());
+                var code = plan.Errors.Count == 0 ? null : plan.Errors[0].Code;
+                result.Status = code == "UNSUPPORTED_FORMAT" ? MasterDataPatchApplyStatus.UnsupportedFormat
+                    : code == "VERSION_MISMATCH" ? MasterDataPatchApplyStatus.VersionMismatch
+                    : code == "SCHEMA_MISMATCH" ? MasterDataPatchApplyStatus.SchemaMismatch
+                    : MasterDataPatchApplyStatus.Invalid;
                 return result;
             }
-            if (!IsSameMasterVersion(result.PatchMasterVersion, result.CurrentMasterVersion))
+
+            try
             {
-                if (!force)
-                {
-                    result.Status = MasterDataPatchApplyStatus.VersionMismatch;
-                    return result;
-                }
-                result.Warnings.Add($"Master version differs (patch: {result.PatchMasterVersion}, current: {result.CurrentMasterVersion}). Force loaded.");
+                MasterDataPatchEngine.Commit(plan);
+            }
+            catch (InvalidOperationException e)
+            {
+                result.Status = MasterDataPatchApplyStatus.Conflict;
+                result.Errors.Add(e.Message);
+                return result;
             }
 
-            using (MasterMemoryDebugRuntime.BeginBatch())
+            result.AppliedRecords = plan.Targets.Count;
+            result.AppliedFields = plan.FieldCount;
+            foreach (var target in plan.Targets)
             {
-                if (replaceExisting) MasterMemoryDebugRuntime.Store.Clear();
-                foreach (var patchTable in patch.Tables)
-                {
-                    var table = FindTable(patchTable);
-                    if (table == null)
-                    {
-                        result.Warnings.Add($"Table '{patchTable.TableName}' is not registered, skipped.");
-                        continue;
-                    }
-                    ApplyTable(patchTable, table, result);
-                }
+                if (target.Kind == MasterDataPatchOperationKind.Add) result.AddedRecords++;
+                else if (target.Kind == MasterDataPatchOperationKind.Delete) result.DeletedRecords++;
             }
-
             result.Status = MasterDataPatchApplyStatus.Applied;
             return result;
         }
 
         public static bool IsSameMasterVersion(string a, string b)
         {
-            return string.Equals(
-                string.IsNullOrEmpty(a) ? MasterMemoryDebugRegistry.UnknownMasterVersion : a,
-                string.IsNullOrEmpty(b) ? MasterMemoryDebugRegistry.UnknownMasterVersion : b,
-                StringComparison.Ordinal);
-        }
-
-        internal static MasterMemoryTableDescriptor FindTable(MasterDataPatchTable patchTable)
-        {
-            if (patchTable.TableName != null && MasterMemoryDebugRegistry.TryGetTable(patchTable.TableName, out var table)) return table;
-            foreach (var t in MasterMemoryDebugRegistry.Tables)
-            {
-                if (patchTable.RecordType != null && t.RecordType.FullName == patchTable.RecordType) return t;
-            }
-            return null;
-        }
-
-        internal static void ApplyTable(MasterDataPatchTable patchTable, MasterMemoryTableDescriptor table, MasterDataPatchApplyResult result)
-        {
-            var originals = BuildOriginalLookupByKeyJson(table);
-            var store = MasterMemoryDebugRuntime.Store;
-
-            foreach (var patchRecord in patchTable.Records)
-            {
-                string keyText;
-                try
-                {
-                    keyText = NormalizePrimaryKeyJson(table, patchRecord.PrimaryKey);
-                }
-                catch (Exception e)
-                {
-                    result.Warnings.Add($"{table.TableName}: invalid primary key {patchRecord.PrimaryKey.ToCanonicalString()} ({e.Message}), skipped.");
-                    continue;
-                }
-
-                var hasOriginal = originals.TryGetValue(keyText, out var original);
-                if (patchRecord.Deleted)
-                {
-                    if (!hasOriginal)
-                    {
-                        result.Warnings.Add($"{table.TableName} {keyText}: the deleted record does not exist, skipped.");
-                        continue;
-                    }
-                    store.Delete(table.RecordType, table.GetPrimaryKey(original));
-                    result.AppliedRecords++;
-                    result.DeletedRecords++;
-                    continue;
-                }
-                if (!hasOriginal)
-                {
-                    if (!patchRecord.Added)
-                    {
-                        result.Warnings.Add($"{table.TableName} {keyText}: record does not exist, skipped.");
-                        continue;
-                    }
-                    ApplyAddedRecord(patchRecord, table, keyText, result);
-                    continue;
-                }
-                if (patchRecord.Added)
-                {
-                    result.Warnings.Add($"{table.TableName} {keyText}: the added record exists in the master data now; its values are applied as changes.");
-                }
-
-                var copy = MasterDataCloneUtility.Clone(original);
-                var applied = 0;
-                foreach (var change in patchRecord.Changes)
-                {
-                    if (!table.TypeDescriptor.TryGetField(change.Field, out var field))
-                    {
-                        result.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' does not exist, skipped.");
-                        continue;
-                    }
-                    if (!field.CanEdit)
-                    {
-                        result.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' is read-only, skipped.");
-                        continue;
-                    }
-                    try
-                    {
-                        // nested objects are read into a copy of the original value (members missing in the patch are kept)
-                        var currentOriginal = field.GetValue(original);
-                        var value = MasterDataValueUtility.FromJson(change.Value, field.FieldType, currentOriginal);
-                        if (change.HasOriginal)
-                        {
-                            var patchOriginal = TryFromJson(change.Original, field.FieldType, currentOriginal, out var ok);
-                            if (ok && !MasterDataValueUtility.AreEqual(patchOriginal, currentOriginal))
-                            {
-                                result.Warnings.Add(
-                                    $"{table.TableName} {keyText}.{field.Name}: original value changed in master data " +
-                                    $"(patch: {MasterDataValueUtility.Format(patchOriginal)}, current: {MasterDataValueUtility.Format(currentOriginal)}).");
-                            }
-                        }
-                        field.SetValue(copy, value);
-                        applied++;
-                    }
-                    catch (Exception e)
-                    {
-                        result.Warnings.Add($"{table.TableName} {keyText}: field '{change.Field}' has an invalid value ({e.Message}), skipped.");
-                    }
-                }
-
-                if (applied > 0)
-                {
-                    store.Set(table.RecordType, table.GetPrimaryKey(original), copy);
-                    result.AppliedRecords++;
-                    result.AppliedFields += applied;
-                }
-            }
-        }
-
-        static void ApplyAddedRecord(MasterDataPatchRecord patchRecord, MasterMemoryTableDescriptor table, string keyText, MasterDataPatchApplyResult result)
-        {
-            if (!MasterMemoryRecordFactory.CanAdd(table, out var reason))
-            {
-                result.Warnings.Add($"{table.TableName} {keyText}: the added record is skipped ({reason})");
-                return;
-            }
-
-            object record;
-            try
-            {
-                record = MasterMemoryRecordFactory.CreateDefault(table);
-                foreach (var field in table.TypeDescriptor.PrimaryKeyFields)
-                {
-                    field.SetValueUnchecked(record, MasterDataValueUtility.FromJson(patchRecord.PrimaryKey[field.Name], field.FieldType));
-                }
-            }
-            catch (Exception e)
-            {
-                result.Warnings.Add($"{table.TableName} {keyText}: the added record can not be created ({(e.InnerException ?? e).Message}), skipped.");
-                return;
-            }
-
-            var applied = 0;
-            foreach (var change in patchRecord.Changes)
-            {
-                // an added record also sets its secondary keys (a rebuilt database indexes them)
-                if (!table.TypeDescriptor.TryGetField(change.Field, out var field) || field.IsPrimaryKey || !field.HasSetter)
-                {
-                    result.Warnings.Add($"{table.TableName} {keyText} (added): field '{change.Field}' does not exist or can not be written, skipped.");
-                    continue;
-                }
-                try
-                {
-                    field.SetValueUnchecked(record, MasterDataValueUtility.FromJson(change.Value, field.FieldType, field.GetValue(record)));
-                    applied++;
-                }
-                catch (Exception e)
-                {
-                    result.Warnings.Add($"{table.TableName} {keyText} (added): field '{change.Field}' has an invalid value ({(e.InnerException ?? e).Message}), skipped.");
-                }
-            }
-
-            MasterMemoryDebugRuntime.Store.Set(table.RecordType, table.GetPrimaryKey(record), record);
-            result.AppliedRecords++;
-            result.AddedRecords++;
-            result.AppliedFields += applied;
-        }
-
-        static object TryFromJson(object json, Type type, object baseValue, out bool ok)
-        {
-            try
-            {
-                ok = true;
-                return MasterDataValueUtility.FromJson(json, type, baseValue);
-            }
-            catch (Exception)
-            {
-                ok = false;
-                return null;
-            }
+            return MasterDataPatchResolver.IsSameMasterVersion(a, b);
         }
 
         static Dictionary<object, object> BuildOriginalLookupByKey(MasterMemoryTableDescriptor table)
@@ -450,30 +350,6 @@ namespace Nesh.MasterMemoryDebugger
             return lookup;
         }
 
-        static Dictionary<string, object> BuildOriginalLookupByKeyJson(MasterMemoryTableDescriptor table)
-        {
-            var lookup = new Dictionary<string, object>(StringComparer.Ordinal);
-            foreach (var record in table.GetAllRecords())
-            {
-                if (record == null) continue;
-                lookup[CreatePrimaryKeyJson(table, record).ToCanonicalString()] = record;
-            }
-            return lookup;
-        }
 
-        /// <summary>Re-reads key values with the member types so that e.g. 1001.0 and 1001 match.</summary>
-        internal static string NormalizePrimaryKeyJson(MasterMemoryTableDescriptor table, MasterDataJsonObject key)
-        {
-            var keyFields = table.TypeDescriptor.PrimaryKeyFields;
-            if (keyFields.Count == 0) return key.ToCanonicalString();
-
-            var normalized = new MasterDataJsonObject();
-            foreach (var field in keyFields)
-            {
-                if (!key.TryGetValue(field.Name, out var json)) throw new FormatException($"'{field.Name}' is missing");
-                normalized.Add(field.Name, MasterDataValueUtility.ToJson(MasterDataValueUtility.FromJson(json, field.FieldType)));
-            }
-            return normalized.ToCanonicalString();
-        }
     }
 }

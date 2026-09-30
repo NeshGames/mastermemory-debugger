@@ -121,13 +121,55 @@ namespace Nesh.MasterMemoryDebugger
         public static void Save(string tableName, IReadOnlyList<MasterGridColumn> columns)
         {
             if (string.IsNullOrEmpty(tableName)) return;
-            var settings = new Dictionary<string, ColumnSettings>();
-            foreach (var column in columns)
-            {
-                settings[column.Key] = new ColumnSettings { Visible = column.Visible, Frozen = column.Frozen, Width = column.Width, UserSized = column.UserSized };
-            }
+            var settings = CaptureSettings(columns);
             s_settings[tableName] = settings;
             if (s_persist) Write(tableName, settings);
+        }
+
+        /// <summary>Serializable snapshot used by Saved Views; independent of the table's default PlayerPrefs layout.</summary>
+        public static string Capture(IReadOnlyList<MasterGridColumn> columns) =>
+            Serialize(CaptureSettings(columns));
+
+        /// <summary>
+        /// Applies a serialized Saved View layout. Unknown old columns are ignored and newly added columns keep defaults.
+        /// </summary>
+        public static void ApplySerialized(string text, IReadOnlyList<MasterGridColumn> columns)
+        {
+            ResetToDefaults(columns);
+            ApplySettings(Deserialize(text), columns);
+        }
+
+        static Dictionary<string, ColumnSettings> CaptureSettings(IReadOnlyList<MasterGridColumn> columns)
+        {
+            var settings = new Dictionary<string, ColumnSettings>();
+            if (columns == null) return settings;
+            foreach (var column in columns)
+            {
+                settings[column.Key] = new ColumnSettings
+                {
+                    Visible = column.Visible,
+                    Frozen = column.Frozen,
+                    Width = column.Width,
+                    UserSized = column.UserSized,
+                };
+            }
+            return settings;
+        }
+
+        static void ApplySettings(Dictionary<string, ColumnSettings> settings, IReadOnlyList<MasterGridColumn> columns)
+        {
+            if (settings == null || columns == null) return;
+            foreach (var column in columns)
+            {
+                if (!settings.TryGetValue(column.Key, out var s)) continue;
+                column.Visible = s.Visible;
+                column.Frozen = s.Frozen;
+                if (s.UserSized)
+                {
+                    column.UserSized = true;
+                    column.Width = Math.Max(MasterGridColumn.MinWidth, s.Width);
+                }
+            }
         }
 
         /// <summary>Applies the saved settings of the table; columns added since keep their defaults.</summary>
@@ -140,18 +182,7 @@ namespace Nesh.MasterMemoryDebugger
                 if (settings == null) return;
                 s_settings[tableName] = settings;
             }
-            foreach (var column in columns)
-            {
-                if (!settings.TryGetValue(column.Key, out var s)) continue;
-                column.Visible = s.Visible;
-                column.Frozen = s.Frozen;
-                // automatic widths are computed again (labels or data may differ)
-                if (s.UserSized)
-                {
-                    column.UserSized = true;
-                    column.Width = Math.Max(MasterGridColumn.MinWidth, s.Width);
-                }
-            }
+            ApplySettings(settings, columns);
         }
 
         public static void ResetToDefaults(IReadOnlyList<MasterGridColumn> columns)

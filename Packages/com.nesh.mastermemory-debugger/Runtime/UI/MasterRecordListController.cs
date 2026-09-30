@@ -6,6 +6,15 @@ using UnityEngine.UIElements;
 
 namespace Nesh.MasterMemoryDebugger
 {
+    internal sealed class MasterRecordViewState
+    {
+        public string Query;
+        public bool ModifiedOnly;
+        public string SortKey;
+        public bool SortDescending;
+        public string ColumnLayout;
+    }
+
     /// <summary>
     /// Search box, Modified Only filter and the record grid
     /// (state ●, primary key members, a Display column when the project supplies display names, then one column per member).
@@ -110,6 +119,31 @@ namespace Nesh.MasterMemoryDebugger
         {
             searchField.SetValueWithoutNotify(query ?? string.Empty);
             modifiedOnlyToggle.SetValueWithoutNotify(modifiedOnly);
+        }
+
+        internal MasterRecordViewState CaptureViewState()
+        {
+            SaveColumns();
+            return new MasterRecordViewState
+            {
+                Query = Query,
+                ModifiedOnly = ModifiedOnly,
+                SortKey = grid.SortKey,
+                SortDescending = grid.SortDescending,
+                ColumnLayout = MasterGridLayout.Capture(columns),
+            };
+        }
+
+        internal void ApplyViewState(MasterRecordViewState state)
+        {
+            if (state == null || table == null) return;
+            SetState(state.Query, state.ModifiedOnly);
+            MasterGridLayout.ApplySerialized(state.ColumnLayout, columns);
+            MasterGridLayout.AutoFit(columns, snapshot);
+            grid.SetSort(state.SortKey, state.SortDescending);
+            grid.Relayout();
+            SaveColumns();
+            ApplyFilter();
         }
 
         public void CloseColumnsPopup() => columnsPopup?.Close();

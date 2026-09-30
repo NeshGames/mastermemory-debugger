@@ -78,6 +78,30 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.AreEqual(1, loaded.Limit.Value.Raw);
         }
 
+        [Test]
+        public void InvalidCustomValue_ShouldRejectTheWholeSchemaAwarePatch()
+        {
+            var tunings = RegisterTunings();
+            MasterMemoryDebugRuntime.SetOverride(1, tunings[0] with { Speed = TestFixed.FromRaw(12500) });
+            MasterMemoryDebugRuntime.SetOverride(2, tunings[1] with { Speed = TestFixed.FromRaw(15000) });
+            var patch = MasterDataPatchService.CreatePatch();
+            Assert.IsNotEmpty(patch.SchemaHash);
+            patch.Tables.Single().Records.Single(x => x.PrimaryKey.ToCanonicalString() == "{\"Id\":2}")
+                .Changes.Single(x => x.Field == "Speed").Value = "invalid";
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            MasterMemoryDebugRuntime.SetOverride(3, tunings[2] with { Speed = TestFixed.FromRaw(-2500) });
+
+            var result = MasterDataPatchService.Apply(patch, replaceExisting: true);
+
+            Assert.AreEqual(MasterDataPatchApplyStatus.Invalid, result.Status);
+            Assert.IsTrue(result.Errors.Any(x => x.Contains("INVALID_VALUE")));
+            Assert.IsFalse(MasterMemoryDebugRuntime.TryGetOverride<TestTuning, int>(1, out _));
+            Assert.IsFalse(MasterMemoryDebugRuntime.TryGetOverride<TestTuning, int>(2, out _));
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestTuning, int>(3, out var kept));
+            Assert.AreEqual(-2500, kept.Speed.Raw, "failed preflight must not clear unrelated overrides");
+            Assert.AreEqual(1, MasterMemoryDebugRuntime.OverrideCount);
+        }
+
         void ApplySampleOverrides()
         {
             MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 185, Name = "Big \"Fire\"\nball", UnlockLevel = null });
@@ -249,6 +273,152 @@ namespace Nesh.MasterMemoryDebugger.Tests
 
             MasterDataPatchService.Apply(empty);
             Assert.AreEqual(0, MasterMemoryDebugRuntime.OverrideCount);
+        }
+
+        [Test]
+        public void Preview_ShouldMatchApplyImpactWithoutMutatingTheStore()
+        {
+            RegisterTestDatabase();
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            MasterMemoryDebugRuntime.SetOverride(
+                1001, Database.TestSkillTable.FindById(1001) with { Damage = 185 });
+            var patch = MasterDataPatchService.CreatePatch();
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            MasterMemoryDebugRuntime.SetOverride(
+                1002, Database.TestSkillTable.FindById(1002) with { Damage = 77 });
+
+            var preview = MasterDataPatchService.Preview(patch, replaceExisting: true);
+
+            Assert.AreEqual(MasterDataPatchPreviewStatus.Ready, preview.Status);
+            Assert.AreEqual(1, preview.TargetRecords);
+            Assert.AreEqual(1, preview.ChangedRecords);
+            Assert.AreEqual(1, preview.Fields);
+            Assert.AreEqual(1, preview.RemovedExistingOverrides);
+            Assert.AreEqual(1, MasterMemoryDebugRuntime.OverrideCount,
+                "preview must not mutate current overrides");
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1002, out var existing));
+            Assert.AreEqual(77, existing.Damage);
+
+            var applied = MasterDataPatchService.Apply(patch, replaceExisting: true);
+
+            Assert.AreEqual(MasterDataPatchApplyStatus.Applied, applied.Status);
+            Assert.AreEqual(preview.TargetRecords, applied.AppliedRecords);
+            Assert.AreEqual(preview.Fields, applied.AppliedFields);
+            Assert.IsFalse(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1002, out _));
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1001, out var skill));
+            Assert.AreEqual(185, skill.Damage);
+        }
+
+        [Test]
+        public void Preview_InvalidPatch_ShouldExposeErrorsWithoutMutation()
+        {
+            RegisterTestDatabase();
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            MasterMemoryDebugRuntime.SetOverride(
+                1002, Database.TestSkillTable.FindById(1002) with { Damage = 77 });
+            var patch = new MasterDataPatch
+            {
+                MasterVersion = "v1",
+                SchemaHash = MasterMemoryDebugRegistry.GetSchemaHash(),
+                Tables =
+                {
+                    new MasterDataPatchTable
+                    {
+                        TableName = nameof(TestSkill),
+                        RecordType = typeof(TestSkill).FullName,
+                        Records =
+                        {
+                            new MasterDataPatchRecord
+                            {
+                                PrimaryKey = new MasterDataJsonObject { { "Id", 1001 } },
+                                Changes =
+                                {
+                                    new MasterDataPatchChange
+                                    {
+                                        Field = "MissingField",
+                                        Original = 120,
+                                        Value = 999,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            };
+
+            var preview = MasterDataPatchService.Preview(patch, replaceExisting: true);
+
+            Assert.AreEqual(MasterDataPatchPreviewStatus.Invalid, preview.Status);
+            Assert.IsNotEmpty(preview.Errors);
+            Assert.AreEqual(1, MasterMemoryDebugRuntime.OverrideCount);
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1002, out _));
+        }
+
+        [Test]
+        public void Apply_InvalidPatch_ShouldNotReplaceExistingOverrides()
+        {
+            RegisterTestDatabase();
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            MasterMemoryDebugRuntime.SetOverride(
+                1002, Database.TestSkillTable.FindById(1002) with { Damage = 77 });
+
+            var patch = new MasterDataPatch
+            {
+                MasterVersion = "v1",
+                SchemaHash = MasterMemoryDebugRegistry.GetSchemaHash(),
+            };
+            patch.Tables.Add(new MasterDataPatchTable
+            {
+                TableName = nameof(TestSkill),
+                RecordType = typeof(TestSkill).FullName,
+                Records =
+                {
+                    new MasterDataPatchRecord
+                    {
+                        PrimaryKey = new MasterDataJsonObject { { "Id", 1001 } },
+                        Changes =
+                        {
+                            new MasterDataPatchChange
+                            {
+                                Field = "MissingField",
+                                Original = 120,
+                                Value = 999,
+                            },
+                        },
+                    },
+                },
+            });
+
+            var result = MasterDataPatchService.Apply(patch, replaceExisting: true);
+
+            Assert.AreEqual(MasterDataPatchApplyStatus.Invalid, result.Status);
+            Assert.AreEqual(1, MasterMemoryDebugRuntime.OverrideCount,
+                "preflight failure must not clear the existing override layer");
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1002, out var existing));
+            Assert.AreEqual(77, existing.Damage);
+        }
+
+        [Test]
+        public void Apply_SchemaMismatch_ShouldRequireForce()
+        {
+            RegisterTestDatabase();
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            MasterMemoryDebugRuntime.SetOverride(
+                1001, Database.TestSkillTable.FindById(1001) with { Damage = 185 });
+            var patch = MasterDataPatchService.CreatePatch();
+            MasterMemoryDebugRuntime.ClearAllOverrides();
+            patch.SchemaHash = "different-schema";
+
+            var rejected = MasterDataPatchService.Apply(patch);
+
+            Assert.AreEqual(MasterDataPatchApplyStatus.SchemaMismatch, rejected.Status);
+            Assert.AreEqual(0, MasterMemoryDebugRuntime.OverrideCount);
+
+            var forced = MasterDataPatchService.Apply(patch, force: true);
+            Assert.AreEqual(MasterDataPatchApplyStatus.Applied, forced.Status);
+            Assert.IsTrue(forced.Warnings.Any(x => x.Contains("schema differs")));
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestSkill, int>(1001, out var skill));
+            Assert.AreEqual(185, skill.Damage);
         }
 
         [Test]

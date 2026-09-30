@@ -13,9 +13,12 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     internal static class MasterMemoryRemoteProtocol
     {
-        /// <summary>2: validation. 3: deleted records. 4: operations. 5: transactional patch requests.</summary>
-        public const int Version = 5;
-        public const int MaxFrameBytes = 512 * 1024 * 1024;
+        /// <summary>2: validation. 3: deleted records. 4: operations. 5: transactional patches. 6: lazy chunked tables.</summary>
+        public const int Version = 6;
+        public const int TargetTableChunkBytes = 1024 * 1024;
+        // A frame is materialized as one byte[] on both peers. Keep a hard ceiling to prevent a malformed
+        // or unexpectedly huge peer message from forcing a 512 MiB allocation. Large table transport should be chunked.
+        public const int MaxFrameBytes = 64 * 1024 * 1024;
 
         public const int MaxPatchJsonBytes = 16 * 1024 * 1024;
 
@@ -71,7 +74,7 @@ namespace Nesh.MasterMemoryDebugger
         {
             /// <summary>Client → server: protocol version and pairing code.</summary>
             Hello = 1,
-            /// <summary>Server → client: every table, its records and the current overrides.</summary>
+            /// <summary>Server → client: table metadata, labels and operations. Records and overrides are lazy.</summary>
             Welcome = 2,
             /// <summary>Server → client: the connection is refused (wrong code, busy, other version).</summary>
             Reject = 3,
@@ -97,6 +100,10 @@ namespace Nesh.MasterMemoryDebugger
             PatchApplyRequest = 13,
             /// <summary>Server → client: patch export, plan, or apply outcome.</summary>
             PatchResponse = 14,
+            /// <summary>Client → server: request one table's records.</summary>
+            TableRequest = 15,
+            /// <summary>Server → client: one chunk of a requested table.</summary>
+            TableChunk = 16,
         }
 
         public sealed class Operation
@@ -153,9 +160,30 @@ namespace Nesh.MasterMemoryDebugger
             public string RecordType;
             public string KeyType;
             public string Group;
+            public int RecordCount;
+            public bool HasCustomDisplayName;
+            // Kept as conveniences for decoded TableChunk data and tests; Welcome v6 never carries these.
             public List<byte[]> Records = new List<byte[]>();
-            /// <summary>Display names in record order, or null when the table has no custom display name.</summary>
             public List<string> DisplayNames;
+            public List<Change> Overrides = new List<Change>();
+        }
+
+        public sealed class TableRequest
+        {
+            public string RequestId;
+            public string TableName;
+        }
+
+        public sealed class TableChunk
+        {
+            public string RequestId;
+            public string TableName;
+            public int ChunkIndex;
+            public bool IsLast;
+            public string Error;
+            public List<byte[]> Records = new List<byte[]>();
+            public List<string> DisplayNames;
+            public List<Change> Overrides = new List<Change>();
         }
 
         public sealed class Welcome
@@ -163,6 +191,7 @@ namespace Nesh.MasterMemoryDebugger
             public int Version;
             public string ServerEpoch;
             public string MasterVersion;
+            public string SchemaHash;
             public string LabelsTsv;
             public List<Table> Tables = new List<Table>();
             public List<Change> Overrides = new List<Change>();
@@ -259,6 +288,7 @@ namespace Nesh.MasterMemoryDebugger
             w.Write(message.Version);
             w.Write(message.ServerEpoch ?? string.Empty);
             w.Write(message.MasterVersion ?? string.Empty);
+            w.Write(message.SchemaHash ?? string.Empty);
             w.Write(message.LabelsTsv ?? string.Empty);
             w.Write(message.Tables.Count);
             foreach (var table in message.Tables)
@@ -268,17 +298,34 @@ namespace Nesh.MasterMemoryDebugger
                 w.Write(table.RecordType ?? string.Empty);
                 w.Write(table.KeyType ?? string.Empty);
                 w.Write(table.Group ?? string.Empty);
-                w.Write(table.Records.Count);
-                foreach (var record in table.Records) WriteBytes(w, record);
-                w.Write(table.DisplayNames != null);
-                if (table.DisplayNames != null)
-                {
-                    w.Write(table.DisplayNames.Count);
-                    foreach (var name in table.DisplayNames) w.Write(name ?? string.Empty);
-                }
+                w.Write(table.RecordCount);
+                w.Write(table.HasCustomDisplayName);
             }
-            WriteChanges(w, message.Overrides);
             WriteOperations(w, message.Operations);
+        });
+
+        public static byte[] Encode(TableRequest request) => Write(MessageType.TableRequest, w =>
+        {
+            w.Write(request.RequestId ?? string.Empty);
+            w.Write(request.TableName ?? string.Empty);
+        });
+
+        public static byte[] Encode(TableChunk chunk) => Write(MessageType.TableChunk, w =>
+        {
+            w.Write(chunk.RequestId ?? string.Empty);
+            w.Write(chunk.TableName ?? string.Empty);
+            w.Write(chunk.ChunkIndex);
+            w.Write(chunk.IsLast);
+            w.Write(chunk.Error ?? string.Empty);
+            w.Write(chunk.Records.Count);
+            foreach (var record in chunk.Records) WriteBytes(w, record);
+            w.Write(chunk.DisplayNames != null);
+            if (chunk.DisplayNames != null)
+            {
+                w.Write(chunk.DisplayNames.Count);
+                foreach (var name in chunk.DisplayNames) w.Write(name ?? string.Empty);
+            }
+            WriteChanges(w, chunk.Overrides);
         });
 
         public static byte[] EncodeReject(string reason) => Write(MessageType.Reject, w => w.Write(reason ?? string.Empty));
@@ -386,31 +433,60 @@ namespace Nesh.MasterMemoryDebugger
 
         public static Welcome DecodeWelcome(byte[] payload) => Read(payload, MessageType.Welcome, r =>
         {
-            var message = new Welcome { Version = r.ReadInt32(), ServerEpoch = r.ReadString(), MasterVersion = r.ReadString(), LabelsTsv = r.ReadString() };
+            var message = new Welcome
+            {
+                Version = r.ReadInt32(),
+                ServerEpoch = r.ReadString(),
+                MasterVersion = r.ReadString(),
+                SchemaHash = r.ReadString(),
+                LabelsTsv = r.ReadString(),
+            };
             var tableCount = ReadCount(r);
             for (var i = 0; i < tableCount; i++)
             {
-                var table = new Table
+                message.Tables.Add(new Table
                 {
                     TableName = r.ReadString(),
                     MemoryTableName = r.ReadString(),
                     RecordType = r.ReadString(),
                     KeyType = r.ReadString(),
                     Group = r.ReadString(),
-                };
-                var recordCount = ReadCount(r);
-                for (var j = 0; j < recordCount; j++) table.Records.Add(ReadBytes(r));
-                if (r.ReadBoolean())
-                {
-                    var nameCount = ReadCount(r);
-                    table.DisplayNames = new List<string>(nameCount);
-                    for (var j = 0; j < nameCount; j++) table.DisplayNames.Add(r.ReadString());
-                }
-                message.Tables.Add(table);
+                    RecordCount = ReadCount(r),
+                    HasCustomDisplayName = r.ReadBoolean(),
+                });
             }
-            message.Overrides = ReadChanges(r);
             message.Operations = ReadOperations(r);
             return message;
+        });
+
+        public static TableRequest DecodeTableRequest(byte[] payload) =>
+            Read(payload, MessageType.TableRequest, r => new TableRequest
+            {
+                RequestId = r.ReadString(),
+                TableName = r.ReadString(),
+            });
+
+        public static TableChunk DecodeTableChunk(byte[] payload) => Read(payload, MessageType.TableChunk, r =>
+        {
+            var chunk = new TableChunk
+            {
+                RequestId = r.ReadString(),
+                TableName = r.ReadString(),
+                ChunkIndex = r.ReadInt32(),
+                IsLast = r.ReadBoolean(),
+                Error = r.ReadString(),
+            };
+            var count = ReadCount(r);
+            for (var i = 0; i < count; i++) chunk.Records.Add(ReadBytes(r));
+            if (r.ReadBoolean())
+            {
+                var names = ReadCount(r);
+                chunk.DisplayNames = new List<string>(names);
+                for (var i = 0; i < names; i++) chunk.DisplayNames.Add(r.ReadString());
+                if (names != count) throw new InvalidDataException("Table chunk display-name count does not match records.");
+            }
+            chunk.Overrides = ReadChanges(r);
+            return chunk;
         });
 
         // ------------------------------------------------------------------ frames

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -35,6 +36,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryDebugRemote.AutoReconnect = true;
             MasterMemoryDebugRemote.ReconnectDelaySeconds = 3;
             MasterMemoryDebugRemote.IsToolMode = false;
+            MasterMemoryRemoteServer.HelloTimeoutSeconds = 10.0;
             rawClient?.Close();
             rawServer?.Stop();
         }
@@ -66,7 +68,58 @@ namespace Nesh.MasterMemoryDebugger.Tests
             }
         }
 
+        static MasterMemoryRemoteProtocol.Table RequestTable(NetworkStream stream, MasterMemoryRemoteProtocol.Table manifest)
+        {
+            var requestId = Guid.NewGuid().ToString("N");
+            MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.Encode(
+                new MasterMemoryRemoteProtocol.TableRequest { RequestId = requestId, TableName = manifest.TableName }));
+            var result = new MasterMemoryRemoteProtocol.Table
+            {
+                TableName = manifest.TableName,
+                MemoryTableName = manifest.MemoryTableName,
+                RecordType = manifest.RecordType,
+                KeyType = manifest.KeyType,
+                Group = manifest.Group,
+                RecordCount = manifest.RecordCount,
+                HasCustomDisplayName = manifest.HasCustomDisplayName,
+                DisplayNames = manifest.HasCustomDisplayName ? new System.Collections.Generic.List<string>() : null,
+            };
+            var next = 0;
+            while (true)
+            {
+                var chunk = MasterMemoryRemoteProtocol.DecodeTableChunk(
+                    ReceiveOf(stream, MasterMemoryRemoteProtocol.MessageType.TableChunk));
+                if (chunk.RequestId != requestId) continue;
+                Assert.AreEqual(next++, chunk.ChunkIndex);
+                Assert.IsTrue(string.IsNullOrEmpty(chunk.Error), chunk.Error);
+                result.Records.AddRange(chunk.Records);
+                result.Overrides.AddRange(chunk.Overrides);
+                if (result.DisplayNames != null && chunk.DisplayNames != null) result.DisplayNames.AddRange(chunk.DisplayNames);
+                if (chunk.IsLast) break;
+            }
+            Assert.AreEqual(manifest.RecordCount, result.Records.Count);
+            return result;
+        }
+
         static byte[] Pack<T>(T record) => MasterMemoryRemotePeer.Serialize(typeof(T), record);
+
+        [Test]
+        public void ReplayCache_ShouldEvictTheOldestRequest()
+        {
+            var cache = new MasterMemoryReplayCache<int>(2);
+            cache.Add("a", 1);
+            cache.Add("b", 2);
+            Assert.IsTrue(cache.TryGetValue("a", out _));
+
+            cache.Add("c", 3);
+
+            Assert.IsFalse(cache.TryGetValue("a", out _));
+            Assert.IsTrue(cache.TryGetValue("b", out var b));
+            Assert.AreEqual(2, b);
+            Assert.IsTrue(cache.TryGetValue("c", out var c));
+            Assert.AreEqual(3, c);
+            Assert.AreEqual(2, cache.Count);
+        }
 
         // ------------------------------------------------------------------ game side (server)
 
@@ -77,6 +130,25 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var stream = rawClient.GetStream();
             MasterMemoryRemoteProtocol.WriteFrame(stream, MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.Hello { Version = MasterMemoryRemoteProtocol.Version, Code = code }));
             return stream;
+        }
+
+        [Test]
+        public void Server_ShouldDropAConnectionThatNeverSendsHello()
+        {
+            RegisterTestDatabase();
+            MasterMemoryRemoteServer.HelloTimeoutSeconds = 0.01;
+            Assert.IsTrue(MasterMemoryDebugRemote.StartServer(0, "123456"));
+
+            rawClient = new TcpClient();
+            rawClient.Connect(IPAddress.Loopback, MasterMemoryDebugRemote.ServerPort);
+            var stream = rawClient.GetStream();
+
+            var reply = Receive(stream, "the hello timeout");
+
+            Assert.AreEqual(MasterMemoryRemoteProtocol.MessageType.Reject,
+                MasterMemoryRemoteProtocol.GetType(reply));
+            StringAssert.Contains("Timed out", MasterMemoryRemoteProtocol.DecodeReject(reply));
+            Assert.AreEqual(MasterMemoryRemoteState.Listening, MasterMemoryDebugRemote.State);
         }
 
         [Test]
@@ -107,11 +179,14 @@ namespace Nesh.MasterMemoryDebugger.Tests
 
             var skills = welcome.Tables.Single(x => x.TableName == nameof(TestSkill));
             Assert.AreEqual("Battle", skills.Group);
-            Assert.AreEqual(3, skills.Records.Count);
-            var first = (TestSkill)MasterMemoryRemotePeer.Deserialize(typeof(TestSkill), skills.Records[0]);
+            Assert.AreEqual(3, skills.RecordCount);
+            Assert.AreEqual(0, skills.Records.Count, "Welcome v6 contains metadata only");
+            var loadedSkills = RequestTable(stream, skills);
+            var first = (TestSkill)MasterMemoryRemotePeer.Deserialize(typeof(TestSkill), loadedSkills.Records[0]);
             Assert.AreEqual("Fireball", first.Name);
             Assert.AreEqual(typeof(TestSkill), Type.GetType(skills.RecordType));
-            Assert.AreEqual(1, welcome.Overrides.Count);
+            Assert.AreEqual(0, welcome.Overrides.Count, "Welcome v6 carries no override payload");
+            Assert.AreEqual(1, loadedSkills.Overrides.Count, "the requested table carries its override snapshot");
 
             // game edits → tool
             MasterMemoryDebugRuntime.SetOverride(1001, Database.TestSkillTable.FindById(1001) with { Damage = 777 });
@@ -140,6 +215,34 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void Server_ShouldAllowTableTransferRetryAfterDisconnect()
+        {
+            RegisterTestDatabase();
+            MasterMemoryDebugRemote.StartServer(0, "1");
+
+            var first = ConnectRaw("1");
+            var firstWelcome = MasterMemoryRemoteProtocol.DecodeWelcome(Receive(first, "the first welcome"));
+            var manifest = firstWelcome.Tables.Single(x => x.TableName == nameof(TestSkill));
+            MasterMemoryRemoteProtocol.WriteFrame(first,
+                MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableRequest
+                {
+                    RequestId = "first-load",
+                    TableName = manifest.TableName,
+                }));
+            MasterMemoryDebugRemote.Pump();
+            rawClient.Close();
+            PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Listening,
+                "the interrupted table transfer to close");
+
+            var second = ConnectRaw("1");
+            var secondWelcome = MasterMemoryRemoteProtocol.DecodeWelcome(Receive(second, "the second welcome"));
+            var loaded = RequestTable(second,
+                secondWelcome.Tables.Single(x => x.TableName == nameof(TestSkill)));
+
+            Assert.AreEqual(3, loaded.Records.Count);
+        }
+
+        [Test]
         public void Server_ShouldListenAgainWhenTheToolLeaves()
         {
             RegisterTestDatabase();
@@ -148,6 +251,85 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Receive(stream, "the welcome");
             rawClient.Close();
             PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Listening, "the disconnect");
+        }
+
+        [Test]
+        public void Protocol_ShouldRejectOversizedFrameBeforeReadingPayload()
+        {
+            using var stream = new MemoryStream();
+            var header = BitConverter.GetBytes(MasterMemoryRemoteProtocol.MaxFrameBytes + 1);
+            if (!BitConverter.IsLittleEndian) Array.Reverse(header);
+            stream.Write(header, 0, header.Length);
+            stream.Position = 0;
+
+            var error = Assert.Throws<InvalidDataException>(() => MasterMemoryRemoteProtocol.ReadFrame(stream));
+
+            StringAssert.Contains("Invalid frame length", error.Message);
+        }
+
+        [Test]
+        public void PatchPlan_ShouldScanEachOriginalTableOnce()
+        {
+            MasterMemoryDebugRegistry.SetMasterVersionProvider(() => "v1");
+            var records = new[]
+            {
+                Database.TestSkillTable.FindById(1001),
+                Database.TestSkillTable.FindById(1002),
+                Database.TestSkillTable.FindById(1003),
+            };
+            var scans = 0;
+            MasterMemoryDebugRegistry.RegisterTable<TestSkill, int>(
+                "CountedSkill",
+                () =>
+                {
+                    scans++;
+                    return records;
+                },
+                x => x.Id);
+
+            var patch = new MasterDataPatch { MasterVersion = "v1" };
+            var table = new MasterDataPatchTable
+            {
+                TableName = "CountedSkill",
+                RecordType = typeof(TestSkill).FullName,
+            };
+            table.Records.Add(new MasterDataPatchRecord
+            {
+                PrimaryKey = new MasterDataJsonObject { { "Id", 1001 } },
+                Changes = new System.Collections.Generic.List<MasterDataPatchChange>
+                {
+                    new MasterDataPatchChange { Field = "Damage", Original = 120, Value = 121 },
+                },
+            });
+            table.Records.Add(new MasterDataPatchRecord
+            {
+                PrimaryKey = new MasterDataJsonObject { { "Id", 1002 } },
+                Changes = new System.Collections.Generic.List<MasterDataPatchChange>
+                {
+                    new MasterDataPatchChange { Field = "Damage", Original = 100, Value = 101 },
+                },
+            });
+            table.Records.Add(new MasterDataPatchRecord
+            {
+                PrimaryKey = new MasterDataJsonObject { { "Id", 1003 } },
+                Changes = new System.Collections.Generic.List<MasterDataPatchChange>
+                {
+                    new MasterDataPatchChange { Field = "Damage", Original = 0, Value = 1 },
+                },
+            });
+            patch.Tables.Add(table);
+
+            var plan = MasterMemoryRemotePatch.Build(new MasterMemoryRemoteProtocol.PatchRequest
+            {
+                RequestId = "single-scan",
+                ServerEpoch = "epoch",
+                MasterVersion = "v1",
+                PatchJson = MasterDataPatchSerializer.ToJson(patch),
+            }, "epoch");
+
+            Assert.AreEqual(MasterMemoryRemoteProtocol.PatchStatus.Success, plan.Response.Status,
+                string.Join("; ", plan.Response.Errors.ConvertAll(x => x.Message)));
+            Assert.AreEqual(1, scans, "Remote patch planning should build one original lookup per table.");
         }
 
         [Test]
@@ -386,9 +568,44 @@ namespace Nesh.MasterMemoryDebugger.Tests
             MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(welcome));
             PumpUntil(() => MasterMemoryDebugRemote.State == MasterMemoryRemoteState.Connected, "the tables");
 
+            var skillsManifest = Table<TestSkill>();
+            Assert.AreEqual(0, skillsManifest.CreateRecordSnapshot().Count, "records are lazy");
+            Assert.IsFalse(MasterMemoryDebugRemote.EnsureTableLoaded(skillsManifest));
+            var skillRequest = MasterMemoryRemoteProtocol.DecodeTableRequest(ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.TableRequest));
+            var skillChunk = new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = skillRequest.RequestId,
+                TableName = skillRequest.TableName,
+                ChunkIndex = 0,
+                IsLast = true,
+                DisplayNames = new System.Collections.Generic.List<string> { "skill 1001", "skill 1002", "skill 1003" },
+            };
+            foreach (var record in Database.TestSkillTable.All) skillChunk.Records.Add(Pack(record));
+            skillChunk.Overrides.Add(new MasterMemoryRemoteProtocol.Change
+            {
+                Kind = MasterMemoryRemoteProtocol.ChangeKind.Set,
+                TableName = nameof(TestSkill),
+                Record = Pack(Database.TestSkillTable.FindById(1003) with { Damage = 50 }),
+            });
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(skillChunk));
+            PumpUntil(() => MasterMemoryDebugRemote.IsTableLoaded(nameof(TestSkill)), "the skill table");
             var skills = Table<TestSkill>();
             Assert.AreEqual(3, skills.CreateRecordSnapshot().Count);
             Assert.AreEqual("skill 1001", skills.GetDisplayName(skills.CreateRecordSnapshot()[0].Original), "display names come from the game");
+
+            var enemiesManifest = Table<TestEnemyLevel>();
+            Assert.IsFalse(MasterMemoryDebugRemote.EnsureTableLoaded(enemiesManifest));
+            var enemyRequest = MasterMemoryRemoteProtocol.DecodeTableRequest(ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.TableRequest));
+            var enemyChunk = new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = enemyRequest.RequestId,
+                TableName = enemyRequest.TableName,
+                ChunkIndex = 0,
+                IsLast = true,
+            };
+            foreach (var record in Database.TestEnemyLevelTable.All) enemyChunk.Records.Add(Pack(record));
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(enemyChunk));
+            PumpUntil(() => MasterMemoryDebugRemote.IsTableLoaded(nameof(TestEnemyLevel)), "the enemy table");
             var enemies = Table<TestEnemyLevel>();
             Assert.AreEqual(typeof((int, int)), enemies.KeyType);
             Assert.IsTrue(enemies.TryFindOriginal((2, 1), out _), "composite keys are built from the [PrimaryKey] members");
@@ -422,7 +639,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
         [Test]
         public void Client_ShouldEditCustomValuesAndSendTheirRaw()
         {
-            RegisterTunings();
+            var tunings = RegisterTunings();
             var welcome = MasterMemoryRemoteServer.CreateWelcome();
             MasterMemoryDebugRegistry.ClearTables();
             MasterMemoryDebugRemote.IsToolMode = true;
@@ -439,8 +656,42 @@ namespace Nesh.MasterMemoryDebugger.Tests
             var table = Table<TestTuning>();
             var speed = table.TypeDescriptor.Fields.Single(x => x.Name == "Speed");
             Assert.IsTrue(speed.CanEdit, "the tool edits the members of its converters");
+            Assert.AreEqual(0, table.CreateRecordSnapshot().Count, "welcome contains metadata only");
+            Assert.IsFalse(MasterMemoryDebugRemote.EnsureTableLoaded(table));
+            var request = MasterMemoryRemoteProtocol.DecodeTableRequest(
+                ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.TableRequest));
+            var chunk = new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = request.RequestId,
+                TableName = request.TableName,
+                ChunkIndex = 0,
+                IsLast = true,
+            };
+            foreach (var tuning in tunings) chunk.Records.Add(Pack(tuning));
+            chunk.Overrides.Add(new MasterMemoryRemoteProtocol.Change
+            {
+                Kind = MasterMemoryRemoteProtocol.ChangeKind.Set,
+                TableName = nameof(TestTuning),
+                Record = Pack(tunings[0] with { Speed = TestFixed.FromRaw(25) }),
+            });
+            // A newer custom value arriving during loading must win over the chunk's older snapshot.
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(
+                new System.Collections.Generic.List<MasterMemoryRemoteProtocol.Change>
+                {
+                    new MasterMemoryRemoteProtocol.Change
+                    {
+                        Kind = MasterMemoryRemoteProtocol.ChangeKind.Set,
+                        TableName = nameof(TestTuning),
+                        Record = Pack(tunings[0] with { Speed = TestFixed.FromRaw(50) }),
+                    },
+                }));
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(chunk));
+            PumpUntil(() => MasterMemoryDebugRemote.IsTableLoaded(nameof(TestTuning)), "the custom values");
             var records = table.CreateRecordSnapshot();
             Assert.AreEqual(10000, ((TestTuning)records[1].Original).Speed.Raw, "the game's raw");
+            Assert.IsTrue(MasterMemoryDebugRuntime.TryGetOverride<TestTuning, int>(1, out var live));
+            Assert.AreEqual(50, live.Speed.Raw, "live custom values win over the older override snapshot");
+            Assert.AreEqual(2500, ((TestTuning)records[0].Original).Speed.Raw, "original records stay immutable");
 
             MasterMemoryBatchEdit.Apply(records.Take(1), speed, MasterMemoryBatchOperation.Set, "0.001");
             var changes = MasterMemoryRemoteProtocol.DecodeChanges(Receive(game, "the tool's change"));
@@ -461,18 +712,105 @@ namespace Nesh.MasterMemoryDebugger.Tests
         }
 
         [Test]
+        public void Protocol_GoldenHelloAndTableRequest_ShouldStayStable()
+        {
+            var hello = MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.Hello
+            {
+                Version = 6,
+                Code = "42",
+            });
+            Assert.AreEqual("0106000000023432", BitConverter.ToString(hello).Replace("-", "").ToLowerInvariant());
+
+            var request = MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableRequest
+            {
+                RequestId = "req",
+                TableName = "T",
+            });
+            Assert.AreEqual("0f037265710154", BitConverter.ToString(request).Replace("-", "").ToLowerInvariant());
+        }
+
+        [Test]
+        public void Protocol_ShouldRejectTruncatedFrame()
+        {
+            using var stream = new MemoryStream();
+            var header = BitConverter.GetBytes(4);
+            if (!BitConverter.IsLittleEndian) Array.Reverse(header);
+            stream.Write(header, 0, header.Length);
+            stream.WriteByte(1);
+            stream.WriteByte(2);
+            stream.Position = 0;
+
+            Assert.Throws<EndOfStreamException>(() => MasterMemoryRemoteProtocol.ReadFrame(stream));
+        }
+
+        [Test]
+        public void Protocol_ShouldRejectMismatchedChunkDisplayNames()
+        {
+            var payload = MasterMemoryRemoteProtocol.Encode(new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = "table",
+                TableName = "Skill",
+                ChunkIndex = 0,
+                IsLast = true,
+                Records =
+                {
+                    new byte[] { 1 },
+                    new byte[] { 2 },
+                },
+                DisplayNames = new System.Collections.Generic.List<string> { "only-one" },
+            });
+
+            Assert.Throws<InvalidDataException>(() => MasterMemoryRemoteProtocol.DecodeTableChunk(payload));
+        }
+
+        [Test]
+        public void Connection_ShouldCloseWhenIncomingQueueIsFull()
+        {
+            rawServer = new TcpListener(IPAddress.Loopback, 0);
+            rawServer.Start();
+            var listener = rawServer;
+            using var sender = new TcpClient();
+            sender.Connect(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port);
+            using var accepted = listener.AcceptTcpClient();
+            using var connection = new MasterMemoryRemoteConnection(accepted);
+            var stream = sender.GetStream();
+            var payload = MasterMemoryRemoteProtocol.EncodeReject("queued");
+
+            for (var i = 0; i < MasterMemoryRemoteConnection.MaxQueuedFrames + 2; i++)
+            {
+                try
+                {
+                    MasterMemoryRemoteProtocol.WriteFrame(stream, payload);
+                }
+                catch (IOException)
+                {
+                    break;
+                }
+            }
+
+            var watch = Stopwatch.StartNew();
+            while (!connection.IsClosed && watch.ElapsedMilliseconds < 5000)
+                System.Threading.Thread.Sleep(5);
+
+            Assert.IsTrue(connection.IsClosed);
+            StringAssert.Contains("incoming message queue", connection.CloseReason);
+        }
+
+        [Test]
         public void Protocol_ShouldRoundTrip()
         {
-            var welcome = new MasterMemoryRemoteProtocol.Welcome { Version = MasterMemoryRemoteProtocol.Version, ServerEpoch = "epoch", MasterVersion = "v", LabelsTsv = "x" };
-            welcome.Tables.Add(new MasterMemoryRemoteProtocol.Table { TableName = "T", RecordType = "R", KeyType = "K", Group = "", Records = { new byte[] { 1, 2 } }, DisplayNames = new System.Collections.Generic.List<string> { "a" } });
+            var welcome = new MasterMemoryRemoteProtocol.Welcome { Version = MasterMemoryRemoteProtocol.Version, ServerEpoch = "epoch", MasterVersion = "v", SchemaHash = "schema", LabelsTsv = "x" };
+            welcome.Tables.Add(new MasterMemoryRemoteProtocol.Table { TableName = "T", RecordType = "R", KeyType = "K", Group = "", RecordCount = 1, HasCustomDisplayName = true });
             welcome.Overrides.Add(new MasterMemoryRemoteProtocol.Change { IsSet = true, TableName = "T", Record = new byte[] { 3 } });
             welcome.Operations.Add(new MasterMemoryRemoteProtocol.Operation { Id = "refresh", Label = "Refresh", Context = "battle:1", Revision = 7 });
 
             var read = MasterMemoryRemoteProtocol.DecodeWelcome(MasterMemoryRemoteProtocol.Encode(welcome));
             Assert.AreEqual("v", read.MasterVersion);
-            CollectionAssert.AreEqual(new byte[] { 1, 2 }, read.Tables[0].Records[0]);
-            Assert.AreEqual("a", read.Tables[0].DisplayNames[0]);
-            Assert.IsTrue(read.Overrides[0].IsSet);
+            Assert.AreEqual("schema", read.SchemaHash);
+            Assert.AreEqual(1, read.Tables[0].RecordCount);
+            Assert.IsTrue(read.Tables[0].HasCustomDisplayName);
+            Assert.AreEqual(0, read.Tables[0].Records.Count);
+            Assert.AreEqual(0, read.Overrides.Count, "Welcome v6 does not carry override payloads");
             Assert.AreEqual("epoch", read.ServerEpoch);
             Assert.AreEqual("battle:1", read.Operations[0].Context);
             var request = new MasterMemoryRemoteProtocol.OperationRequest
@@ -483,6 +821,23 @@ namespace Nesh.MasterMemoryDebugger.Tests
             Assert.AreEqual("new", MasterMemoryRemoteProtocol.DecodeOperationResult(MasterMemoryRemoteProtocol.Encode(result)).NewSha);
             Assert.AreEqual("refresh", MasterMemoryRemoteProtocol.DecodeOperations(
                 MasterMemoryRemoteProtocol.EncodeOperations(welcome.Operations))[0].Id);
+            var tableRequest = new MasterMemoryRemoteProtocol.TableRequest { RequestId = "table-1", TableName = "T" };
+            Assert.AreEqual("T", MasterMemoryRemoteProtocol.DecodeTableRequest(
+                MasterMemoryRemoteProtocol.Encode(tableRequest)).TableName);
+            var tableChunk = new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = "table-1", TableName = "T", ChunkIndex = 0, IsLast = true,
+                Records = { new byte[] { 1, 2 } },
+                DisplayNames = new System.Collections.Generic.List<string> { "a" },
+            };
+            tableChunk.Overrides.Add(new MasterMemoryRemoteProtocol.Change
+            {
+                IsSet = true, TableName = "T", Record = new byte[] { 3 },
+            });
+            var readChunk = MasterMemoryRemoteProtocol.DecodeTableChunk(MasterMemoryRemoteProtocol.Encode(tableChunk));
+            CollectionAssert.AreEqual(new byte[] { 1, 2 }, readChunk.Records[0]);
+            Assert.AreEqual("a", readChunk.DisplayNames[0]);
+            CollectionAssert.AreEqual(new byte[] { 3 }, readChunk.Overrides[0].Record);
             Assert.Throws<System.IO.InvalidDataException>(() => MasterMemoryRemoteProtocol.DecodeHello(MasterMemoryRemoteProtocol.EncodeReject("no")));
         }
 
@@ -677,6 +1032,21 @@ namespace Nesh.MasterMemoryDebugger.Tests
                 new MasterMemoryRemoteProtocol.Failure { TableName = nameof(TestSkill), Key = "1001", Message = "Exists failed", IsNew = true },
             }));
             PumpUntil(() => !MasterMemoryDebugValidation.IsPending, "the results");
+
+            var request = MasterMemoryRemoteProtocol.DecodeTableRequest(
+                ReceiveOf(game, MasterMemoryRemoteProtocol.MessageType.TableRequest));
+            Assert.AreEqual(nameof(TestSkill), request.TableName);
+            var chunk = new MasterMemoryRemoteProtocol.TableChunk
+            {
+                RequestId = request.RequestId,
+                TableName = request.TableName,
+                ChunkIndex = 0,
+                IsLast = true,
+            };
+            foreach (var record in Database.TestSkillTable.All) chunk.Records.Add(Pack(record));
+            MasterMemoryRemoteProtocol.WriteFrame(game, MasterMemoryRemoteProtocol.Encode(chunk));
+            PumpUntil(() => MasterMemoryDebugRemote.IsTableLoaded(nameof(TestSkill)), "the validation table");
+
             var failures = MasterMemoryDebugValidation.Run();
             Assert.AreEqual(1, failures.Count);
             Assert.AreEqual(typeof(TestSkill), failures[0].RecordType);
@@ -773,7 +1143,7 @@ namespace Nesh.MasterMemoryDebugger.Tests
                 var game = search.Games.Single();
                 Assert.AreEqual("127.0.0.1", game.Address);
                 Assert.AreEqual(MasterMemoryDebugRemote.ServerPort, game.Port);
-                Assert.AreEqual("Harness", game.ProductName);
+                Assert.AreEqual(UnityEngine.Application.productName, game.ProductName);
 
                 MasterMemoryDebugRemote.Stop();
                 var none = new MasterMemoryRemoteDiscovery.Search(200);

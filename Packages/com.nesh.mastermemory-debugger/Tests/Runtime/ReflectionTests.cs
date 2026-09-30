@@ -172,6 +172,8 @@ namespace Nesh.MasterMemoryDebugger.Tests
         struct TypedId
         {
             public int Value;
+
+            public TypedId(int value) => Value = value;
         }
 
         [Test]

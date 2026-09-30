@@ -2,7 +2,7 @@
 
 All notable changes to this package are documented in this file.
 
-## [0.15.0] - 2026-09-29
+## [0.15.0] - 2026-09-30
 
 ### Added
 
@@ -10,7 +10,17 @@ All notable changes to this package are documented in this file.
 - A converter that is also an `IComparer` orders sorting and the `> >= < <=` query conditions; without it queries only compare with `=` / `!=`. A converter that is also an `IMasterDataValueDrawer` provides its own inspector editor.
 - `MasterDataValueKind.Custom` (added after the existing kinds), `MasterMemoryFieldDescriptor.Converter` / `ElementConverter`.
 - `MasterDataValueConverters.Register` returns a token that removes the converter when disposed (an empty token when the debugger is disabled). It throws `InvalidOperationException` for a type that already has a converter, after a table was registered (tables keep their member descriptors), and off the main thread; `ArgumentException` for simple, `Nullable<T>`, array, list and open types. Registrations are cleared at `SubsystemRegistration`.
-- The remote protocol (v5) and the patch format are unchanged. Register the same converters in the game (it reads patch values) and the remote editor tool (it edits them); the type's MessagePack formatter belongs in `MasterMemoryDebugRemote.SerializerOptions`.
+- Value converters retain the patch value format; the integrated remote transport uses protocol v6. Register the same converters in the game (it reads patch values) and the remote editor tool (it edits them); the type's MessagePack formatter belongs in `MasterMemoryDebugRemote.SerializerOptions`.
+
+- Shared transactional patch engine for local, auto-loaded and remote patches, with schema identity, atomic preflight, conflict checks and impact preview. Legacy patches without a schema hash retain partial-import compatibility.
+- Remote protocol v6: metadata-only Welcome, lazy chunked table records and override snapshots, bounded queues and replay caches, and replay of live changes after snapshots.
+- Saved Views, Diagnostics, explicit reference registration, a MasterMemory v3 adapter and runtime session ownership.
+- Modular Remote CLI, architecture/format verification, input consumer compile checks, robustness tests and CI coverage artifacts.
+
+### Changed
+
+- Split the former `Nesh.MasterMemoryDebugger.Runtime` assembly into Core, Remote, UI and an optional InputSystem adapter. The old Runtime GUID belongs to Core; name-based custom asmdefs must migrate and reference Remote/UI directly when used.
+- Game and remote tool must use the same protocol v6 package revision. Custom text converters belong to Core; converters implementing `IMasterDataValueDrawer` additionally require the UI assembly.
 
 ## [0.14.0] - 2026-09-28
 

@@ -43,6 +43,28 @@ namespace Nesh.MasterMemoryDebugger
 
         static readonly Regex s_exists = new Regex(@"^Exists failed: (\S+) -> (\S+), value =", RegexOptions.CultureInvariant);
         static readonly Dictionary<Type, IReadOnlyList<MasterMemoryReference>> s_cache = new Dictionary<Type, IReadOnlyList<MasterMemoryReference>>();
+        static readonly Dictionary<Type, List<MasterMemoryReference>> s_explicit =
+            new Dictionary<Type, List<MasterMemoryReference>>();
+
+        /// <summary>
+        /// Registers a reference explicitly. Explicit references are stable across MasterMemory validation message changes;
+        /// automatic IValidatable/Exists discovery remains as a fallback and is merged with them.
+        /// </summary>
+        public static void Register<TSource, TTarget, TValue>(
+            Expression<Func<TSource, TValue>> source,
+            Expression<Func<TTarget, TValue>> target)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            if (target == null) throw new ArgumentNullException(nameof(target));
+            var reference = new MasterMemoryReference(
+                typeof(TSource), MemberPath(source), typeof(TTarget), MemberPath(target));
+            if (!s_explicit.TryGetValue(typeof(TSource), out var list))
+                s_explicit.Add(typeof(TSource), list = new List<MasterMemoryReference>());
+            if (!list.Exists(x => x.SourceMember == reference.SourceMember
+                && x.TargetType == reference.TargetType && x.TargetMember == reference.TargetMember))
+                list.Add(reference);
+            s_cache.Remove(typeof(TSource));
+        }
 
         /// <summary>References from the records of <paramref name="table"/> (cached per record type).</summary>
         public static IReadOnlyList<MasterMemoryReference> Get(MasterMemoryTableDescriptor table)
@@ -60,12 +82,29 @@ namespace Nesh.MasterMemoryDebugger
                     records.Add(record.Original);
                     if (records.Count >= MaxScannedRecords) break;
                 }
-                result = Discover(table.RecordType, records);
+                var discovered = Discover(table.RecordType, records);
+                if (!s_explicit.TryGetValue(table.RecordType, out var explicitReferences) || explicitReferences.Count == 0)
+                {
+                    result = discovered;
+                }
+                else
+                {
+                    var merged = new List<MasterMemoryReference>(explicitReferences);
+                    foreach (var reference in discovered)
+                    {
+                        if (!merged.Exists(x => x.SourceMember == reference.SourceMember
+                            && x.TargetType == reference.TargetType && x.TargetMember == reference.TargetMember))
+                            merged.Add(reference);
+                    }
+                    result = merged;
+                }
             }
             catch (Exception e)
             {
                 MasterMemoryDebugLog.Warning($"Could not read the references of {table.TableName}: {(e.InnerException ?? e).Message}");
-                result = Array.Empty<MasterMemoryReference>();
+                result = s_explicit.TryGetValue(table.RecordType, out var explicitReferences)
+                    ? new List<MasterMemoryReference>(explicitReferences)
+                    : (IReadOnlyList<MasterMemoryReference>)Array.Empty<MasterMemoryReference>();
             }
             s_cache[table.RecordType] = result;
             return result;
@@ -133,6 +172,30 @@ namespace Nesh.MasterMemoryDebugger
         }
 
         internal static void ClearCache() => s_cache.Clear();
+
+        internal static void Reset()
+        {
+            s_cache.Clear();
+            s_explicit.Clear();
+        }
+
+        static string MemberPath(LambdaExpression expression)
+        {
+            Expression node = expression.Body;
+            if (node is UnaryExpression unary
+                && (unary.NodeType == ExpressionType.Convert || unary.NodeType == ExpressionType.ConvertChecked))
+                node = unary.Operand;
+
+            var names = new Stack<string>();
+            while (node is MemberExpression member)
+            {
+                names.Push(member.Member.Name);
+                node = member.Expression;
+            }
+            if (!(node is ParameterExpression) || names.Count == 0)
+                throw new ArgumentException("Reference expressions must be direct member paths.", nameof(expression));
+            return string.Join(".", names);
+        }
 
         internal static IReadOnlyList<MasterMemoryReference> Discover(Type recordType, IEnumerable<object> records)
         {

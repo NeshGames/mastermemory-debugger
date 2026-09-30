@@ -12,10 +12,16 @@ namespace Nesh.MasterMemoryDebugger
     /// </summary>
     internal sealed class MasterMemoryRemoteConnection : IDisposable
     {
+        // Frames can be large (table snapshots), so cap queued frame counts on both directions.
+        // If either side stops consuming, fail the connection instead of retaining unbounded byte arrays.
+        internal const int MaxQueuedFrames = 32;
+
         readonly TcpClient client;
         readonly NetworkStream stream;
-        readonly ConcurrentQueue<byte[]> received = new ConcurrentQueue<byte[]>();
-        readonly BlockingCollection<byte[]> outgoing = new BlockingCollection<byte[]>();
+        readonly BlockingCollection<byte[]> received =
+            new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>(), MaxQueuedFrames);
+        readonly BlockingCollection<byte[]> outgoing =
+            new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>(), MaxQueuedFrames);
         readonly Thread readThread;
         readonly Thread writeThread;
         volatile bool closed;
@@ -42,18 +48,28 @@ namespace Nesh.MasterMemoryDebugger
 
         public void Send(byte[] payload)
         {
-            if (closed) return;
+            if (!TrySend(payload) && !closed)
+                Close("Connection closed because the outgoing message queue is full.");
+        }
+
+        /// <summary>
+        /// Queues a frame without blocking. Used by chunked transfers to apply backpressure instead of closing when the
+        /// writer has not drained the bounded queue yet.
+        /// </summary>
+        public bool TrySend(byte[] payload)
+        {
+            if (closed) return false;
             try
             {
-                outgoing.Add(payload);
+                return outgoing.TryAdd(payload);
             }
             catch (InvalidOperationException)
             {
-                // closed meanwhile
+                return false;
             }
         }
 
-        public bool TryReceive(out byte[] payload) => received.TryDequeue(out payload);
+        public bool TryReceive(out byte[] payload) => received.TryTake(out payload);
 
         /// <summary>Sends the queued messages, then closes (used after a Reject).</summary>
         public void CloseAfterSending()
@@ -78,7 +94,11 @@ namespace Nesh.MasterMemoryDebugger
                         Close("The other side closed the connection.");
                         return;
                     }
-                    received.Enqueue(payload);
+                    if (!received.TryAdd(payload))
+                    {
+                        Close("Connection closed because the incoming message queue is full.");
+                        return;
+                    }
                 }
             }
             catch (Exception e) when (e is IOException || e is SocketException || e is ObjectDisposedException || e is InvalidDataException)

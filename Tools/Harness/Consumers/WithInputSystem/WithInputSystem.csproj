@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>Harness.WithInputSystem.Consumer</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>$(ExtraDefines)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Consumer.cs" />
+    <ProjectReference Include="../../UI/UI.csproj" />
+    <ProjectReference Include="../../InputSystem/InputSystem.csproj" />
+    <ProjectReference Include="../../InputSystemStubs/InputSystemStubs.csproj" />
+  </ItemGroup>
+</Project>

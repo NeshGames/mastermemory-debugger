@@ -21,24 +21,24 @@ namespace Nesh.MasterMemoryDebugger
         [Serializable]
         sealed class CatalogAsset
         {
-            public string language;
-            public string displayName;
-            public TextEntry[] strings;
-            public PatternEntry[] patterns;
+            public string language = null;
+            public string displayName = null;
+            public TextEntry[] strings = null;
+            public PatternEntry[] patterns = null;
         }
 
         [Serializable]
         sealed class TextEntry
         {
-            public string key;
-            public string value;
+            public string key = null;
+            public string value = null;
         }
 
         [Serializable]
         sealed class PatternEntry
         {
-            public string pattern;
-            public string replacement;
+            public string pattern = null;
+            public string replacement = null;
         }
 
         sealed class Catalog
